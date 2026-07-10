@@ -28,3 +28,4 @@ Thumbs.db
 # File sementara migrate/patch (tidak diperlukan di repo produksi)
 patch-*.ts
 test-*.ts
+firebase-applet-config.json
