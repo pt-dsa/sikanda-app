@@ -60,7 +60,7 @@ function Bubble({ msg }: { key?: any; msg: ChatMsg }) {
       <div className={`flex items-end gap-2 max-w-[85%] sm:max-w-[75%] ${isUser ? "flex-row-reverse" : ""}`}>
         {!isUser && (
           <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
-            <img src="/logo simosda.png" alt="SIKANDA" className="w-full h-full object-contain p-1" />
+            <img src={`${import.meta.env.BASE_URL}logo_simosda.png`} alt="SIKANDA" className="w-full h-full object-contain p-1" />
           </div>
         )}
         <div
@@ -95,7 +95,7 @@ function TypingIndicator() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
       <div className="flex items-end gap-2">
         <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
-          <img src="/logo simosda.png" alt="SIKANDA" className="w-full h-full object-contain p-1" />
+          <img src={`${import.meta.env.BASE_URL}logo_simosda.png`} alt="SIKANDA" className="w-full h-full object-contain p-1" />
         </div>
         <div className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-md shadow-sm">
           <div className="flex gap-1">
@@ -264,7 +264,7 @@ export default function TanyaSikanda() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
             <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm overflow-hidden">
-              <img src="/logo simosda.png" alt="SIKANDA" className="w-full h-full object-contain p-1" />
+              <img src={`${import.meta.env.BASE_URL}logo_simosda.png`} alt="SIKANDA" className="w-full h-full object-contain p-1" />
             </div>
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full" />
           </div>

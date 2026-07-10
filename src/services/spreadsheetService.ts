@@ -554,21 +554,17 @@ export const spreadsheetService = {
       pegawaiResult,
       vehiclesResult,
       equipmentResult,
-      inventoryResult,
-      loansResult,
-      maintenanceResult,
-      budgetsResult,
-      forecastResult,
+      loansResult
     ] = await Promise.allSettled([
       this.getPegawai(),
       this.getVehicles(),
       this.getEquipment(),
-      this.getInventory(),
       this.getLoans(),
-      this.getMaintenance(),
-      this.getBudgets(),
-      this.getMaintenanceForecast(),
     ]);
+    const inventoryResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
+    const maintenanceResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
+    const budgetsResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
+    const forecastResult = { status: "fulfilled", value: { avgMonthlyCost: 0, sixMonthTotal: 0, forecastData: [] } } as PromiseSettledResult<any>;
 
     // Ambil nilai; jika gagal, log warning dan gunakan array/default kosong
     const safeArray = (r: PromiseSettledResult<any[]>) => r.status === "fulfilled" ? r.value : [];

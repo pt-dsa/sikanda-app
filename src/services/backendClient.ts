@@ -4,33 +4,42 @@ import { getFirebaseIdToken } from "@/lib/firebase";
 export type BackendPayload = Record<string, any>;
 export type BackendAuth = { idToken?: string };
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-async function waitForFirebaseIdToken(timeoutMs = 5000): Promise<string | null> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    const token = await getFirebaseIdToken();
-    if (token) return token;
-    await sleep(120);
-  }
-  return getFirebaseIdToken();
-}
-
 async function buildAuth(explicitAuth?: BackendAuth): Promise<BackendAuth> {
   if (explicitAuth?.idToken) return { idToken: explicitAuth.idToken };
-  const idToken = await waitForFirebaseIdToken();
+  const idToken = await getFirebaseIdToken();
   if (!idToken) {
     throw new Error("Sesi login tidak ditemukan atau sudah kedaluwarsa. Silakan masuk ulang dengan Google.");
   }
   return { idToken };
 }
 
+let pendingRequests = 0;
+const requestQueue: Array<() => void> = [];
+async function acquireConcurrencySlot(): Promise<void> {
+  if (pendingRequests < 15) {
+    pendingRequests++;
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    requestQueue.push(resolve);
+  });
+}
+function releaseConcurrencySlot() {
+  if (requestQueue.length > 0) {
+    const next = requestQueue.shift();
+    if (next) next();
+  } else {
+    pendingRequests--;
+  }
+}
+
 export async function callBackend<T = any>(
   payload: BackendPayload,
   explicitAuth?: BackendAuth
 ): Promise<T> {
+  await acquireConcurrencySlot();
+  try {
+  
   if (!isBackendConfigured()) {
     throw new Error(
       "Backend Apps Script belum dikonfigurasi. Isi VITE_APPS_SCRIPT_URL di environment Google AI Studio atau GitHub Actions."
@@ -66,6 +75,9 @@ export async function callBackend<T = any>(
     throw new Error((json && json.error) || "Operasi gagal di server SIKANDA.");
   }
   return json as T;
+  } finally {
+    releaseConcurrencySlot();
+  }
 }
 
 export type SupabaseFilter = {

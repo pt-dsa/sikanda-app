@@ -12,6 +12,8 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence
 } from "firebase/auth";
 
 const env = import.meta.env;
@@ -35,6 +37,7 @@ export function isFirebaseConfigured(): boolean {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 export interface GoogleSignInResult {
   email: string;
@@ -61,13 +64,12 @@ export async function signInWithGoogle(): Promise<GoogleSignInResult> {
 
 /** Ambil idToken SEGAR dari sesi Firebase yang sedang berjalan. */
 export async function getFirebaseIdToken(): Promise<string | null> {
+  if (auth.authStateReady) {
+    await auth.authStateReady();
+  }
   const u = auth.currentUser;
   if (!u) return null;
-  try {
-    return await u.getIdToken();
-  } catch {
-    return null;
-  }
+  return await u.getIdToken();
 }
 
 export async function firebaseSignOut(): Promise<void> {

@@ -5,6 +5,7 @@ import {
   Settings, LogOut, Menu, Map, FileText, CalendarClock, Users, Bell, CalendarCheck, UserCog, ScanSearch, MessagesSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logoUrl from "@/assets/logo_kota_tangerang_selatan.png";
 import { withinMonths, buildPenjagaanEvents, sisaWaktuLabel, type PenjagaanEvent } from "@/lib/penjagaan";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/ui/GlobalSearch";
@@ -68,13 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
         } catch (e: any) {
           console.error("[SIKANDA] whoami error on auth sync:", e);
-          if (e?.message?.includes("Backend Apps Script belum dikonfigurasi")) {
-            // Biarkan sesi ada agar user bisa melihat pesan error spesifik di halaman
-            return;
-          }
-          await firebaseSignOut();
-          localStorage.removeItem(SESSION_KEY);
-          setUser(null);
+          // JANGAN sign out pengguna jika backend gagal (karena masalah jaringan, timeout, atau limit API).
+          // Jika token benar-benar kedaluwarsa, Firebase SDK akan mengetahuinya dan memanggil onFirebaseAuth(false).
         }
       } else if (!isDev) {
         localStorage.removeItem(SESSION_KEY);
@@ -182,7 +178,7 @@ function Sidebar({ mobileOpen, desktopOpen, setMobileOpen }: { mobileOpen: boole
     )}>
       <div className={cn("flex flex-col items-center justify-center border-b border-gray-100/50 dark:border-gray-800/50 overflow-hidden py-4", desktopOpen ? "px-4" : "md:px-2 md:justify-center px-4")}>
         <div className="flex flex-col items-center gap-2 text-blue-700 dark:text-blue-500 font-bold tracking-tight whitespace-nowrap neuglass rounded-2xl p-3 w-full">
-          <img src="/logo_kota_tangerang_selatan.png" alt="SIKANDA Logo" className="w-16 h-16 object-contain drop-shadow-sm" />
+          <img src={logoUrl} alt="SIKANDA Logo" className="w-16 h-16 object-contain drop-shadow-sm" />
           <span className={cn("transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-top text-lg w-[88.625px] text-center leading-[28px]", desktopOpen ? "opacity-100 scale-100 h-auto mt-1" : "md:opacity-0 md:scale-0 md:h-0 opacity-100 scale-100 h-auto mt-1")}>SIKANDA</span>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { DashboardMetrics } from "@/types";
 import { formatNumber, formatCurrency } from "@/lib/utils";
 import {
   Users, UserCheck, AlertTriangle, Clock, Calendar, Bell,
-  CarFront, Wrench, Package, Wallet, Banknote, Archive,
+  
   GraduationCap, Award, Timer, ShieldCheck, ClipboardList,
   ExternalLink, RefreshCw,
 } from "lucide-react";
@@ -71,7 +71,8 @@ function AlertCard({ title, count, subtitle, colorScheme, icon }: {
             {Array.from({ length: Math.min(count, 8) }).map((_, i) => <span key={i} className={`w-2 h-2 rounded-full ${P.dot}`} />)}
             {count > 8 && <span className="text-xs text-gray-500">+{count - 8}</span>}
           </div>
-        )}
+  
+      )}
       </div>
     </div>
   );
@@ -153,7 +154,8 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
               <summary className="text-xs text-amber-600 cursor-pointer hover:underline">Lihat detail teknis</summary>
               <p className="mt-1 text-xs font-mono bg-white/60 dark:bg-gray-900/40 p-2 rounded text-red-600 dark:text-red-400 break-all">{errorMsg}</p>
             </details>
-          )}
+    
+      )}
         </div>
       </div>
     </div>
@@ -220,9 +222,6 @@ export default function Dashboard() {
     ? new Intl.DateTimeFormat("id-ID", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(metrics.lastUpdated))
     : "—";
 
-  const budgetBarData = metrics
-    ? [{ name: "Anggaran", Pagu: metrics.totalPagu, Realisasi: metrics.totalRealisasi }]
-    : [];
 
   return (
     <motion.div className="space-y-8" variants={containerVars} initial="hidden" animate="show">
@@ -247,6 +246,7 @@ export default function Dashboard() {
         <motion.div variants={itemVars}>
           <PegawaiSetupGuide errorMsg={errorMsg || ""} onRetry={load} />
         </motion.div>
+
       )}
 
       {/* Fatal error non-pegawai */}
@@ -258,6 +258,7 @@ export default function Dashboard() {
             <p className="text-sm text-red-600 dark:text-red-500 mt-0.5">{errorMsg}</p>
           </div>
         </motion.div>
+
       )}
 
       {metrics && (
@@ -342,6 +343,7 @@ export default function Dashboard() {
                   <CardHeader className="pb-2">
                     <div className="flex items-center gap-2">
                       <ClipboardList size={16} className="text-amber-500" />
+                      <ClipboardList size={16} className="text-amber-500" />
                       <CardTitle className="text-sm">Kriteria yang Paling Sering Belum Terpenuhi</CardTitle>
                     </div>
                   </CardHeader>
@@ -388,7 +390,7 @@ export default function Dashboard() {
                             <Pie data={metrics.distribusiGolongan} cx="50%" cy="50%" innerRadius={42} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none">
                               {metrics.distribusiGolongan.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                             </Pie>
-                            <Tooltip formatter={(v: number) => [`${v} orang`, ""]} />
+                            <Tooltip formatter={(v) => [`${v} orang`, ""]} />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -411,6 +413,7 @@ export default function Dashboard() {
                   ) : <p className="text-sm text-gray-400 py-8">Data pegawai belum tersedia</p>}
                 </CardContent>
               </Card>
+              
               {/* Pendidikan */}
               <Card>
                 <CardHeader className="pb-2"><div className="flex items-center gap-2"><GraduationCap size={16} className="text-green-500" /><CardTitle className="text-sm">Distribusi Pendidikan</CardTitle></div></CardHeader>
@@ -424,74 +427,7 @@ export default function Dashboard() {
             </motion.div>
           </section>
 
-          {/* ── SECTION 4: Aset & Anggaran ── */}
-          <section>
-            <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-widest">
-              Metrik Aset dan Penganggaran
-            </h2>
-            <motion.div variants={itemVars} className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <KpiCard title="Total Aset" value={metrics.totalAset} icon={Package} colorClass="bg-purple-100/60 text-purple-600" />
-              <KpiCard title="Kendaraan" value={metrics.totalKendaraan} icon={CarFront} colorClass="bg-indigo-100/60 text-indigo-600" />
-              <KpiCard title="Alat & Mesin" value={metrics.totalAlatMesin} icon={Wrench} colorClass="bg-emerald-100/60 text-emerald-600" />
-              <KpiCard title="Inventaris" value={metrics.totalInventaris} icon={Archive} colorClass="bg-orange-100/60 text-orange-600" />
-            </motion.div>
-            <motion.div variants={itemVars} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <KpiCard title="Total Pagu" value={metrics.totalPagu} icon={Wallet} colorClass="bg-slate-100/60 text-slate-600" />
-                <KpiCard title="Total Realisasi" value={metrics.totalRealisasi} icon={Banknote} colorClass="bg-teal-100/60 text-teal-600" subtitle={`${metrics.persenRealisasi.toFixed(1)}% terserap`} />
-                <Card className="sm:col-span-2">
-                  <CardHeader><CardTitle>Pagu vs Realisasi Anggaran</CardTitle></CardHeader>
-                  <CardContent className="h-52">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={budgetBarData} layout="vertical" margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E3E3E3" />
-                        <XAxis type="number" tickFormatter={(v) => v >= 1e9 ? `Rp ${(v / 1e9).toFixed(1)} M` : `Rp ${(v / 1e6).toFixed(0)} Jt`} tick={{ fontSize: 11 }} />
-                        <YAxis dataKey="name" type="category" hide />
-                        <Tooltip formatter={(v: number) => formatCurrency(v)} cursor={false} />
-                        <Legend />
-                        <Bar dataKey="Pagu" fill="#0B57D0" radius={[0, 4, 4, 0]} barSize={28} />
-                        <Bar dataKey="Realisasi" fill="#16A34A" radius={[0, 4, 4, 0]} barSize={28} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              </div>
-              <Card className="flex flex-col">
-                <CardHeader><CardTitle>Distribusi Aset</CardTitle></CardHeader>
-                <CardContent className="flex flex-col items-center justify-center flex-1 pb-6">
-                  {metrics.totalAset > 0 ? (
-                    <>
-                      <div className="w-44 h-44 relative mb-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={[{ name: "Kendaraan", value: metrics.totalKendaraan }, { name: "Alat & Mesin", value: metrics.totalAlatMesin }, { name: "Inventaris", value: metrics.totalInventaris }]} cx="50%" cy="50%" innerRadius={58} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
-                              <Cell fill="#0B57D0" /><Cell fill="#34A853" /><Cell fill="#FBBC04" />
-                            </Pie>
-                            <Tooltip cursor={false} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{formatNumber(metrics.totalAset)}</span>
-                          <span className="text-xs text-gray-500">Total Aset</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 w-full">
-                        {[{ name: "Kendaraan", val: metrics.totalKendaraan, color: "#0B57D0" }, { name: "Alat & Mesin", val: metrics.totalAlatMesin, color: "#34A853" }, { name: "Inventaris", val: metrics.totalInventaris, color: "#FBBC04" }].map((item) => (
-                          <div key={item.name} className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">{item.name}</span>
-                            </div>
-                            <span className="text-sm font-bold text-gray-900 dark:text-gray-100 shrink-0">{formatNumber(item.val)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  ) : <p className="text-sm text-gray-400">Tidak ada data aset</p>}
-                </CardContent>
-              </Card>
-            </motion.div>
-          </section>
+
         </>
       )}
     </motion.div>

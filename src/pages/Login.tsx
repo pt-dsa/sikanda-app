@@ -3,6 +3,8 @@ import { Navigate } from "react-router-dom";
 import { LogIn, ShieldAlert } from "lucide-react";
 import { AuthContext } from "../components/layout/AppShell";
 import { motion } from "motion/react";
+import logoUrl from "@/assets/logo_kota_tangerang_selatan.png";
+import bgUrl from "@/assets/images_landingpage.png";
 
 export default function Login() {
   const [error, setError] = useState("");
@@ -27,13 +29,13 @@ export default function Login() {
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-cover bg-center bg-no-repeat bg-gray-900"
-      style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images_landingpage.png)` }}
+      style={{ backgroundImage: `url(${bgUrl})` }}
     >
       <div className="absolute inset-0 bg-black/10 dark:bg-black/40 backdrop-blur-[2px]"></div>
 
       <div className="w-full max-w-lg bg-white/40 dark:bg-gray-900/40 backdrop-blur-xl shadow-2xl border border-white/50 dark:border-gray-700/50 p-6 sm:p-10 rounded-[32px] relative z-10 transition-all duration-300 mx-4 mt-8 sm:-mt-16">
         <div className="flex flex-col items-center text-center w-[450px] h-[198.734px] mb-[31px] ml-0 max-w-full">
-          <img src={`${import.meta.env.BASE_URL}logo_kota_tangerang_selatan.png`} alt="SIKANDA Logo" className="w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] object-contain mb-5 drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <img src={logoUrl} alt="SIKANDA Logo" className="w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] object-contain mb-5 drop-shadow-md" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
           <h1 className="text-2xl sm:text-[27px] font-bold text-gray-900 dark:text-gray-100 tracking-tight">Selamat Datang di SIKANDA</h1>
           <p className="text-gray-700 dark:text-gray-300 text-[15px] w-[800px] max-w-full font-bold leading-[22.375px] font-[system-ui] mt-[6px] -ml-[6px] px-0">Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah</p>
         </div>
