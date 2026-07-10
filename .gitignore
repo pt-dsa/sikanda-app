@@ -1,0 +1,30 @@
+# Dependensi
+node_modules/
+
+# Build output (di-generate ulang oleh GitHub Actions)
+dist/
+build/
+
+# File lokal & sistem
+.DS_Store
+Thumbs.db
+*.log
+
+# Environment & secrets lokal (JANGAN dicommit)
+.env
+.env.local
+.env.*.local
+
+# Izinkan file contoh env
+!.env.example
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Editor
+.vscode/
+.idea/
+
+# File sementara migrate/patch (tidak diperlukan di repo produksi)
+patch-*.ts
+test-*.ts

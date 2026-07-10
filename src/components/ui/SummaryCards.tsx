@@ -1,0 +1,68 @@
+import React from "react";
+
+// Pola props mandiri + index signature (lihat catatan §3 handoff: @types/react
+// tidak terpasang → hindari `extends React.*HTMLAttributes`).
+export interface SummaryCardItem {
+  key: string;                       // nilai kanonik (value filter); "" = Total
+  label: string;
+  count: number;
+  tone?: { bg: string; text: string };
+}
+
+interface SummaryCardsProps {
+  items: SummaryCardItem[];          // bucket selain Total
+  totalLabel?: string;
+  totalCount: number;
+  activeKey: string;                 // "" berarti Total/semua sedang aktif
+  onSelect: (key: string) => void;   // "" untuk Total
+  className?: string;
+  [key: string]: any;
+}
+
+/**
+ * Baris kartu ringkasan klikable. Kartu pertama selalu "Total" (key ""), diikuti
+ * tiap bucket. Klik kartu memanggil onSelect(key). Kartu aktif diberi ring biru.
+ * Angka pada kartu HARUS berasal dari hitungan nyata pemanggil — komponen ini
+ * hanya menyajikan, tidak menghitung ulang.
+ */
+export function SummaryCards({
+  items,
+  totalLabel = "Total",
+  totalCount,
+  activeKey,
+  onSelect,
+  className = "",
+}: SummaryCardsProps) {
+  const cards: SummaryCardItem[] = [
+    { key: "", label: totalLabel, count: totalCount, tone: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-800 dark:text-gray-200" } },
+    ...items,
+  ];
+
+  // Kolom adaptif: 2 di mobile, sampai 5 di desktop (atau sejumlah kartu).
+  const cols = Math.min(cards.length, 5);
+  const lgCols = ["lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3", "lg:grid-cols-4", "lg:grid-cols-5"][cols - 1] || "lg:grid-cols-5";
+
+  return (
+    <div className={`grid grid-cols-2 ${lgCols} gap-3 ${className}`}>
+      {cards.map((c) => {
+        const active = activeKey === c.key;
+        const tone = c.tone || { bg: "bg-gray-50 dark:bg-gray-800/40", text: "text-gray-600 dark:text-gray-300" };
+        return (
+          <button
+            key={c.key || "__total__"}
+            onClick={() => onSelect(c.key)}
+            aria-pressed={active}
+            className={`${tone.bg} text-left rounded-3xl neu-raised p-4 border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+              active ? "border-blue-500 ring-2 ring-blue-500/40" : "border-white/40 dark:border-white/5"
+            }`}
+          >
+            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize pr-2 line-clamp-1" title={c.label}>
+              {c.label.toLowerCase()}
+            </p>
+            <p className={`text-2xl font-bold mt-1 ${tone.text}`}>{c.count}</p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
