@@ -66,7 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const fresh: AppUser = { email: res.email, role: res.role, nip: res.nip, nama: res.nama, is_active: true };
           setUser(fresh);
           localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
-        } catch {
+        } catch (e: any) {
+          console.error("[SIKANDA] whoami error on auth sync:", e);
+          if (e?.message?.includes("Backend Apps Script belum dikonfigurasi")) {
+            // Biarkan sesi ada agar user bisa melihat pesan error spesifik di halaman
+            return;
+          }
           await firebaseSignOut();
           localStorage.removeItem(SESSION_KEY);
           setUser(null);

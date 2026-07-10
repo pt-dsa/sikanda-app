@@ -229,23 +229,7 @@ function authenticate_(body) {
   throw new Error('Autentikasi gagal: idToken/secret tidak valid.');
 }
 
-// Verifikasi idToken via Identity Toolkit accounts:lookup (tanpa kripto manual).
-// Google menolak token tak valid/kedaluwarsa dengan kode non-200.
-function verifyFirebaseToken_(idToken) {
-  var url = 'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(FIREBASE_API_KEY);
-  var resp = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify({ idToken: idToken }),
-    muteHttpExceptions: true
-  });
-  if (resp.getResponseCode() !== 200) return null;
-  var data;
-  try { data = JSON.parse(resp.getContentText()); } catch (e) { return null; }
-  if (!data || !data.users || !data.users.length) return null;
-  var u = data.users[0];
-  return { email: u.email, email_verified: (u.emailVerified === true) };
-}
+// Cek token via Identity Toolkit.
 
 // Cocokkan email → peran via Supabase `app_access` (+ BOOTSTRAP_ADMIN_EMAIL).
 // MIGRASI TOTAL: sumber tunggal akun = Supabase; sheet legacy hanya fallback
@@ -1262,10 +1246,13 @@ function verifyFirebaseToken_(idToken) {
     payload: JSON.stringify({ idToken: idToken }),
     muteHttpExceptions: true
   });
-  if (resp.getResponseCode() !== 200) return null;
+  if (resp.getResponseCode() !== 200) {
+    var errText = resp.getContentText();
+    throw new Error('Verifikasi token Firebase gagal: ' + errText);
+  }
   var data;
-  try { data = JSON.parse(resp.getContentText()); } catch (e) { return null; }
-  if (!data || !data.users || !data.users.length) return null;
+  try { data = JSON.parse(resp.getContentText()); } catch (e) { throw new Error('Respons Firebase tidak valid.'); }
+  if (!data || !data.users || !data.users.length) throw new Error('Token Firebase tidak memiliki info pengguna.');
   var u = data.users[0];
   var result = { email: u.email, email_verified: (u.emailVerified === true) };
   cache.put(cacheKey, JSON.stringify(result), 300); // Cache 5 menit
