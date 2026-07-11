@@ -16,7 +16,7 @@ var SUPABASE_ANON_KEY = scriptProp_('SUPABASE_ANON_KEY', '');
 var SUPABASE_SERVICE_ROLE_KEY = scriptProp_('SUPABASE_SERVICE_ROLE_KEY', '');
 var FIREBASE_API_KEY = scriptProp_('FIREBASE_API_KEY', '');
 var GEMINI_API_KEY = scriptProp_('GEMINI_API_KEY', '');
-var GEMINI_MODEL = scriptProp_('GEMINI_MODEL', 'gemini-2.0-flash');
+var GEMINI_MODEL = scriptProp_('GEMINI_MODEL', 'gemini-2.5-flash');
 var BOOTSTRAP_ADMIN_EMAIL = scriptProp_('BOOTSTRAP_ADMIN_EMAIL', '');
 var DRIVE_FOLDER_NAME = scriptProp_('DRIVE_FOLDER_NAME', 'SIKANDA_Foto_Pegawai');
 
@@ -29,8 +29,8 @@ var AI_RATE_LIMIT_SECONDS = 600;
 
 var ACTIVE_DATA_TABLES = ['pegawai', 'assets_vehicle', 'assets_equipment', 'asset_locations', 'system_config'];
 var DEFERRED_V2_TABLES = ['assets_inventory', 'vehicle_budget', 'maintenance', 'loans'];
-var SAFE_CONFIG_KEYS = ['KGB_CYCLE_YEARS', 'PANGKAT_CYCLE_YEARS', 'BUP_USIA', 'NOTIF_WINDOW_HARI'];
-var MANAGED_CONFIG_KEYS = SAFE_CONFIG_KEYS.concat(['NOTIF_ADMIN_EMAIL', 'NOTIF_COOLDOWN_DAYS']);
+var SAFE_CONFIG_KEYS = ['KGB_CYCLE_YEARS', 'PANGKAT_CYCLE_YEARS', 'BUP_USIA'];
+var MANAGED_CONFIG_KEYS = SAFE_CONFIG_KEYS.slice();
 
 var EMPLOYEE_EDITABLE_FIELDS = [
   'foto', 'kontak', 'email', 'tingkat', 'pendidikan_jurusan', 'universitas',
@@ -97,7 +97,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.0-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.1-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -489,6 +489,13 @@ function savePegawai_(actor, data, isNew) {
   }
   if (isManager_(actor) && Object.prototype.hasOwnProperty.call(data, 'status')) {
     var status = String(data.status || '').toUpperCase().trim();
+    if (status === 'PPPK_PENUH_WAKTU' || status === 'PPPK (PENUH WAKTU)') {
+      status = 'PPPK';
+      data.kategori_pppk = 'penuh_waktu';
+    } else if (status === 'PPPK_PARUH_WAKTU' || status === 'PPPK (PARUH WAKTU)') {
+      status = 'PPPK';
+      data.kategori_pppk = 'paruh_waktu';
+    }
     if (['ASN', 'PPPK', 'PENSIUN'].indexOf(status) === -1) throw publicError_('Status pegawai tidak valid.');
     data.status = status;
     if (status === 'PPPK') {
@@ -662,15 +669,9 @@ function getPublicConfig_() {
 }
 
 function validatedConfigValue_(key, value) {
-  if (key === 'NOTIF_ADMIN_EMAIL') {
-    var email = String(value || '').trim();
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw publicError_('Email notifikasi tidak valid.');
-    return email;
-  }
   var number = parseInt(value, 10);
   var ranges = {
-    KGB_CYCLE_YEARS: [1, 10], PANGKAT_CYCLE_YEARS: [1, 10], BUP_USIA: [50, 70],
-    NOTIF_WINDOW_HARI: [1, 730], NOTIF_COOLDOWN_DAYS: [1, 30]
+    KGB_CYCLE_YEARS: [1, 10], PANGKAT_CYCLE_YEARS: [1, 10], BUP_USIA: [50, 70]
   };
   if (!ranges[key] || isNaN(number) || number < ranges[key][0] || number > ranges[key][1]) {
     throw publicError_('Konfigurasi ' + key + ' berada di luar rentang yang diizinkan.');
@@ -684,7 +685,7 @@ function setConfig_(actor, key, value) {
   var cleanValue = validatedConfigValue_(key, value);
   var payload = { key: key, value: cleanValue, updated_at: new Date().toISOString() };
   supaRequest_('post', 'system_config?on_conflict=key', payload, 'resolution=merge-duplicates,return=representation');
-  auditLog_(actor, 'config.update', 'system_config', key, { value: key === 'NOTIF_ADMIN_EMAIL' ? '[REDACTED]' : cleanValue });
+  auditLog_(actor, 'config.update', 'system_config', key, { value: cleanValue });
   return { ok: true, key: key, value: cleanValue };
 }
 
@@ -780,7 +781,7 @@ function aiAsk_(actor, body) {
     'Jaga kerahasiaan data dan jangan menampilkan data di luar lingkup hak pengguna. ' + scopeText + '\n\n' +
     '<DATA_SIKANDA>\n' + context + '\n</DATA_SIKANDA>';
 
-  var response = UrlFetchApp.fetch(AI_ENDPOINT_BASE + encodeURIComponent(GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY), {
+  var response = fetchGeminiWithRetry_({
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     payload: JSON.stringify({
       system_instruction: { parts: [{ text: systemText }] }, contents: contents,
@@ -788,7 +789,10 @@ function aiAsk_(actor, body) {
     })
   });
   if (response.getResponseCode() !== 200) {
-    console.error('[SIKANDA][Gemini] HTTP ' + response.getResponseCode() + ': ' + response.getContentText().substring(0, 1000));
+    var geminiCode = response.getResponseCode();
+    console.error('[SIKANDA][Gemini] HTTP ' + geminiCode + ' pada model ' + GEMINI_MODEL + '.');
+    if (geminiCode === 404) throw publicError_('Model Tanya SIKANDA belum tersedia. Administrator perlu memeriksa GEMINI_MODEL di Apps Script.');
+    if (geminiCode === 429) throw publicError_('Tanya SIKANDA sedang ramai. Silakan coba kembali beberapa saat lagi.');
     throw publicError_('Tanya SIKANDA sedang beristirahat sebentar. Silakan coba kembali beberapa saat lagi.');
   }
   var result = JSON.parse(response.getContentText() || '{}');
@@ -798,6 +802,19 @@ function aiAsk_(actor, body) {
   if (!answer) throw publicError_('Tanya SIKANDA belum memperoleh jawaban yang tepat. Silakan coba dengan kalimat berbeda.');
   auditLog_(actor, 'ai.ask', 'tanya_sikanda', '', { question_length: question.length });
   return { ok: true, answer: answer, model: GEMINI_MODEL };
+}
+
+function fetchGeminiWithRetry_(options) {
+  var url = AI_ENDPOINT_BASE + encodeURIComponent(GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+  var response = null;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    response = UrlFetchApp.fetch(url, options);
+    var code = response.getResponseCode();
+    if (code === 200) return response;
+    if (code !== 429 && code < 500) return response;
+    if (attempt < 2) Utilities.sleep((attempt + 1) * 750);
+  }
+  return response;
 }
 
 function enforceAiRateLimit_(email) {
@@ -861,25 +878,31 @@ function employmentRules_(row) {
 }
 
 function kirimNotifikasiBukuPenjagaan() {
-  return runNotifications_(false, { email: '(system-trigger)', role: 'admin', nama: 'System Trigger' });
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    return runNotifications_(false, { email: '(system-trigger)', role: 'admin', nama: 'System Trigger' });
+  } finally {
+    try { lock.releaseLock(); } catch (ignore) {}
+  }
 }
 
 function runNotifications_(force, actor) {
   var todayKey = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
   var properties = PropertiesService.getScriptProperties();
-  if (!force && properties.getProperty('NOTIF_LAST_RUN_DATE') === todayKey) {
+  if (!force && properties.getProperty('NOTIF_LAST_SUCCESS_DATE') === todayKey) {
     return { ok: true, skipped: true, agenda: 0, email_terkirim: 0, note: 'Notifikasi hari ini sudah dijalankan.' };
   }
   var config = getConfig_();
   var kgbCycle = intConfig_(config, 'KGB_CYCLE_YEARS', 2);
   var rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4);
   var bupAge = intConfig_(config, 'BUP_USIA', 58);
-  var windowDays = intConfig_(config, 'NOTIF_WINDOW_HARI', 180);
-  var adminEmail = String(config.NOTIF_ADMIN_EMAIL || '').trim();
   var employees = supaGet_('pegawai?select=*&limit=5000').filter(function (row) { return isActive_(row.is_active); });
   var today = startOfDay_(new Date());
-  var end = new Date(today.getTime() + windowDays * 86400000);
-  var summaries = [], personal = {};
+  var lastSuccess = force ? null : parseDate_(properties.getProperty('NOTIF_LAST_SUCCESS_DATE'));
+  var intervalStart = lastSuccess && lastSuccess < today ? lastSuccess : new Date(today.getTime() - 86400000);
+  var summaries = [];
+  var reminders = [];
 
   for (var i = 0; i < employees.length; i++) {
     var row = employees[i];
@@ -888,43 +911,182 @@ function runNotifications_(force, actor) {
     if (!name) continue;
     var tmt = row.tgl_mulai_golongan || row.terhitung_mulai_tanggal_golongan;
     var birth = row.tgl_lahir || row.tanggal_lahir;
-    var events = [];
-    if (rules.kgb) addUpcomingEvent_(events, 'KGB (Kenaikan Gaji Berkala)', nextCycleDate_(tmt, kgbCycle), today, end);
-    if (rules.pangkat) addUpcomingEvent_(events, 'Kenaikan Pangkat', nextCycleDate_(tmt, rankCycle), today, end);
-    if (rules.bup) addUpcomingEvent_(events, 'Batas Usia Pensiun (BUP)', pensionDate_(birth, bupAge), today, end);
-    if (!events.length) continue;
-    for (var e = 0; e < events.length; e++) summaries.push({ nama: name, nip: row.nip, jenis: events[e].jenis, tanggal: events[e].tanggal });
-    var email = String(row.email || '').toLowerCase().trim();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) personal[email] = { nama: name, events: events };
+    if (rules.kgb) collectSixMonthReminder_(reminders, row, name, 'KGB', 'KGB (Kenaikan Gaji Berkala)', nextCycleDate_(tmt, kgbCycle), intervalStart, today);
+    if (rules.pangkat) collectSixMonthReminder_(reminders, row, name, 'PANGKAT', 'Kenaikan Pangkat', nextCycleDate_(tmt, rankCycle), intervalStart, today);
+    if (rules.bup) collectSixMonthReminder_(reminders, row, name, 'BUP', 'Batas Usia Pensiun (BUP)', pensionDate_(birth, bupAge), intervalStart, today);
+  }
+
+  var sentRows = supaGet_('notification_logs?select=event_key,status&notification_kind=eq.employee&due_date=gte.' + todayKey + '&limit=5000');
+  var alreadySent = {};
+  for (var s = 0; s < sentRows.length; s++) {
+    if (String(sentRows[s].status || '').toLowerCase() === 'sent') alreadySent[String(sentRows[s].event_key || '')] = true;
   }
 
   var remaining = MailApp.getRemainingDailyQuota();
-  var sent = 0;
-  for (var recipient in personal) {
-    if (!Object.prototype.hasOwnProperty.call(personal, recipient) || remaining <= 0) break;
-    var person = personal[recipient];
-    MailApp.sendEmail({
-      to: recipient,
-      subject: 'SIKANDA - Pengingat Buku Penjagaan',
-      htmlBody: notificationHtml_(person.nama, person.events)
-    });
-    remaining--; sent++;
+  var employeeSent = 0;
+  var adminSent = 0;
+  var complete = true;
+  for (var r = 0; r < reminders.length; r++) {
+    var reminder = reminders[r];
+    var recipient = String(reminder.email || '').toLowerCase().trim();
+    var summary = {
+      nama: reminder.nama, nip: reminder.nip, jenis: reminder.jenis,
+      tanggal: reminder.tanggal, eventKey: reminder.eventKey, status: ''
+    };
+    summaries.push(summary);
+    if (alreadySent[reminder.eventKey] || properties.getProperty(notificationFallbackKey_(reminder.eventKey)) === 'sent') {
+      summary.status = 'Sudah terkirim ke pegawai';
+      continue;
+    }
+    if (!isValidEmail_(recipient)) {
+      summary.status = 'Tidak terkirim: email pegawai belum valid';
+      continue;
+    }
+    if (remaining <= 0) {
+      summary.status = 'Ditunda: kuota email harian habis';
+      complete = false;
+      continue;
+    }
+    try {
+      MailApp.sendEmail({
+        to: recipient,
+        subject: 'SIKANDA - Pengingat ' + reminder.jenis,
+        htmlBody: notificationHtml_(reminder.nama, [reminder])
+      });
+      remaining--;
+      employeeSent++;
+      summary.status = 'Terkirim ke pegawai';
+      properties.setProperty(notificationFallbackKey_(reminder.eventKey), 'sent');
+      logNotificationSent_({
+        event_key: reminder.eventKey,
+        notification_kind: 'employee',
+        recipient_email: recipient,
+        employee_nip: reminder.nip,
+        event_type: reminder.jenisCode,
+        due_date: formatDateKey_(reminder.tanggal),
+        reminder_date: formatDateKey_(reminder.reminderDate),
+        status: 'sent',
+        sent_at: new Date().toISOString()
+      });
+      properties.deleteProperty(notificationFallbackKey_(reminder.eventKey));
+    } catch (mailErr) {
+      console.error('[SIKANDA][Notifikasi] Gagal mengirim ke pegawai ' + reminder.nip + ': ' + String(mailErr && mailErr.message || mailErr));
+      summary.status = 'Ditunda: layanan email gagal';
+      complete = false;
+    }
   }
-  if (adminEmail && summaries.length && remaining > 0) {
-    MailApp.sendEmail({
-      to: adminEmail,
-      subject: 'SIKANDA - Rekap Buku Penjagaan (' + summaries.length + ' agenda)',
-      htmlBody: adminNotificationHtml_(summaries, windowDays)
-    });
-    sent++;
+
+  var managers = managerNotificationEmails_();
+  if (summaries.length) {
+    var summaryDigest = notificationDigest_(summaries.map(function (item) { return item.eventKey; }).sort().join('|'));
+    for (var m = 0; m < managers.length; m++) {
+      var managerEmail = managers[m];
+      var recapKey = 'ADMIN|' + managerEmail + '|' + summaryDigest;
+      var recapExisting = supaGet_('notification_logs?select=event_key&event_key=eq.' + encodeURIComponent(recapKey) + '&status=eq.sent&limit=1');
+      if (recapExisting.length || properties.getProperty(notificationFallbackKey_(recapKey)) === 'sent') continue;
+      if (remaining <= 0) { complete = false; break; }
+      try {
+        MailApp.sendEmail({
+          to: managerEmail,
+          subject: 'SIKANDA - Rekap Notifikasi Buku Penjagaan (' + summaries.length + ' agenda)',
+          htmlBody: adminNotificationHtml_(summaries)
+        });
+        remaining--;
+        adminSent++;
+        properties.setProperty(notificationFallbackKey_(recapKey), 'sent');
+        logNotificationSent_({
+          event_key: recapKey,
+          notification_kind: 'admin_summary',
+          recipient_email: managerEmail,
+          event_type: 'REKAP',
+          due_date: todayKey,
+          reminder_date: todayKey,
+          status: 'sent',
+          sent_at: new Date().toISOString()
+        });
+        properties.deleteProperty(notificationFallbackKey_(recapKey));
+      } catch (adminMailErr) {
+        console.error('[SIKANDA][Notifikasi] Gagal mengirim rekap Administrator: ' + String(adminMailErr && adminMailErr.message || adminMailErr));
+        complete = false;
+      }
+    }
   }
-  properties.setProperty('NOTIF_LAST_RUN_DATE', todayKey);
-  auditLog_(actor, 'notification.run', 'buku_penjagaan', todayKey, { agenda: summaries.length, sent: sent });
-  return { ok: true, agenda: summaries.length, email_terkirim: sent };
+
+  if (complete) properties.setProperty('NOTIF_LAST_SUCCESS_DATE', todayKey);
+  auditLog_(actor, 'notification.run', 'buku_penjagaan', todayKey, {
+    agenda: summaries.length, employee_sent: employeeSent, admin_sent: adminSent, complete: complete
+  });
+  return {
+    ok: true,
+    agenda: summaries.length,
+    email_pegawai_terkirim: employeeSent,
+    email_rekap_terkirim: adminSent,
+    email_terkirim: employeeSent + adminSent,
+    complete: complete
+  };
 }
 
-function addUpcomingEvent_(events, label, date, start, end) {
-  if (date && date >= start && date <= end) events.push({ jenis: label, tanggal: date });
+function collectSixMonthReminder_(out, row, name, code, label, dueDate, intervalStart, today) {
+  if (!dueDate || dueDate < today) return;
+  var reminderDate = calendarMonthsBefore_(dueDate, 6);
+  if (!(reminderDate > intervalStart && reminderDate <= today)) return;
+  var nip = String(row.nip || '').trim();
+  var dueKey = formatDateKey_(dueDate);
+  out.push({
+    eventKey: [nip, code, dueKey].join('|'),
+    nip: nip,
+    nama: name,
+    email: String(row.email || '').trim(),
+    jenisCode: code,
+    jenis: label,
+    tanggal: dueDate,
+    reminderDate: reminderDate
+  });
+}
+
+function calendarMonthsBefore_(date, months) {
+  var year = date.getFullYear();
+  var month = date.getMonth() - months;
+  while (month < 0) { month += 12; year--; }
+  var day = Math.min(date.getDate(), new Date(year, month + 1, 0).getDate());
+  return startOfDay_(new Date(year, month, day));
+}
+
+function formatDateKey_(date) {
+  return Utilities.formatDate(date, 'Asia/Jakarta', 'yyyy-MM-dd');
+}
+
+function isValidEmail_(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').toLowerCase().trim());
+}
+
+function managerNotificationEmails_() {
+  var rows = supaGet_('app_access?select=email,role,is_active&or=(role.eq.admin,role.eq.pimpinan)&limit=100');
+  var seen = {};
+  var emails = [];
+  for (var i = 0; i < rows.length; i++) {
+    var email = String(rows[i].email || '').toLowerCase().trim();
+    if (isActive_(rows[i].is_active) && isValidEmail_(email) && !seen[email]) {
+      seen[email] = true;
+      emails.push(email);
+    }
+  }
+  var bootstrap = String(BOOTSTRAP_ADMIN_EMAIL || '').toLowerCase().trim();
+  if (isValidEmail_(bootstrap) && !seen[bootstrap]) emails.push(bootstrap);
+  return emails;
+}
+
+function notificationDigest_(value) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value || ''));
+  return bytesToHex_(digest).substring(0, 32);
+}
+
+function notificationFallbackKey_(eventKey) {
+  return 'NOTIF_SENT_' + notificationDigest_(eventKey);
+}
+
+function logNotificationSent_(row) {
+  supaRequest_('post', 'notification_logs?on_conflict=event_key', row, 'resolution=ignore-duplicates,return=minimal');
 }
 
 function notificationHtml_(name, events) {
@@ -939,17 +1101,19 @@ function notificationHtml_(name, events) {
     '<p style="font-size:12px;color:#64748b">Email otomatis SIKANDA. Silakan berkoordinasi dengan pengelola kepegawaian.</p></div>';
 }
 
-function adminNotificationHtml_(items, windowDays) {
+function adminNotificationHtml_(items) {
   var rows = items.map(function (item) {
     return '<tr><td style="padding:7px;border:1px solid #dbe3ef">' + escapeHtml_(item.nama) + '</td>' +
       '<td style="padding:7px;border:1px solid #dbe3ef">' + escapeHtml_(String(item.nip || '')) + '</td>' +
       '<td style="padding:7px;border:1px solid #dbe3ef">' + escapeHtml_(item.jenis) + '</td>' +
-      '<td style="padding:7px;border:1px solid #dbe3ef">' + escapeHtml_(formatIndo_(item.tanggal)) + '</td></tr>';
+      '<td style="padding:7px;border:1px solid #dbe3ef">' + escapeHtml_(formatIndo_(item.tanggal)) + '</td>' +
+      '<td style="padding:7px;border:1px solid #dbe3ef">' + escapeHtml_(item.status || '-') + '</td></tr>';
   }).join('');
   return '<div style="font-family:Arial,sans-serif;color:#1e293b"><h2 style="color:#0B57D0">SIKANDA - Rekap Buku Penjagaan</h2>' +
-    '<p>Agenda dalam ' + windowDays + ' hari ke depan:</p><table style="border-collapse:collapse"><tr>' +
+    '<p>Rekap agenda yang memasuki enam bulan kalender sebelum jatuh tempo:</p><table style="border-collapse:collapse"><tr>' +
     '<th style="padding:7px;border:1px solid #dbe3ef">Nama</th><th style="padding:7px;border:1px solid #dbe3ef">NIP</th>' +
-    '<th style="padding:7px;border:1px solid #dbe3ef">Agenda</th><th style="padding:7px;border:1px solid #dbe3ef">Tanggal</th></tr>' + rows + '</table></div>';
+    '<th style="padding:7px;border:1px solid #dbe3ef">Agenda</th><th style="padding:7px;border:1px solid #dbe3ef">Tanggal</th>' +
+    '<th style="padding:7px;border:1px solid #dbe3ef">Status</th></tr>' + rows + '</table></div>';
 }
 
 function escapeHtml_(value) {

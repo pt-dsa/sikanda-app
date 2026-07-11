@@ -20,11 +20,11 @@ export default function Peminjaman() {
           </div>
           
           <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white mb-3 tracking-tight">
-            Menu Dalam Pengembangan
+            Menu Peminjaman dalam Pengembangan
           </h1>
           
           <p className="text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-            Menu dalam pengembangan, nantikan pada SIKANDA Versi 2.
+            Menu Peminjaman dalam pengembangan, nantikan pada SIKANDA Versi 2.
           </p>
         </div>
       </motion.div>

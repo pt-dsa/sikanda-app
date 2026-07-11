@@ -10,12 +10,12 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 
 // ---------------------------------------------------------------------------
-// Tanya SIKANDA — asisten data berbasis AI (Groq via backend Apps Script).
+// Tanya SIKANDA — asisten data berbasis Gemini melalui backend Apps Script.
 //   - Konteks: SELURUH data SIKANDA (pegawai, aset, agenda penjagaan, config)
-//     dibangun sekali per sesi dari cache spreadsheetService (data NYATA).
+//     dibangun di backend dari data Supabase yang sesuai dengan role pengguna.
 //   - Persona: humanis, akrab, profesional, non-robotik — Bahasa Indonesia.
 //   - Batasan: HANYA menjawab topik seputar SIKANDA (ditegakkan system prompt
-//     di backend). API key Groq TIDAK PERNAH ada di frontend (aman di Script
+//     di backend). Gemini API key TIDAK PERNAH ada di frontend (aman di Script
 //     Properties Apps Script).
 //   - Riwayat percakapan: hanya selama sesi (state React, hilang saat refresh).
 // ---------------------------------------------------------------------------

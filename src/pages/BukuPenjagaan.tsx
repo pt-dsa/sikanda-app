@@ -107,7 +107,6 @@ export default function BukuPenjagaan() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
     KGB_CYCLE_YEARS: "2", PANGKAT_CYCLE_YEARS: "4", BUP_USIA: "58",
-    NOTIF_WINDOW_HARI: "180", NOTIF_ADMIN_EMAIL: "",
   });
 
   const canNotifikasi = can(user?.role, "config.write"); // true untuk admin & pimpinan
@@ -316,8 +315,8 @@ export default function BukuPenjagaan() {
     try {
       const res = await apiService.runNotifikasi() as any;
       toast.success(
-        "Notifikasi Terkirim",
-        `${res.agenda ?? 0} agenda ditemukan, ${res.email_terkirim ?? 0} email berhasil dikirim.`
+        "Proses Notifikasi Selesai",
+        `${res.agenda ?? 0} agenda masuk ambang 6 bulan; ${res.email_pegawai_terkirim ?? 0} email pegawai dan ${res.email_rekap_terkirim ?? 0} rekap Administrator dikirim.`
       );
     } catch (err: any) {
       toast.error("Gagal Mengirim", err?.message || "Terjadi kesalahan saat mengirim notifikasi.");
@@ -391,7 +390,7 @@ export default function BukuPenjagaan() {
                   open: true,
                   title: "Kirim Notifikasi Sekarang",
                   message:
-                    "Kirim email notifikasi Buku Penjagaan ke admin yang terdaftar?\n\nTindakan ini akan memicu pengiriman email segera (tidak menunggu jadwal harian).",
+                    "Periksa agenda yang tepat memasuki enam bulan kalender hari ini dan kirim email satu kali kepada pegawai terkait. Rekap otomatis juga dikirim ke akun Administrator/Pimpinan aktif.\n\nNotifikasi yang sudah tercatat tidak akan dikirim ulang.",
                   confirmLabel: "Kirim Notifikasi",
                   confirmClass: "bg-emerald-600 hover:bg-emerald-700",
                   onConfirm: doKirimNotifikasi,
@@ -757,7 +756,6 @@ export default function BukuPenjagaan() {
                 ["KGB_CYCLE_YEARS", "Siklus KGB (tahun)", 1, 10],
                 ["PANGKAT_CYCLE_YEARS", "Siklus Pangkat (tahun)", 1, 10],
                 ["BUP_USIA", "Usia BUP", 50, 70],
-                ["NOTIF_WINDOW_HARI", "Jendela notifikasi (hari)", 1, 730],
               ].map(([key, label, min, max]) => (
                 <label key={String(key)} className="text-xs font-bold text-gray-700 dark:text-gray-300">
                   {String(label)}
@@ -766,16 +764,9 @@ export default function BukuPenjagaan() {
                     className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800" />
                 </label>
               ))}
-              <label className="sm:col-span-2 text-xs font-bold text-gray-700 dark:text-gray-300">
-                Email penerima notifikasi
-                <input type="email" value={settingsForm.NOTIF_ADMIN_EMAIL}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, NOTIF_ADMIN_EMAIL: e.target.value }))}
-                  placeholder="admin@contoh.go.id"
-                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800" />
-              </label>
             </div>
             <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
-              Default resmi: KGB 2 tahun, pangkat 4 tahun, dan BUP 58 tahun. Perubahan tercatat dalam audit.
+              Default resmi: KGB 2 tahun, pangkat 4 tahun, dan BUP 58 tahun. Email pegawai dikirim satu kali saat memasuki enam bulan kalender; rekap dikirim otomatis ke akun Administrator/Pimpinan aktif. Perubahan konfigurasi tercatat dalam audit.
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" disabled={savingSettings} onClick={() => setSettingsOpen(false)} className="px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700">Batal</button>

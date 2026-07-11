@@ -396,11 +396,12 @@ export const spreadsheetService = {
         
         const jabatanRaw = String(item.jabatan || "").trim();
         const golonganRaw = String(item.golongan || "").trim();
-        const statusRaw = String(item.status || "").trim().toUpperCase();
+        const statusSource = String(item.status || "").trim().toUpperCase();
+        const statusRaw = statusSource.startsWith("PPPK") ? "PPPK" : statusSource;
         const kategoriPppkRaw = String(item.kategori_pppk || item.pppk_category || "").trim().toLowerCase();
-        const kategori_pppk = kategoriPppkRaw.includes('paruh') || kategoriPppkRaw.includes('part')
+        const kategori_pppk = kategoriPppkRaw.includes('paruh') || kategoriPppkRaw.includes('part') || statusSource.includes('PARUH')
           ? 'paruh_waktu' as const
-          : kategoriPppkRaw.includes('penuh') || kategoriPppkRaw.includes('full')
+          : kategoriPppkRaw.includes('penuh') || kategoriPppkRaw.includes('full') || statusSource.includes('PENUH')
             ? 'penuh_waktu' as const
             : '' as const;
         const isIncomplete = !nip || !jabatanRaw || !golonganRaw || !statusRaw;
@@ -468,8 +469,6 @@ export const spreadsheetService = {
       this.getEquipment(),
     ]);
     const inventoryResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
-    const maintenanceResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
-    const budgetsResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
     const forecastResult = { status: "fulfilled", value: { avgMonthlyCost: 0, sixMonthTotal: 0, forecastData: [] } } as PromiseSettledResult<any>;
 
     // Ambil nilai; jika gagal, log warning dan gunakan array/default kosong

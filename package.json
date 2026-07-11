@@ -1,14 +1,16 @@
 {
   "name": "sikanda",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build && cp dist/index.html dist/404.html",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "esbuild tests/agenda.test.ts tests/backend-rules.test.ts --bundle --platform=node --format=esm --outdir=.test-dist && node .test-dist/agenda.test.js && node .test-dist/backend-rules.test.js",
+    "verify": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",

@@ -11,7 +11,7 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role/secret key baru, hanya di Apps Script |
 | `FIREBASE_API_KEY` | Firebase Web API key untuk verifikasi ID token |
 | `GEMINI_API_KEY` | Gemini API key baru, hanya di Apps Script |
-| `GEMINI_MODEL` | Model yang diizinkan, default `gemini-2.0-flash` |
+| `GEMINI_MODEL` | Model yang diizinkan, default `gemini-2.5-flash` |
 | `BOOTSTRAP_ADMIN_EMAIL` | Email admin pertama |
 | `DRIVE_FOLDER_NAME` | Contoh `SIKANDA_Foto_Pegawai` |
 
@@ -19,6 +19,9 @@ Hapus properti lama `SPREADSHEET_ID`, `SHARED_SECRET`, dan `ALLOW_LEGACY_SECRET`
 
 4. Deploy → **New deployment** → **Web app** → Execute as **Me** → Who has access **Anyone**.
 5. Salin URL yang berakhir `/exec` ke `VITE_APPS_SCRIPT_URL` pada frontend.
-6. Buka URL `/exec`; respons sehat berisi `ok: true` dan versi `1.1.0-secure`.
+6. Buka URL `/exec`; respons sehat berisi `ok: true` dan versi `1.1.1-secure`.
+7. Jalankan trigger harian `kirimNotifikasiBukuPenjagaan` pada timezone `Asia/Jakarta`.
 
-Panduan lengkap ada di root proyek: `PANDUAN_IMPLEMENTASI_SIKANDA_V1_SECURE.md`.
+Rekap notifikasi diambil otomatis dari email akun aktif Administrator/Pimpinan pada `app_access`; tidak ada Script Property alamat rekap manual.
+
+Panduan lengkap ada di root proyek: `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.1_SECURE.md`.

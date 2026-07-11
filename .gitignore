@@ -4,6 +4,7 @@ node_modules/
 # Build output (di-generate ulang oleh GitHub Actions)
 dist/
 build/
+.test-dist/
 
 # File lokal & sistem
 .DS_Store

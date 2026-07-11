@@ -1,29 +1,30 @@
-# SIKANDA V1 Secure — Release Notes
+# SIKANDA V1.1.1 Secure — Release Notes
 
-Baseline: `sikanda_v1.zip` (SHA-256 `a0cdba5fc271209323dc2e5e66e13df6dd119e42ca830dea1cb86638ec9a4a24`).
+Baseline awal: `sikanda_v1.zip` (SHA-256 `a0cdba5fc271209323dc2e5e66e13df6dd119e42ca830dea1cb86638ec9a4a24`).
 
-Perubahan utama:
+## Koreksi V1.1.1
 
-- Supabase menjadi database tunggal; fallback Spreadsheet dihapus.
-- Firebase Auth dipertahankan dan seluruh request backend wajib Firebase ID token.
-- Admin dan Pimpinan memiliki izin identik; Pegawai dibatasi pada profil sendiri.
-- Endpoint CRUD Supabase generik dinonaktifkan; tulis memakai endpoint khusus dan audit log.
-- KGB/Pangkat/BUP dapat dikonfigurasi dari Buku Penjagaan.
-- Aturan ASN, PPPK penuh waktu, dan PPPK paruh waktu diterapkan konsisten.
-- Tanya SIKANDA menyusun konteks di server sesuai role dan mengecualikan modul Versi 2.
-- Foto tetap di Google Drive dengan pembatasan tipe, ukuran, dan sharing.
-- Logo rusak diganti SVG internal; background dioptimalkan dari sekitar 6,6 MB menjadi sekitar 86 KB pada build.
-- Inventaris, Pagu Anggaran, Pemeliharaan Kendaraan, dan Peminjaman dibekukan untuk Versi 2 tanpa pemrosesan data V1.
-- Cache, deduplikasi request, batas paralel, timeout, dan code splitting dipertahankan/ditingkatkan.
+- Logo sementara diganti dengan `logo_kota_tangerang_selatan.png` asli yang dibundel melalui Vite.
+- Instruksi Firebase Environment type yang sudah tidak relevan dihapus.
+- Notifikasi diubah menjadi satu kali pada ambang enam bulan kalender, dengan ledger `notification_logs`.
+- Email individual hanya ke pegawai terkait; rekap otomatis ke Administrator/Pimpinan aktif tanpa alamat manual.
+- Opsi form menjadi ASN, PPPK (Penuh Waktu), PPPK (Paruh Waktu), dan Pensiun.
+- PPPK penuh waktu memperoleh KGB saja; PPPK paruh waktu tidak memperoleh agenda.
+- Empat halaman Versi 2 menampilkan nama menu masing-masing dalam pesan pengembangan.
+- Rekap Laporan hanya berisi Data ASN/PPPK, Buku Penjagaan, dan Data Kendaraan.
+- Tanya SIKANDA memakai default `gemini-2.5-flash`, retry terbatas untuk 429/5xx, dan pesan error yang lebih spesifik.
+- Berkas netral `src/lib/supabase.ts` menimpa file lama penyebab GitHub Actions gagal tanpa membuka akses database dari browser.
+- GitHub Actions memakai Node.js 22 dan menjalankan typecheck, test, audit produksi, serta build sebelum deploy.
+- Panduan implementasi disatukan dan diperbarui untuk import bersih, staging, production, rollback, dan troubleshooting.
 
-Validasi rilis:
+## Arsitektur dan keamanan yang dipertahankan
 
-- TypeScript `tsc --noEmit`: lulus.
-- Vite production build: lulus.
-- Sintaks Apps Script (`node --check`): lulus.
-- Pengujian aturan agenda ASN/PPPK dan leap year: lulus.
-- Pemindaian credential pada source dan build: lulus.
-- Pemindaian aset gambar rusak pada build: lulus.
-- `npm audit --omit=dev --audit-level=high`: 0 vulnerability.
+- Supabase adalah database tunggal; Firebase Authentication tetap untuk login Google.
+- Apps Script memverifikasi Firebase ID token dan menegakkan RBAC di server.
+- Service-role key Supabase serta Gemini API key hanya berada di Script Properties.
+- Foto tetap disimpan Restricted di Google Drive.
+- Admin dan Pimpinan memiliki izin identik; Pegawai terbatas pada profil sendiri.
+- Endpoint CRUD Supabase generik tetap dinonaktifkan.
+- Modul Inventaris, Pagu Anggaran, Pemeliharaan Kendaraan, dan Peminjaman tidak memproses data pada V1.
 
-Ikuti `PANDUAN_IMPLEMENTASI_SIKANDA_V1_SECURE.md` dari awal; jangan langsung mengganti produksi tanpa staging dan backup.
+Ikuti `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.1_SECURE.md` dari awal dan lakukan rotasi key sebelum production/public.

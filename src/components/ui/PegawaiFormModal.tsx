@@ -129,6 +129,19 @@ export function PegawaiFormModal({
     setFormData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
+  const handleEmploymentStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setFormData((prev) => {
+      if (value === "PPPK_PENUH_WAKTU") {
+        return { ...prev, status: "PPPK", kategori_pppk: "penuh_waktu" };
+      }
+      if (value === "PPPK_PARUH_WAKTU") {
+        return { ...prev, status: "PPPK", kategori_pppk: "paruh_waktu" };
+      }
+      return { ...prev, status: value, kategori_pppk: "" };
+    });
+  }, []);
+
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -151,6 +164,10 @@ export function PegawaiFormModal({
 
     if (!formData.nip) {
       setErrorMsg("NIP wajib diisi.");
+      return;
+    }
+    if (String(formData.status || "").toUpperCase() === "PPPK" && !formData.kategori_pppk) {
+      setErrorMsg("Pilih PPPK (Penuh Waktu) atau PPPK (Paruh Waktu).");
       return;
     }
 
@@ -186,6 +203,13 @@ export function PegawaiFormModal({
 
   // Helper: ambil nilai string dari formData (untuk prop value Field)
   const V = (name: keyof Pegawai): string => String((formData as any)[name] ?? "");
+  const employmentStatusValue = (() => {
+    const status = V("status").toUpperCase();
+    if (status !== "PPPK") return status || "ASN";
+    if (V("kategori_pppk") === "penuh_waktu") return "PPPK_PENUH_WAKTU";
+    if (V("kategori_pppk") === "paruh_waktu") return "PPPK_PARUH_WAKTU";
+    return "PPPK_BELUM_DIKATEGORIKAN";
+  })();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -287,37 +311,21 @@ export function PegawaiFormModal({
                 Status <span className="text-red-500">*</span>
               </label>
               <select
-                name="status"
                 required
-                value={V("status") || "ASN"}
-                onChange={handleChange}
+                value={employmentStatusValue}
+                onChange={handleEmploymentStatusChange}
                 disabled={L("status")}
                 className={inputCls}
               >
                 <option value="ASN">ASN</option>
-                <option value="PPPK">PPPK</option>
+                {employmentStatusValue === "PPPK_BELUM_DIKATEGORIKAN" && (
+                  <option value="PPPK_BELUM_DIKATEGORIKAN" disabled>PPPK — kategori belum ditetapkan</option>
+                )}
+                <option value="PPPK_PENUH_WAKTU">PPPK (Penuh Waktu) — mendapat KGB</option>
+                <option value="PPPK_PARUH_WAKTU">PPPK (Paruh Waktu) — tanpa agenda</option>
                 <option value="PENSIUN">PENSIUN</option>
               </select>
             </div>
-            {V("status").startsWith("PPPK") && (
-              <div>
-                <label className={labelCls}>
-                  Kategori PPPK <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="kategori_pppk"
-                  required
-                  value={V("kategori_pppk")}
-                  onChange={handleChange}
-                  disabled={L("kategori_pppk")}
-                  className={inputCls}
-                >
-                  <option value="">Pilih kategori</option>
-                  <option value="penuh_waktu">PPPK (penuh waktu) — mendapat KGB</option>
-                  <option value="paruh_waktu">PPPK (paruh waktu) — tanpa agenda</option>
-                </select>
-              </div>
-            )}
             <Field label="Tanggal Lahir" name="tgl_lahir" type="date"
               value={V("tgl_lahir")} onChange={handleChange} locked={L("tgl_lahir")} />
 

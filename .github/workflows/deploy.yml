@@ -28,14 +28,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
 
       - name: Install dependensi
         run: npm ci
 
       - name: Verifikasi TypeScript
-        run: npx tsc --noEmit
+        run: npm run lint
+
+      - name: Uji aturan agenda
+        run: npm run test
+
+      - name: Audit dependensi produksi
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build produksi
         run: npm run build

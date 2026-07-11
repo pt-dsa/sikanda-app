@@ -92,7 +92,7 @@ export interface Pegawai {
   jabatan: string;
   unit_kerja: string;
   golongan: string;
-  status: string; // "ASN" | "PPPK"
+  status: string; // "ASN" | "PPPK" | "PENSIUN"; kategori PPPK disimpan terpisah
   kategori_pppk?: "penuh_waktu" | "paruh_waktu" | "";
 
   // Dates (from sheet, raw string)

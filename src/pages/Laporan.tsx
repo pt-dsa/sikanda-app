@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import Papa from "papaparse";
 import { useToast } from "@/components/ui/Toast";
+import { buildPenjagaanEvents } from "@/lib/penjagaan";
 
 export default function Laporan() {
   const [isExporting, setIsExporting] = useState(false);
@@ -14,8 +15,50 @@ export default function Laporan() {
     try {
       let data: any[] = [];
       const fetchers: Record<string, () => Promise<any[]>> = {
+        'pegawai': async () => {
+          const pegawai = await spreadsheetService.getPegawai();
+          return pegawai.map((p: any) => ({
+            nip: p.nip,
+            nama: p.nama,
+            status: p.status === "PPPK"
+              ? (p.kategori_pppk === "penuh_waktu" ? "PPPK (Penuh Waktu)" : p.kategori_pppk === "paruh_waktu" ? "PPPK (Paruh Waktu)" : "PPPK (Belum Dikategorikan)")
+              : p.status,
+            golongan: p.golongan,
+            jabatan: p.jabatan,
+            unit_kerja: p.unit_kerja,
+            tanggal_lahir: p.tgl_lahir,
+            tmt_golongan: p.tgl_mulai_golongan,
+            tmt_jabatan: p.tgl_mulai_jabatan,
+            masa_kerja_tahun: p.masa_kerja_tahun,
+            masa_kerja_bulan: p.masa_kerja_bulan,
+            pendidikan: p.tingkat,
+            jurusan: p.pendidikan_jurusan,
+            universitas: p.universitas,
+            tahun_lulus: p.tahun_lulus,
+            riwayat_diklat: p.riwayat_diklat,
+            tahun_diklat: p.tahun_diklat,
+            kontak: p.kontak,
+            email: p.email,
+            keterangan: p.keterangan,
+          }));
+        },
+        'buku_penjagaan': async () => {
+          const pegawai = await spreadsheetService.getPegawai();
+          return buildPenjagaanEvents(pegawai).map((agenda) => ({
+            nip: agenda.nip,
+            nama: agenda.nama,
+            status: agenda.status,
+            golongan: agenda.golongan,
+            jabatan: agenda.jabatan,
+            unit_kerja: agenda.bidang,
+            kategori_agenda: agenda.kategori,
+            jenis_agenda: agenda.kategoriLabel,
+            tanggal_jatuh_tempo: agenda.tanggal,
+            sisa_hari: agenda.selisihHari,
+            indikator: agenda.bucket,
+          }));
+        },
         'kendaraan': spreadsheetService.getVehicles.bind(spreadsheetService),
-        'alat_mesin': spreadsheetService.getEquipment.bind(spreadsheetService),
       };
 
       if (fetchers[type]) {
@@ -43,6 +86,7 @@ export default function Laporan() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
       toast.success("Ekspor Berhasil", `Laporan ${name} berhasil diunduh.`);
 
@@ -59,8 +103,9 @@ export default function Laporan() {
   };
 
   const reports = [
-    { id: 'kendaraan', name: 'Kendaraan', description: 'Master data aset kendaraan dinas roda 2 dan roda 4.' },
-    { id: 'alat_mesin', name: 'Alat & Mesin', description: 'Master data peralatan dan mesin yang terdaftar.' },
+    { id: 'pegawai', name: 'Data ASN_PPPK', title: 'Data ASN / PPPK', description: 'Data identitas dan kepegawaian ASN serta PPPK aktif.' },
+    { id: 'buku_penjagaan', name: 'Buku_Penjagaan', title: 'Buku Penjagaan', description: 'Rekap agenda KGB, kenaikan pangkat, dan BUP sesuai aturan pegawai.' },
+    { id: 'kendaraan', name: 'Data_Kendaraan', title: 'Data Kendaraan', description: 'Master data kendaraan dinas roda 2 dan roda 4.' },
   ];
 
   return (
@@ -87,7 +132,7 @@ export default function Laporan() {
             className={`print:break-inside-avoid shadow-sm border-0 ${isExporting ? "opacity-60" : "cursor-pointer"}`}
           >
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">{report.name}</CardTitle>
+              <CardTitle className="text-lg">{report.title}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{report.description}</p>
