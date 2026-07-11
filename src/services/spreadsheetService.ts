@@ -1,10 +1,13 @@
-import { normalizeData, parseMoneyString } from "@/lib/utils";
-import { nextCycleDate, pensionDate, withinMonths, buildPenjagaanEvents } from "@/lib/penjagaan";
+import { normalizeData } from "@/lib/utils";
+import { nextCycleDate, pensionDate, buildPenjagaanEvents } from "@/lib/penjagaan";
 import { buildUnifiedAssets, buildFuzzyNipSet, rekapKelengkapan } from "@/lib/kelengkapan";
 import type { DashboardMetrics, DistribusiItem } from "@/types";
-import { backendSelect, backendInsert, backendUpdate, backendDelete } from "@/services/backendClient";
+import { backendSelect } from "@/services/backendClient";
+import { apiService } from "@/services/apiService";
 
-const CACHE_EXPIRY = 5 * 1000; // 5 seconds cache to avoid CDN/Storage staleness
+const CACHE_EXPIRY = 30 * 1000;
+const DEFERRED_V2 = new Set(["assets_inventory", "vehicle_budget", "vehicle_maintenance", "equipment_maintenance", "maintenance", "loans"]);
+const inFlight = new Map<string, Promise<any[]>>();
 
 // ---------------------------------------------------------------------------
 // Core fetch — FIXED: detect GViz API error response (not just HTML pages)
@@ -13,6 +16,7 @@ const CACHE_EXPIRY = 5 * 1000; // 5 seconds cache to avoid CDN/Storage staleness
 // Core fetch — Now using Supabase!
 // ---------------------------------------------------------------------------
 async function fetchFromSheet(sheetName: string): Promise<any[]> {
+  if (DEFERRED_V2.has(sheetName)) return [];
   const cacheKey = `supabase_v2_backend_${sheetName}`;
 
   try {
@@ -22,18 +26,15 @@ async function fetchFromSheet(sheetName: string): Promise<any[]> {
       if (Date.now() - parsed.timestamp < CACHE_EXPIRY) return parsed.data;
     }
 
-    let tableName = sheetName;
+    const tableName = sheetName;
     const filters: Array<{ column: string; op: "eq"; value: string }> = [];
 
-    if (sheetName === "vehicle_maintenance") {
-      tableName = "maintenance";
-      filters.push({ column: "asset_type", op: "eq", value: "vehicle" });
-    } else if (sheetName === "equipment_maintenance") {
-      tableName = "maintenance";
-      filters.push({ column: "asset_type", op: "eq", value: "equipment" });
+    let request = inFlight.get(cacheKey);
+    if (!request) {
+      request = backendSelect(tableName, filters).finally(() => inFlight.delete(cacheKey));
+      inFlight.set(cacheKey, request);
     }
-
-    const resultData = await backendSelect(tableName, filters);
+    const resultData = await request;
 
     try {
       if (typeof sessionStorage !== "undefined") {
@@ -49,14 +50,6 @@ async function fetchFromSheet(sheetName: string): Promise<any[]> {
     console.error(`[SIKANDA] ❌ Gagal fetch data ${sheetName}:`, error.message);
     throw error;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Date helpers — perhitungan siklus & window memakai modul bersama
-// @/lib/penjagaan (sumber tunggal; keluaran lokal "YYYY-MM-DD" agar = backend).
-// ---------------------------------------------------------------------------
-function isWithinMonths(dateStr: string, months: number): boolean {
-  return withinMonths(dateStr, months);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,19 +196,14 @@ export const spreadsheetService = {
   },
 
   async savePegawai(data: Partial<any>, isNew: boolean) {
-    const allowed = ['nip', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'status', 'tgl_lahir', 'tgl_mulai_golongan', 'tgl_mulai_jabatan', 'tgl_kgb', 'tgl_pangkat', 'tgl_pensiun', 'masa_kerja_tahun', 'masa_kerja_bulan', 'tingkat', 'pendidikan_jurusan', 'universitas', 'tahun_lulus', 'riwayat_diklat', 'tahun_diklat', 'usia', 'kontak', 'email', 'keterangan', 'catatan_mutasi_masuk', 'catatan_mutasi_keluar', 'foto', 'is_active', 'created_at'];
+    const allowed = ['nip', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'status', 'kategori_pppk', 'tgl_lahir', 'tgl_mulai_golongan', 'tgl_mulai_jabatan', 'masa_kerja_tahun', 'masa_kerja_bulan', 'tingkat', 'pendidikan_jurusan', 'universitas', 'tahun_lulus', 'riwayat_diklat', 'tahun_diklat', 'usia', 'kontak', 'email', 'keterangan', 'catatan_mutasi_masuk', 'catatan_mutasi_keluar', 'foto', 'is_active'];
     const sanitized = this._sanitizeData(data, allowed);
-    
-    if (isNew) {
-      await backendInsert('pegawai', sanitized);
-    } else {
-      await backendUpdate('pegawai', sanitized, { column: 'nip', op: 'eq', value: String(data.nip || '') });
-    }
+    await apiService.savePegawai(sanitized, isNew);
     this.clearCache();
   },
 
   async deletePegawai(nip: string) {
-    await backendDelete('pegawai', { column: 'nip', op: 'eq', value: nip });
+    await apiService.deletePegawai(nip);
     this.clearCache();
   },
 
@@ -223,16 +211,12 @@ export const spreadsheetService = {
     const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'no_polisi', 'tipe', 'jenis_kendaraan', 'km_kendaraan', 'created_at'];
     const sanitized = this._sanitizeData(data, allowed);
     
-    if (isNew) {
-      await backendInsert('assets_vehicle', sanitized);
-    } else {
-      await backendUpdate('assets_vehicle', sanitized, { column: 'asset_id', op: 'eq', value: String(data.asset_id || '') });
-    }
+    await apiService.saveAsset('assets_vehicle', sanitized, isNew);
     this.clearCache();
   },
 
   async deleteVehicle(asset_id: string) {
-    await backendDelete('assets_vehicle', { column: 'asset_id', op: 'eq', value: asset_id });
+    await apiService.deleteAsset('assets_vehicle', asset_id);
     this.clearCache();
   },
 
@@ -240,46 +224,40 @@ export const spreadsheetService = {
     const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'jenis', 'jumlah', 'satuan', 'created_at'];
     const sanitized = this._sanitizeData(data, allowed);
     
-    if (isNew) {
-      await backendInsert('assets_equipment', sanitized);
-    } else {
-      await backendUpdate('assets_equipment', sanitized, { column: 'asset_id', op: 'eq', value: String(data.asset_id || '') });
-    }
+    await apiService.saveAsset('assets_equipment', sanitized, isNew);
     this.clearCache();
   },
 
   async deleteEquipment(asset_id: string) {
-    await backendDelete('assets_equipment', { column: 'asset_id', op: 'eq', value: asset_id });
+    await apiService.deleteAsset('assets_equipment', asset_id);
     this.clearCache();
   },
 
   async saveInventory(data: Partial<any>, isNew: boolean) {
-    const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'jenis', 'jumlah', 'satuan', 'lokasi_ruangan', 'created_at'];
-    const sanitized = this._sanitizeData(data, allowed);
-    
-    if (isNew) {
-      await backendInsert('assets_inventory', sanitized);
-    } else {
-      await backendUpdate('assets_inventory', sanitized, { column: 'asset_id', op: 'eq', value: String(data.asset_id || '') });
-    }
-    this.clearCache();
+    void data; void isNew;
+    throw new Error('Menu dalam pengembangan, nantikan pada SIKANDA Versi 2.');
   },
 
   async deleteInventory(asset_id: string) {
-    await backendDelete('assets_inventory', { column: 'asset_id', op: 'eq', value: asset_id });
-    this.clearCache();
+    void asset_id;
+    throw new Error('Menu dalam pengembangan, nantikan pada SIKANDA Versi 2.');
   },
 
-  async getSystemSettings(): Promise<{ bup: number }> {
+  async getSystemSettings(): Promise<{ bup: number; kgbCycle: number; pangkatCycle: number }> {
     try {
       const rows = await fetchFromSheet("system_config");
-      const bupRow = rows.find((r: any) =>
-        ["bup_usia", "bup"].includes(String(r.config_key || "").toLowerCase())
-      );
-      const bup = bupRow ? parseInt(String(bupRow.config_value || "58")) : 58;
-      return { bup: isNaN(bup) ? 58 : bup };
+      const values: Record<string, string> = {};
+      rows.forEach((r: any) => {
+        const key = String(r.key ?? r.config_key ?? '').toUpperCase();
+        if (key) values[key] = String(r.value ?? r.config_value ?? '');
+      });
+      const numberOr = (key: string, fallback: number) => {
+        const n = parseInt(values[key] || '', 10);
+        return Number.isFinite(n) ? n : fallback;
+      };
+      return { bup: numberOr('BUP_USIA', 58), kgbCycle: numberOr('KGB_CYCLE_YEARS', 2), pangkatCycle: numberOr('PANGKAT_CYCLE_YEARS', 4) };
     } catch {
-      return { bup: 58 };
+      return { bup: 58, kgbCycle: 2, pangkatCycle: 4 };
     }
   },
 
@@ -340,101 +318,25 @@ export const spreadsheetService = {
     }));
   },
 
-  async getInventory() {
-    const data = await fetchFromSheet("assets_inventory");
-    return data.map((item: any) => ({
-      ...item,
-      asset_id: item.asset_id,
-      kode_barang: item.asset_code || item.kode_barang,
-      nama_aset: item.asset_name || item.nama_aset || item.nama_barang || "-",
-      merk: item.brand || item.merk || "-",
-      jumlah: parseInt(item.quantity || item.jumlah || "1"),
-      satuan: item.unit || item.satuan || "Unit",
-      tahun: item.purchase_year || item.tahun || "-",
-      lokasi_ruangan: item.room_location || item.lokasi_ruangan || "-",
-      pengguna: item.holder_name || item.pengguna || "-",
-      penanggung_jawab: item.person_in_charge || item.holder_name || "-",
-      kondisi: (item.condition || item.kondisi || "BAIK").toUpperCase(),
-      harga_pembelian: item.acquisition_price ? `Rp ${new Intl.NumberFormat("id-ID").format(item.acquisition_price)}` : "-",
-      latitude: item.lat || item.latitude,
-      longitude: item.lng || item.longitude,
-      foto: item.photo_1_legacy || item.foto,
-      qr_url: item.qr_legacy_url || item.qr_url,
-    }));
-  },
+  async getInventory() { return []; },
 
-  async getBudgets() {
-    const data = await fetchFromSheet("vehicle_budget");
-    return data.map((item: any) => {
-      const ps = parseMoneyString(item.service_budget || item.pagu_service);
-      const pc = parseMoneyString(item.sparepart_budget || item.pagu_suku_cadang);
-      const rs = parseMoneyString(item.service_realization || item.realisasi_service);
-      const rc = parseMoneyString(item.sparepart_realization || item.realisasi_suku_cadang);
-      const tp = parseMoneyString(item.total_budget || item.total_pagu) || ps + pc;
-      const tr = parseMoneyString(item.total_realization || item.total_realisasi) || rs + rc;
-      return {
-        ...item,
-        no_polisi: item.plate_number || item.no_polisi,
-        tahun_anggaran: item.year || item.tahun || item.tahun_anggaran,
-        total_pagu: tp, total_realisasi: tr,
-        sisa_anggaran: parseMoneyString(item.total_remaining) || tp - tr,
-        persentase_realisasi: tp > 0 ? (tr / tp) * 100 : 0,
-      };
-    });
-  },
-
-  async getMaintenance() {
-    const data = await fetchFromSheet("vehicle_maintenance");
-    return data.map((item: any) => ({ ...item, biaya: parseMoneyString(item.total_cost) || parseMoneyString(item.biaya) }));
-  },
-
-  async getEquipmentMaintenance() {
-    const data = await fetchFromSheet("equipment_maintenance");
-    return data.map((item: any) => ({ ...item, biaya: parseMoneyString(item.maintenance_cost) || parseMoneyString(item.biaya) }));
-  },
-
-  async getLoans() { return fetchFromSheet("loans"); },
+  async getBudgets() { return []; },
+  async getMaintenance() { return []; },
+  async getEquipmentMaintenance() { return []; },
+  async getLoans() { return []; },
   async getLocations() { return fetchFromSheet("asset_locations"); },
 
-  async getMaintenanceForecast() {
-    const [vehicles, equipment] = await Promise.all([this.getMaintenance(), this.getEquipmentMaintenance()]);
-    const allRecords = [...vehicles, ...equipment];
-    const grouped: Record<string, { total: number; count: number }> = {};
-    let totalCost = 0;
-    allRecords.forEach((r) => {
-      const dateStr = r.request_date || r.tanggal || "";
-      const cost = r.biaya || 0;
-      if (dateStr && cost > 0) {
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) {
-          const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-          if (!grouped[ym]) grouped[ym] = { total: 0, count: 0 };
-          grouped[ym].total += cost;
-          totalCost += cost;
-        }
-      }
-    });
-    const months = Object.keys(grouped).length;
-    const avg = months > 0 ? totalCost / months : 0;
-    const today = new Date();
-    const forecast = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(today.getFullYear(), today.getMonth() + i + 1, 1);
-      // Proyeksi deterministik berbasis rata-rata historis nyata (tanpa noise acak).
-      return { name: d.toLocaleString("id-ID", { month: "short", year: "numeric" }), PredictedCost: Math.round(avg) };
-    });
-    return { avgMonthlyCost: avg, sixMonthTotal: avg * 6, forecastData: forecast };
-  },
+  async getMaintenanceForecast() { return { avgMonthlyCost: 0, sixMonthTotal: 0, forecastData: [] }; },
 
   // ---------------------------------------------------------------------------
   // getPegawai — with GViz fix + robust column detection
   // ---------------------------------------------------------------------------
   async getPegawai() {
     try {
-      const [rawPegawai, vehicles, equipment, inventory, settings] = await Promise.all([
+      const [rawPegawai, vehicles, equipment, settings] = await Promise.all([
         fetchFromSheet("pegawai"),
         this.getVehicles(),
         this.getEquipment(),
-        this.getInventory(),
         this.getSystemSettings(),
       ]);
 
@@ -447,10 +349,8 @@ export const spreadsheetService = {
         return [];
       }
 
-      const bup = settings.bup;
       const vMaps = buildLookupMaps(vehicles);
       const eMaps = buildLookupMaps(equipment);
-      const iMaps = buildLookupMaps(inventory);
 
       return rawPegawai.map((item: any) => {
         // ── ROBUST: coba beberapa varian nama kolom ──
@@ -478,11 +378,9 @@ export const spreadsheetService = {
 
         const vMatch = matchAssets(nama, vMaps.byExact, vMaps.byFuzzy);
         const eMatch = matchAssets(nama, eMaps.byExact, eMaps.byFuzzy);
-        const iMatch = matchAssets(nama, iMaps.byExact, iMaps.byFuzzy);
-
-        const allAssets = [...vMatch.items, ...eMatch.items, ...iMatch.items];
+        const allAssets = [...vMatch.items, ...eMatch.items];
         const RANK = { exact: 2, fuzzy: 1, none: 0 };
-        const bestQ = [vMatch.via, eMatch.via, iMatch.via].reduce(
+        const bestQ = [vMatch.via, eMatch.via].reduce(
           (b, c) => (RANK[c] > RANK[b] ? c : b), "none" as "exact" | "fuzzy" | "none"
         );
 
@@ -499,6 +397,12 @@ export const spreadsheetService = {
         const jabatanRaw = String(item.jabatan || "").trim();
         const golonganRaw = String(item.golongan || "").trim();
         const statusRaw = String(item.status || "").trim().toUpperCase();
+        const kategoriPppkRaw = String(item.kategori_pppk || item.pppk_category || "").trim().toLowerCase();
+        const kategori_pppk = kategoriPppkRaw.includes('paruh') || kategoriPppkRaw.includes('part')
+          ? 'paruh_waktu' as const
+          : kategoriPppkRaw.includes('penuh') || kategoriPppkRaw.includes('full')
+            ? 'penuh_waktu' as const
+            : '' as const;
         const isIncomplete = !nip || !jabatanRaw || !golonganRaw || !statusRaw;
 
         return {
@@ -508,12 +412,16 @@ export const spreadsheetService = {
           unit_kerja,
           golongan: golonganRaw,
           status: statusRaw,
+          kategori_pppk,
           tgl_lahir: tglLahir,
           tgl_mulai_golongan: tglMulaiGolongan,
           tgl_mulai_jabatan: String(item.terhitung_mulai_tanggal_jabatan || item.tgl_mulai_jabatan || "").trim(),
-          tgl_kgb: nextCycleDate(tglMulaiGolongan, 2),
-          tgl_pangkat: nextCycleDate(tglMulaiGolongan, 4),
-          tgl_pensiun: pensionDate(tglLahir, bup),
+          tgl_kgb: nextCycleDate(tglMulaiGolongan, settings.kgbCycle),
+          tgl_pangkat: nextCycleDate(tglMulaiGolongan, settings.pangkatCycle),
+          tgl_pensiun: pensionDate(tglLahir, settings.bup),
+          kgb_cycle_years: settings.kgbCycle,
+          pangkat_cycle_years: settings.pangkatCycle,
+          bup_usia: settings.bup,
           masa_kerja_tahun: parseInt(String(item.masa_kerja_tahun || "0")) || 0,
           masa_kerja_bulan: parseInt(String(item.masa_kerja_bulan || "0")) || 0,
           tingkat: String(item.tingkat || "").trim(),
@@ -532,7 +440,7 @@ export const spreadsheetService = {
           assets: allAssets,
           assets_kendaraan: vMatch.items,
           assets_alat_mesin: eMatch.items,
-          assets_inventaris: iMatch.items,
+          assets_inventaris: [],
           match_quality: bestQ,
           is_incomplete: isIncomplete,
         };
@@ -553,13 +461,11 @@ export const spreadsheetService = {
     const [
       pegawaiResult,
       vehiclesResult,
-      equipmentResult,
-      loansResult
+      equipmentResult
     ] = await Promise.allSettled([
       this.getPegawai(),
       this.getVehicles(),
       this.getEquipment(),
-      this.getLoans(),
     ]);
     const inventoryResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
     const maintenanceResult = { status: "fulfilled", value: [] } as PromiseSettledResult<any[]>;
@@ -580,13 +486,7 @@ export const spreadsheetService = {
     const vehicles = safeArray(vehiclesResult);
     const equipment = safeArray(equipmentResult);
     const inventory = safeArray(inventoryResult);
-    const loans = safeArray(loansResult);
-    const maintenance = safeArray(maintenanceResult);
-    const budgets = safeArray(budgetsResult);
     const forecast = safeForecast(forecastResult);
-
-    const totalPagu = budgets.reduce((s: number, b: any) => s + parseMoneyString(b.total_pagu), 0);
-    const totalRealisasi = budgets.reduce((s: number, b: any) => s + parseMoneyString(b.total_realisasi), 0);
 
     const currentYear = new Date().getFullYear();
     const trendYears = Array.from({ length: 5 }, (_, i) => String(currentYear - 4 + i));
@@ -599,7 +499,7 @@ export const spreadsheetService = {
     addTrend(inventory, "Inventory");
 
     const pegawaiASN = pegawai.filter((p: any) => p.status === "ASN").length;
-    const pegawaiPPPK = pegawai.filter((p: any) => p.status === "PPPK").length;
+    const pegawaiPPPK = pegawai.filter((p: any) => String(p.status || '').startsWith("PPPK")).length;
 
     // ---------------------------------------------------------------------------
     // Hitung agenda kepegawaian via buildPenjagaanEvents (SAMA dengan Buku
@@ -614,7 +514,7 @@ export const spreadsheetService = {
     // Kriteria ke-9 (relasi nama aset bersih) memerlukan pemindaian Levenshtein
     // terhadap holder_name; data aset sudah tersedia di scope ini.
     // ---------------------------------------------------------------------------
-    const unifiedAssets = buildUnifiedAssets(vehicles, equipment, inventory);
+    const unifiedAssets = buildUnifiedAssets(vehicles, equipment);
     const fuzzyNipSet = buildFuzzyNipSet(pegawai as any[], unifiedAssets);
     const kelengkapan = rekapKelengkapan(pegawai as any[], fuzzyNipSet);
 
@@ -646,11 +546,11 @@ export const spreadsheetService = {
       totalAlatMesin: equipment.length,
       totalInventaris: inventory.length,
       totalAset: vehicles.length + equipment.length + inventory.length,
-      totalPeminjaman: loans.length,
-      totalPemeliharaan: maintenance.length,
-      totalPagu,
-      totalRealisasi,
-      persenRealisasi: totalPagu > 0 ? (totalRealisasi / totalPagu) * 100 : 0,
+      totalPeminjaman: 0,
+      totalPemeliharaan: 0,
+      totalPagu: 0,
+      totalRealisasi: 0,
+      persenRealisasi: 0,
       lastUpdated: this.getLastUpdated(),
       assetTrends: trendYears.map((y) => trendsMap[y]),
       maintenanceForecast: forecast,

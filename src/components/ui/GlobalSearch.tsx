@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, CarFront, Wrench, Package, FileText, X } from "lucide-react";
+import { Search, CarFront, Wrench, FileText, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { cn } from "@/lib/utils";
 
 interface SearchResult {
   id: string;
-  type: "module" | "vehicle" | "equipment" | "inventory";
+  type: "module" | "vehicle" | "equipment";
   title: string;
   subtitle: string;
   url: string;
@@ -17,10 +17,6 @@ const MODULES: SearchResult[] = [
   { id: "m1", type: "module", title: "Dashboard", subtitle: "Ringkasan Aset Daerah", url: "/dashboard", icon: <FileText size={18} /> },
   { id: "m2", type: "module", title: "Data Kendaraan", subtitle: "Kelola aset kendaraan", url: "/kendaraan", icon: <CarFront size={18} /> },
   { id: "m3", type: "module", title: "Alat & Mesin", subtitle: "Kelola aset alat dan mesin", url: "/alat-mesin", icon: <Wrench size={18} /> },
-  { id: "m4", type: "module", title: "Inventaris", subtitle: "Kelola barang inventaris", url: "/inventaris", icon: <Package size={18} /> },
-  { id: "m5", type: "module", title: "Pagu Anggaran", subtitle: "Monitoring anggaran", url: "/pagu", icon: <FileText size={18} /> },
-  { id: "m6", type: "module", title: "Pemeliharaan Kendaraan", subtitle: "Jadwal dan riwayat", url: "/pemeliharaan-kendaraan", icon: <FileText size={18} /> },
-  { id: "m7", type: "module", title: "Peminjaman", subtitle: "Data peminjaman aset", url: "/peminjaman", icon: <FileText size={18} /> },
   { id: "m8", type: "module", title: "Peta Sebaran", subtitle: "Lokasi geografis aset", url: "/peta", icon: <FileText size={18} /> },
   { id: "m9", type: "module", title: "Rekap Laporan", subtitle: "Unduh laporan data", url: "/laporan", icon: <FileText size={18} /> },
 ];
@@ -35,8 +31,7 @@ export function GlobalSearch() {
   const [assetData, setAssetData] = useState<{
     vehicles: any[];
     equipment: any[];
-    inventory: any[];
-  }>({ vehicles: [], equipment: [], inventory: [] });
+  }>({ vehicles: [], equipment: [] });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -72,12 +67,11 @@ export function GlobalSearch() {
     if (!assetsLoaded && !isLoading) {
       setIsLoading(true);
       try {
-        const [v, e, i] = await Promise.all([
+        const [v, e] = await Promise.all([
           spreadsheetService.getVehicles(),
-          spreadsheetService.getEquipment(),
-          spreadsheetService.getInventory()
+          spreadsheetService.getEquipment()
         ]);
-        setAssetData({ vehicles: v, equipment: e, inventory: i });
+        setAssetData({ vehicles: v, equipment: e });
         setAssetsLoaded(true);
       } catch (error) {
         console.error("Failed to load assets for search:", error);
@@ -133,19 +127,6 @@ export function GlobalSearch() {
         
       searchResults.push(...eMatches);
 
-      const iMatches = assetData.inventory
-        .filter(i => i.nama_barang?.toLowerCase().includes(q) || i.kode_barang?.toLowerCase().includes(q))
-        .map(i => ({
-          id: `i_${i.inventory_id || i.kode_barang}`,
-          type: "inventory" as const,
-          title: i.nama_barang || "Inventaris",
-          subtitle: i.kode_barang || "Data Inventaris",
-          url: `/inventaris?search=${i.nama_barang}`,
-          icon: <Package size={18} />
-        }))
-        .slice(0, 5);
-        
-      searchResults.push(...iMatches);
     }
 
     setResults(searchResults.slice(0, 8)); // Max 8 results overall

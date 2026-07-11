@@ -7,9 +7,9 @@
 // (role) + relasi (nip) + status aktif — bukan aturan izinnya.
 //
 // Tiga peran:
-//   - admin    : penuh + KELOLA AKUN + config + cleansing.
-//   - pimpinan : penuh + config + cleansing, TANPA kelola akun.
-//   - pegawai  : LIHAT semua modul (baca) + EDIT PROFIL BARIS SENDIRI (terbatas).
+//   - admin    : CRUD penuh, approval, akun, konfigurasi, dan cleansing.
+//   - pimpinan : kewenangan identik dengan admin (label dipertahankan untuk audit).
+//   - pegawai  : hanya profil sendiri dan Tanya SIKANDA dalam lingkup data sendiri.
 // ---------------------------------------------------------------------------
 
 export type Role = "admin" | "pimpinan" | "pegawai";
@@ -66,6 +66,7 @@ export const EDITABLE_FIELDS_OWN: readonly string[] = [
   "tahun_lulus",
   "riwayat_diklat",
   "tahun_diklat",
+  "keterangan",
 ];
 
 const ALL_MENUS: MenuKey[] = [
@@ -83,10 +84,12 @@ const ALL_MENUS: MenuKey[] = [
   "tanya", // Tanya SIKANDA — semua peran boleh bertanya (konteks SIKANDA saja)
 ];
 
+const MANAGER_MENUS: MenuKey[] = [...ALL_MENUS, "kelola-akun", "cleansing"];
+
 const MENU_BY_ROLE: Record<Role, MenuKey[]> = {
-  admin: [...ALL_MENUS, "kelola-akun", "cleansing"],
-  pimpinan: [...ALL_MENUS, "cleansing"], // tanpa kelola-akun
-  pegawai: [...ALL_MENUS], // lihat semua (mode baca)
+  admin: MANAGER_MENUS,
+  pimpinan: MANAGER_MENUS,
+  pegawai: ["pegawai", "tanya"],
 };
 
 const ACTIONS_BY_ROLE: Record<Role, Action[]> = {
@@ -106,6 +109,7 @@ const ACTIONS_BY_ROLE: Record<Role, Action[]> = {
     "asset.write",
     "config.write",
     "cleansing.run",
+    "account.manage",
   ],
   pegawai: ["pegawai.edit.own"],
 };

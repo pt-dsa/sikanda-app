@@ -296,10 +296,28 @@ export function PegawaiFormModal({
               >
                 <option value="ASN">ASN</option>
                 <option value="PPPK">PPPK</option>
-                <option value="HONORER">HONORER</option>
                 <option value="PENSIUN">PENSIUN</option>
               </select>
             </div>
+            {V("status").startsWith("PPPK") && (
+              <div>
+                <label className={labelCls}>
+                  Kategori PPPK <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="kategori_pppk"
+                  required
+                  value={V("kategori_pppk")}
+                  onChange={handleChange}
+                  disabled={L("kategori_pppk")}
+                  className={inputCls}
+                >
+                  <option value="">Pilih kategori</option>
+                  <option value="penuh_waktu">PPPK (penuh waktu) — mendapat KGB</option>
+                  <option value="paruh_waktu">PPPK (paruh waktu) — tanpa agenda</option>
+                </select>
+              </div>
+            )}
             <Field label="Tanggal Lahir" name="tgl_lahir" type="date"
               value={V("tgl_lahir")} onChange={handleChange} locked={L("tgl_lahir")} />
 

@@ -93,6 +93,7 @@ export interface Pegawai {
   unit_kerja: string;
   golongan: string;
   status: string; // "ASN" | "PPPK"
+  kategori_pppk?: "penuh_waktu" | "paruh_waktu" | "";
 
   // Dates (from sheet, raw string)
   tgl_lahir: string;
@@ -103,6 +104,9 @@ export interface Pegawai {
   tgl_kgb: string;
   tgl_pangkat: string;
   tgl_pensiun: string;
+  kgb_cycle_years?: number;
+  pangkat_cycle_years?: number;
+  bup_usia?: number;
 
   // Work metrics (from sheet)
   masa_kerja_tahun: number;

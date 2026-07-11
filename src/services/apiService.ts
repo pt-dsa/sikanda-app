@@ -25,22 +25,23 @@ export const apiService = {
   deletePegawai: async (nip: string) =>
     callBackend<{ ok: true; nip: string }>({ action: "pegawai_delete", nip }),
 
+  saveAsset: async (table: "assets_vehicle" | "assets_equipment", data: Record<string, any>, isNew: boolean) =>
+    callBackend<{ ok: true; mode: string; asset_id: string }>({ action: "asset_save", table, data, isNew }),
+
+  deleteAsset: async (table: "assets_vehicle" | "assets_equipment", assetId: string) =>
+    callBackend<{ ok: true; asset_id: string }>({ action: "asset_delete", table, assetId }),
+
   uploadFoto: (params: { nip: string; base64: string; mimeType: string; fileName: string }) =>
     callBackend<UploadFotoResult>({ action: "upload_foto", ...params }),
 
   // Aset: koreksi nama pengguna (Tahap 6 — Data Cleansing fuzzy matching).
   fixAssetHolder: async (sheet: string, assetId: string, newHolderName: string) => {
-    const { spreadsheetService } = await import("./spreadsheetService");
-    if (sheet === "kendaraan") {
-      await spreadsheetService.saveVehicle({ asset_id: assetId, pengguna: newHolderName }, false);
-    } else if (sheet === "alat_mesin") {
-      await spreadsheetService.saveEquipment({ asset_id: assetId, pengguna: newHolderName }, false);
-    } else if (sheet === "inventaris") {
-      await spreadsheetService.saveInventory({ asset_id: assetId, pengguna: newHolderName }, false);
-    } else {
+    if (sheet !== "kendaraan" && sheet !== "alat_mesin") {
       throw new Error("Jenis aset tidak dikenali.");
     }
-    return { ok: true as const, sheet, assetId, newHolderName };
+    return callBackend<{ ok: true; sheet: string; assetId: string; newHolderName: string }>({
+      action: "asset_fix_holder", sheet, assetId, newHolderName,
+    });
   },
 
   getConfig: async (): Promise<{ ok: true; config: Record<string, any> }> =>

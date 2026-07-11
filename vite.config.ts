@@ -6,6 +6,9 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     base: process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_REPOSITORY ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/` : '/',
+    // Aset publik lama pada baseline berisi PNG rusak. Semua aset runtime V1
+    // diimpor dari src agar Vite hanya menerbitkan berkas yang tervalidasi.
+    publicDir: false,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

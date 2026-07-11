@@ -26,6 +26,7 @@ import {
   CalendarCheck, Search, RefreshCw, Download,
   TrendingUp, CalendarClock, Clock, Mail,
   LayoutList, Users, Bell, Send,
+  Settings,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -102,6 +103,12 @@ export default function BukuPenjagaan() {
   // Notifikasi
   const [confirmState,    setConfirmState]    = useState<ConfirmState>(CONFIRM_CLOSED);
   const [isSendingNotif,  setIsSendingNotif]  = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    KGB_CYCLE_YEARS: "2", PANGKAT_CYCLE_YEARS: "4", BUP_USIA: "58",
+    NOTIF_WINDOW_HARI: "180", NOTIF_ADMIN_EMAIL: "",
+  });
 
   const canNotifikasi = can(user?.role, "config.write"); // true untuk admin & pimpinan
 
@@ -319,6 +326,35 @@ export default function BukuPenjagaan() {
     }
   }
 
+  async function openSettings() {
+    try {
+      const res = await apiService.getConfig();
+      setSettingsForm((prev) => ({
+        ...prev,
+        ...Object.fromEntries(Object.keys(prev).map((key) => [key, String(res.config?.[key] ?? prev[key as keyof typeof prev])])),
+      }));
+      setSettingsOpen(true);
+    } catch (err: any) {
+      toast.error("Gagal Memuat Pengaturan", err?.message || "Pengaturan tidak dapat dimuat.");
+    }
+  }
+
+  async function saveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      for (const [key, value] of Object.entries(settingsForm)) await apiService.setConfig(key, value);
+      spreadsheetService.clearCache();
+      setSettingsOpen(false);
+      await load(true);
+      toast.success("Pengaturan Tersimpan", "Perhitungan agenda telah diperbarui.");
+    } catch (err: any) {
+      toast.error("Gagal Menyimpan", err?.message || "Pengaturan tidak dapat disimpan.");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   if (loading) return <LoadingState />;
 
   return (
@@ -340,6 +376,14 @@ export default function BukuPenjagaan() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {canNotifikasi && (
+            <button
+              onClick={openSettings}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+            >
+              <Settings size={15} /> Pengaturan Agenda
+            </button>
+          )}
           {canNotifikasi && (
             <button
               onClick={() =>
@@ -701,6 +745,45 @@ export default function BukuPenjagaan() {
       </AnimatePresence>
       <AssetDetailModal asset={selectedAsset} isOpen={!!selectedAsset} onClose={() => setSelectedAsset(null)} />
       <ConfirmModal state={confirmState} onClose={() => setConfirmState(CONFIRM_CLOSED)} />
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => !savingSettings && setSettingsOpen(false)}>
+          <form onSubmit={saveSettings} onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pengaturan Buku Penjagaan</h2>
+              <p className="text-xs text-gray-500 mt-1">Berlaku untuk perhitungan seluruh pegawai aktif.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                ["KGB_CYCLE_YEARS", "Siklus KGB (tahun)", 1, 10],
+                ["PANGKAT_CYCLE_YEARS", "Siklus Pangkat (tahun)", 1, 10],
+                ["BUP_USIA", "Usia BUP", 50, 70],
+                ["NOTIF_WINDOW_HARI", "Jendela notifikasi (hari)", 1, 730],
+              ].map(([key, label, min, max]) => (
+                <label key={String(key)} className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {String(label)}
+                  <input type="number" min={Number(min)} max={Number(max)} required value={settingsForm[key as keyof typeof settingsForm]}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, [String(key)]: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800" />
+                </label>
+              ))}
+              <label className="sm:col-span-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+                Email penerima notifikasi
+                <input type="email" value={settingsForm.NOTIF_ADMIN_EMAIL}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, NOTIF_ADMIN_EMAIL: e.target.value }))}
+                  placeholder="admin@contoh.go.id"
+                  className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800" />
+              </label>
+            </div>
+            <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
+              Default resmi: KGB 2 tahun, pangkat 4 tahun, dan BUP 58 tahun. Perubahan tercatat dalam audit.
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" disabled={savingSettings} onClick={() => setSettingsOpen(false)} className="px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700">Batal</button>
+              <button type="submit" disabled={savingSettings} className="px-4 py-2 text-sm font-bold rounded-xl bg-blue-600 text-white disabled:opacity-50">{savingSettings ? "Menyimpan…" : "Simpan"}</button>
+            </div>
+          </form>
+        </div>
+      )}
     </motion.div>
   );
 }

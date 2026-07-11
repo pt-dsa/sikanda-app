@@ -1,47 +1,24 @@
-# Deploy Backend Apps Script SIKANDA — Public Safe
+# Deploy Backend Apps Script SIKANDA
 
-## 1. Salin Code.gs
+1. Jalankan migrasi `supabase/001_sikanda_v1_security.sql` dan pastikan berhasil.
+2. Ganti seluruh isi `Code.gs` pada project Backend SIKANDA dengan `apps-script/Code.gs` dari rilis ini.
+3. Isi Script Properties berikut tanpa membagikan nilainya:
 
-Buka Google Apps Script project backend SIKANDA, lalu ganti isi `Code.gs` dengan file `apps-script/Code.gs` dari paket ini.
-
-## 2. Isi Script Properties
-
-Apps Script → Project Settings → Script properties → Add script property.
-
-Wajib:
-
-| Key | Isi |
+| Properti | Keterangan |
 |---|---|
-| `SUPABASE_URL` | URL project Supabase, contoh `https://xxxxx.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key. Jangan taruh di frontend/GitHub. |
-| `FIREBASE_API_KEY` | Firebase Web API key dari project Authentication |
-| `GEMINI_API_KEY` | API key Gemini untuk Tanya SIKANDA |
+| `SUPABASE_URL` | URL project Supabase |
+| `SUPABASE_ANON_KEY` | Anon/publishable key project; tidak dipakai untuk otorisasi server |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service-role/secret key baru, hanya di Apps Script |
+| `FIREBASE_API_KEY` | Firebase Web API key untuk verifikasi ID token |
+| `GEMINI_API_KEY` | Gemini API key baru, hanya di Apps Script |
+| `GEMINI_MODEL` | Model yang diizinkan, default `gemini-2.0-flash` |
 | `BOOTSTRAP_ADMIN_EMAIL` | Email admin pertama |
-| `DRIVE_FOLDER_NAME` | Nama folder Google Drive untuk foto, contoh `SIKANDA_Foto_Pegawai` |
-| `ALLOW_LEGACY_SECRET` | Isi `false` untuk mode public-safe |
+| `DRIVE_FOLDER_NAME` | Contoh `SIKANDA_Foto_Pegawai` |
 
-Opsional:
+Hapus properti lama `SPREADSHEET_ID`, `SHARED_SECRET`, dan `ALLOW_LEGACY_SECRET`; backend V1 Secure tidak memakainya.
 
-| Key | Isi |
-|---|---|
-| `SPREADSHEET_ID` | Spreadsheet legacy, hanya untuk attachment fallback/arsip |
-| `SHARED_SECRET` | Tidak dipakai jika `ALLOW_LEGACY_SECRET=false` |
+4. Deploy → **New deployment** → **Web app** → Execute as **Me** → Who has access **Anyone**.
+5. Salin URL yang berakhir `/exec` ke `VITE_APPS_SCRIPT_URL` pada frontend.
+6. Buka URL `/exec`; respons sehat berisi `ok: true` dan versi `1.1.0-secure`.
 
-## 3. Deploy Web App
-
-1. Klik Deploy → New deployment.
-2. Type: Web app.
-3. Execute as: Me.
-4. Who has access: Anyone.
-5. Copy URL `/exec`.
-6. Masukkan URL tersebut ke env frontend `VITE_APPS_SCRIPT_URL`.
-
-## 4. Test
-
-Buka URL `/exec` di browser. Respons normal:
-
-```json
-{"ok":true,"service":"SIKANDA","time":"..."}
-```
-
-Untuk operasi POST, frontend akan mengirim Firebase idToken. Backend akan memverifikasi token dan mencocokkan email ke Supabase `app_access`.
+Panduan lengkap ada di root proyek: `PANDUAN_IMPLEMENTASI_SIKANDA_V1_SECURE.md`.

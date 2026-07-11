@@ -185,24 +185,20 @@ export default function Dashboard() {
         setErrorMsg(msg);
         // Tetap fetch metrik aset saja (tanpa pegawai) agar dashboard partial bisa tampil
         try {
-          const [vehicles, equipment, inventory, budgets] = await Promise.all([
+          const [vehicles, equipment] = await Promise.all([
             spreadsheetService.getVehicles(),
             spreadsheetService.getEquipment(),
-            spreadsheetService.getInventory(),
-            spreadsheetService.getBudgets(),
           ]);
-          const totalPagu = budgets.reduce((s: number, b: any) => s + (b.total_pagu || 0), 0);
-          const totalRealisasi = budgets.reduce((s: number, b: any) => s + (b.total_realisasi || 0), 0);
           setMetrics({
             totalPegawai: 0, pegawaiAktif: 0, pegawaiPensiun: 0,
             pegawaiASN: 0, pegawaiPPPK: 0,
             peringatanKGB: 0, peringatanPangkat: 0, peringatanPensiun: 0, peringatanTerlambat: 0,
             distribusiGolongan: [], distribusiPendidikan: [], distribusiMasaKerja: [],
             totalKendaraan: vehicles.length, totalAlatMesin: equipment.length,
-            totalInventaris: inventory.length, totalAset: vehicles.length + equipment.length + inventory.length,
+            totalInventaris: 0, totalAset: vehicles.length + equipment.length,
             totalPeminjaman: 0, totalPemeliharaan: 0,
-            totalPagu, totalRealisasi,
-            persenRealisasi: totalPagu > 0 ? (totalRealisasi / totalPagu) * 100 : 0,
+            totalPagu: 0, totalRealisasi: 0,
+            persenRealisasi: 0,
             lastUpdated: spreadsheetService.getLastUpdated(),
           });
         } catch { /* silently ignore partial load errors */ }

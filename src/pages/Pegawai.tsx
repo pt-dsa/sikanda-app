@@ -122,12 +122,11 @@ export default function PegawaiPage() {
       // pemindaian TIDAK memblokir halaman: set kosong = kriteria 9 lolos
       // berdasarkan match_quality saja.
       try {
-        const [vehicles, equipment, inventory] = await Promise.all([
+        const [vehicles, equipment] = await Promise.all([
           spreadsheetService.getVehicles(),
           spreadsheetService.getEquipment(),
-          spreadsheetService.getInventory(),
         ]);
-        const unified = buildUnifiedAssets(vehicles, equipment, inventory);
+        const unified = buildUnifiedAssets(vehicles, equipment);
         setFuzzyNipSet(buildFuzzyNipSet(result as Pegawai[], unified));
       } catch {
         setFuzzyNipSet(new Set());

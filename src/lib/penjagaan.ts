@@ -58,6 +58,17 @@ function parseLocalDate(dateStr: string): Date | null {
   return null;
 }
 
+function anniversary(start: Date, year: number): Date {
+  // JavaScript menggeser 29 Februari ke Maret pada tahun non-kabisat. Untuk
+  // agenda administrasi, gunakan hari terakhir Februari secara konsisten.
+  const month = start.getMonth();
+  const day = start.getDate();
+  const maxDay = new Date(year, month + 1, 0).getDate();
+  const d = new Date(year, month, Math.min(day, maxDay));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 // ── perhitungan siklus ──────────────────────────────────────────────────────
 
 /**
@@ -67,18 +78,16 @@ function parseLocalDate(dateStr: string): Date | null {
  */
 export function nextCycleDate(tmtInput: unknown, cycleYears: number): string {
   const start = parseAnyDate(tmtInput);
-  if (!start) return "";
+  if (!start || !Number.isFinite(cycleYears) || cycleYears < 1) return "";
   const today = startOfToday();
-  let year = start.getFullYear();
-  const month = start.getMonth();
-  const day = start.getDate();
+  let year = start.getFullYear() + cycleYears;
   if (today.getFullYear() > year) {
     year += Math.floor((today.getFullYear() - year) / cycleYears) * cycleYears;
   }
-  let cand = new Date(year, month, day); cand.setHours(0, 0, 0, 0);
+  let cand = anniversary(start, year);
   while (cand < today) {
     year += cycleYears;
-    cand = new Date(year, month, day); cand.setHours(0, 0, 0, 0);
+    cand = anniversary(start, year);
   }
   return localISO(cand);
 }
@@ -93,18 +102,16 @@ export function prevCycleDate(tmtInput: unknown, cycleYears: number): string {
   const start = parseAnyDate(tmtInput);
   if (!start) return "";
   const today = startOfToday();
-  const month = start.getMonth();
-  const day = start.getDate();
 
   // Jatuh tempo pertama setelah TMT (k=1).
   let year = start.getFullYear() + cycleYears;
-  let cand = new Date(year, month, day); cand.setHours(0, 0, 0, 0);
+  let cand = anniversary(start, year);
   if (cand >= today) return ""; // siklus pertama masih di masa depan → belum ada yang lewat
 
   // Maju sampai occurrence terakhir yang masih < hari ini.
   while (true) {
     const nextYear = year + cycleYears;
-    const nextCand = new Date(nextYear, month, day); nextCand.setHours(0, 0, 0, 0);
+    const nextCand = anniversary(start, nextYear);
     if (nextCand >= today) break;
     year = nextYear; cand = nextCand;
   }
@@ -115,8 +122,7 @@ export function prevCycleDate(tmtInput: unknown, cycleYears: number): string {
 export function pensionDate(lahirInput: unknown, bup: number): string {
   const b = parseAnyDate(lahirInput);
   if (!b) return "";
-  const d = new Date(b.getFullYear() + bup, b.getMonth(), b.getDate());
-  d.setHours(0, 0, 0, 0);
+  const d = anniversary(b, b.getFullYear() + bup);
   return localISO(d);
 }
 
@@ -248,11 +254,25 @@ export function buildPenjagaanEvents(pegawaiList: any[], today: Date = startOfTo
   const events: PenjagaanEvent[] = [];
   for (const p of pegawaiList) {
     const base = baseOf(p);
-    pushCycleEvent(events, base, "KGB", "KGB (Kenaikan Gaji Berkala)",
-      String(p.tgl_kgb || ""), prevCycleDate(p.tgl_mulai_golongan, 2), today);
-    pushCycleEvent(events, base, "PANGKAT", "Kenaikan Pangkat",
-      String(p.tgl_pangkat || ""), prevCycleDate(p.tgl_mulai_golongan, 4), today);
-    pushBupEvent(events, base, String(p.tgl_pensiun || ""), today);
+    const status = base.status;
+    const category = String(p.kategori_pppk || '').toLowerCase();
+    const isAsn = status === 'ASN';
+    const isFullTimePppk = status.startsWith('PPPK') && category === 'penuh_waktu';
+    const kgbCycle = Number(p.kgb_cycle_years) || 2;
+    const pangkatCycle = Number(p.pangkat_cycle_years) || 4;
+
+    // ASN memperoleh seluruh agenda. PPPK penuh waktu hanya memperoleh KGB.
+    // PPPK tanpa kategori sengaja tidak diagendakan agar tidak terjadi asumsi
+    // hak; administrator harus menentukan kategorinya terlebih dahulu.
+    if (isAsn || isFullTimePppk) {
+      pushCycleEvent(events, base, "KGB", "KGB (Kenaikan Gaji Berkala)",
+        String(p.tgl_kgb || ""), prevCycleDate(p.tgl_mulai_golongan, kgbCycle), today);
+    }
+    if (isAsn) {
+      pushCycleEvent(events, base, "PANGKAT", "Kenaikan Pangkat",
+        String(p.tgl_pangkat || ""), prevCycleDate(p.tgl_mulai_golongan, pangkatCycle), today);
+      pushBupEvent(events, base, String(p.tgl_pensiun || ""), today);
+    }
   }
   return events;
 }

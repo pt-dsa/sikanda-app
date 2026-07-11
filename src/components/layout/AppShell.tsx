@@ -5,7 +5,7 @@ import {
   Settings, LogOut, Menu, Map, FileText, CalendarClock, Users, Bell, CalendarCheck, UserCog, ScanSearch, MessagesSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import logoUrl from "@/assets/logo_kota_tangerang_selatan.png";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { withinMonths, buildPenjagaanEvents, sisaWaktuLabel, type PenjagaanEvent } from "@/lib/penjagaan";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/ui/GlobalSearch";
@@ -138,36 +138,10 @@ const navItems: { icon: any; label: string; href: string; menu: MenuKey }[] = [
 function Sidebar({ mobileOpen, desktopOpen, setMobileOpen }: { mobileOpen: boolean, desktopOpen: boolean, setMobileOpen: (v: boolean) => void }) {
   const location = useLocation();
   const { user, logout } = useContext(AuthContext);
-  const [upcomingMaintenanceCount, setUpcomingMaintenanceCount] = useState(0);
   const items = useMemo(
     () => navItems.filter((it) => canViewMenu(user?.role, it.menu)),
     [user?.role]
   );
-
-  useEffect(() => {
-    async function checkMaintenance() {
-      try {
-        const vehicles = await spreadsheetService.getVehicles();
-        let count = 0;
-        const now = new Date();
-        const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-        vehicles.forEach((v: any) => {
-          // Hanya berbasis tanggal servis NYATA bila tersedia di data. Tidak ada simulasi.
-          const dateStr = v.next_service_date || v.jadwal_service;
-          if (dateStr) {
-            const dt = new Date(dateStr);
-            if (!isNaN(dt.getTime()) && dt >= now && dt <= next7Days) count++;
-          }
-        });
-
-        setUpcomingMaintenanceCount(count);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    checkMaintenance();
-  }, []);
 
   return (
     <aside className={cn(
@@ -178,7 +152,7 @@ function Sidebar({ mobileOpen, desktopOpen, setMobileOpen }: { mobileOpen: boole
     )}>
       <div className={cn("flex flex-col items-center justify-center border-b border-gray-100/50 dark:border-gray-800/50 overflow-hidden py-4", desktopOpen ? "px-4" : "md:px-2 md:justify-center px-4")}>
         <div className="flex flex-col items-center gap-2 text-blue-700 dark:text-blue-500 font-bold tracking-tight whitespace-nowrap neuglass rounded-2xl p-3 w-full">
-          <img src={logoUrl} alt="SIKANDA Logo" className="w-16 h-16 object-contain drop-shadow-sm" />
+          <BrandLogo className="w-16 h-16" />
           <span className={cn("transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] origin-top text-lg w-[88.625px] text-center leading-[28px]", desktopOpen ? "opacity-100 scale-100 h-auto mt-1" : "md:opacity-0 md:scale-0 md:h-0 opacity-100 scale-100 h-auto mt-1")}>SIKANDA</span>
         </div>
       </div>
@@ -186,7 +160,7 @@ function Sidebar({ mobileOpen, desktopOpen, setMobileOpen }: { mobileOpen: boole
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname.startsWith(item.href);
-          const notifyBadge = item.label === "Pemeliharaan Kendaraan" && upcomingMaintenanceCount > 0;
+          const notifyBadge = false;
           return (
             <NavLink
               key={item.href}
@@ -213,9 +187,7 @@ function Sidebar({ mobileOpen, desktopOpen, setMobileOpen }: { mobileOpen: boole
                 </span>
               </div>
               {notifyBadge && desktopOpen && (
-                <span className="flex items-center justify-center w-5 h-5 ml-2 text-[10px] font-bold text-white bg-red-500 rounded-full shadow-sm">
-                  {upcomingMaintenanceCount}
-                </span>
+                <span />
               )}
             </NavLink>
           );
@@ -382,7 +354,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
       </div>
       
       <div className="flex-1 max-w-2xl px-2 sm:px-4 lg:px-8 flex justify-center">
-        <GlobalSearch />
+        {user?.role !== "pegawai" ? <GlobalSearch /> : <div className="flex-1" />}
       </div>
 
       <div className="flex items-center gap-4 flex-shrink-0">

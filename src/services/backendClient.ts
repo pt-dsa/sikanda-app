@@ -16,7 +16,7 @@ async function buildAuth(explicitAuth?: BackendAuth): Promise<BackendAuth> {
 let pendingRequests = 0;
 const requestQueue: Array<() => void> = [];
 async function acquireConcurrencySlot(): Promise<void> {
-  if (pendingRequests < 15) {
+  if (pendingRequests < 6) {
     pendingRequests++;
     return Promise.resolve();
   }
@@ -49,19 +49,27 @@ export async function callBackend<T = any>(
   const auth = await buildAuth(explicitAuth);
 
   let res: Response;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
   try {
     res = await fetch(APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ ...payload, ...auth }),
       redirect: "follow",
+      signal: controller.signal,
     });
   } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new Error("Server SIKANDA tidak merespons dalam 30 detik. Silakan coba lagi.");
+    }
     throw new Error(
       "Tidak dapat menghubungi server SIKANDA. Periksa koneksi internet dan URL Apps Script. (" +
         (e?.message || e) +
         ")"
     );
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
   let json: any;
@@ -88,24 +96,5 @@ export type SupabaseFilter = {
 
 export async function backendSelect(table: string, filters: SupabaseFilter[] = []): Promise<any[]> {
   const res = await callBackend<{ ok: true; data: any[] }>({ action: "supa_select", table, filters });
-  return res.data || [];
-}
-
-export async function backendInsert(table: string, data: any | any[]): Promise<any[]> {
-  const res = await callBackend<{ ok: true; data: any[] }>({ action: "supa_insert", table, data });
-  return res.data || [];
-}
-
-export async function backendUpdate(
-  table: string,
-  data: Record<string, any>,
-  match: SupabaseFilter
-): Promise<any[]> {
-  const res = await callBackend<{ ok: true; data: any[] }>({ action: "supa_update", table, data, match });
-  return res.data || [];
-}
-
-export async function backendDelete(table: string, match: SupabaseFilter): Promise<any[]> {
-  const res = await callBackend<{ ok: true; data: any[] }>({ action: "supa_delete", table, match });
   return res.data || [];
 }

@@ -1,16 +1,13 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { spreadsheetService } from "@/services/spreadsheetService";
 import { apiService } from "@/services/apiService";
-import { buildDataContext } from "@/lib/tanya";
 import { AuthContext } from "@/components/layout/AppShell";
-import { LoadingState } from "@/components/ui/LoadingState";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { useToast } from "@/components/ui/Toast";
 import Markdown from "react-markdown";
 import {
-  Sparkles, SendHorizonal, RefreshCw, AlertTriangle, ShieldCheck, Trash2, CheckCheck
+  SendHorizonal, ShieldCheck, Trash2, CheckCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Pegawai } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Tanya SIKANDA — asisten data berbasis AI (Groq via backend Apps Script).
@@ -60,7 +57,7 @@ function Bubble({ msg }: { key?: any; msg: ChatMsg }) {
       <div className={`flex items-end gap-2 max-w-[85%] sm:max-w-[75%] ${isUser ? "flex-row-reverse" : ""}`}>
         {!isUser && (
           <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
-            <img src={`${import.meta.env.BASE_URL}logo_simosda.png`} alt="SIKANDA" className="w-full h-full object-contain p-1" />
+            <BrandLogo className="w-7 h-7" compact />
           </div>
         )}
         <div
@@ -95,7 +92,7 @@ function TypingIndicator() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
       <div className="flex items-end gap-2">
         <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
-          <img src={`${import.meta.env.BASE_URL}logo_simosda.png`} alt="SIKANDA" className="w-full h-full object-contain p-1" />
+          <BrandLogo className="w-7 h-7" compact />
         </div>
         <div className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-md shadow-sm">
           <div className="flex gap-1">
@@ -118,11 +115,6 @@ export default function TanyaSikanda() {
   const { user } = useContext(AuthContext);
   const toast = useToast();
 
-  // Konteks data (dibangun per pertanyaan dari data nyata)
-  const [rawData, setRawData] = useState<{pegawai: Pegawai[], vehicles: any[], equipment: any[], inventory: any[], config: any} | null>(null);
-  const [ctxLoading, setCtxLoading] = useState(true);
-  const [ctxError, setCtxError] = useState<string | null>(null);
-
   // Percakapan — hanya selama sesi (state, hilang saat refresh)
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -136,36 +128,6 @@ export default function TanyaSikanda() {
     return n ? n.split(/\s+/)[0] : "";
   }, [user]);
 
-  async function loadData() {
-    setCtxLoading(true);
-    setCtxError(null);
-    try {
-      const [pegawai, vehicles, equipment, inventory, settings] = await Promise.all([
-        spreadsheetService.getPegawai(),
-        spreadsheetService.getVehicles(),
-        spreadsheetService.getEquipment(),
-        spreadsheetService.getInventory(),
-        spreadsheetService.getSystemSettings(),
-      ]);
-      setRawData({
-        pegawai: pegawai as Pegawai[],
-        vehicles,
-        equipment,
-        inventory,
-        config: { BUP_USIA: settings.bup }
-      });
-    } catch (err: any) {
-      setCtxError(err?.message || "Gagal memuat data SIKANDA.");
-    } finally {
-      setCtxLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Auto-scroll ke pesan terbaru
   useEffect(() => {
     const el = scrollRef.current;
@@ -174,17 +136,7 @@ export default function TanyaSikanda() {
 
   async function send(rawQuestion: string) {
     const question = rawQuestion.trim();
-    if (!question || sending || !rawData) return;
-    
-    // Bangun konteks HANYA dengan data yang relevan dengan pertanyaan
-    const dynamicContext = buildDataContext(
-      rawData.pegawai,
-      rawData.vehicles,
-      rawData.equipment,
-      rawData.inventory,
-      rawData.config,
-      question
-    );
+    if (!question || sending) return;
 
     const userMsg: ChatMsg = { id: newId(), role: "user", content: question, time: nowLabel() };
 
@@ -198,7 +150,9 @@ export default function TanyaSikanda() {
     setInput("");
     setSending(true);
     try {
-      const res = await apiService.askAI(question, history, dynamicContext);
+      // Konteks dibangun di server berdasarkan role; data dari browser sengaja
+      // tidak dipercaya agar pegawai tidak dapat meminta data milik orang lain.
+      const res = await apiService.askAI(question, history, "");
       setMessages((prev) => [
         ...prev,
         { id: newId(), role: "assistant", content: res.answer, time: nowLabel() },
@@ -236,26 +190,6 @@ export default function TanyaSikanda() {
     }
   }
 
-  if (ctxLoading) return <LoadingState />;
-
-  if (ctxError) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-6 rounded-xl max-w-md text-center border border-red-200 dark:border-red-800/50">
-          <AlertTriangle size={40} className="mx-auto mb-3 opacity-50" />
-          <h2 className="font-bold mb-2">Gagal Memuat Data SIKANDA</h2>
-          <p className="text-sm mb-4">{ctxError}</p>
-          <button
-            onClick={loadData}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <RefreshCw size={14} /> Coba Lagi
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-[calc(100dvh-8.5rem)] md:h-full">
 
@@ -264,7 +198,7 @@ export default function TanyaSikanda() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative shrink-0">
             <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center shadow-sm overflow-hidden">
-              <img src={`${import.meta.env.BASE_URL}logo_simosda.png`} alt="SIKANDA" className="w-full h-full object-contain p-1" />
+              <BrandLogo className="w-8 h-8" compact />
             </div>
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full" />
           </div>

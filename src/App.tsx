@@ -31,8 +31,14 @@ const TanyaSikanda = lazy(() => import("@/pages/TanyaSikanda"));
 function MenuGuard({ menu, children }: { menu: MenuKey; children: React.ReactNode }) {
   const { user } = useContext(AuthContext);
   if (!user) return <Navigate to="/login" replace />;
-  if (!canViewMenu(user.role, menu)) return <Navigate to="/dashboard" replace />;
+  if (!canViewMenu(user.role, menu)) {
+    return <Navigate to={user.role === "pegawai" ? "/pegawai" : "/dashboard"} replace />;
+  }
   return <>{children}</>;
+}
+
+function GuardedPage({ menu, children }: { menu: MenuKey; children: React.ReactNode }) {
+  return <MenuGuard menu={menu}>{children}</MenuGuard>;
 }
 
 function ProtectedLayout() {
@@ -58,18 +64,18 @@ export default function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
               <Route element={<ProtectedLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/pegawai" element={<PegawaiPage />} />
-                <Route path="/buku-penjagaan" element={<BukuPenjagaan />} />
-                <Route path="/kendaraan" element={<Kendaraan />} />
-                <Route path="/alat-mesin" element={<AlatMesin />} />
-                <Route path="/inventaris" element={<Inventaris />} />
-                <Route path="/pagu" element={<PaguAnggaran />} />
-                <Route path="/pemeliharaan-kendaraan" element={<PemeliharaanKendaraan />} />
-                <Route path="/peminjaman" element={<Peminjaman />} />
-                <Route path="/peta" element={<PetaSebaran />} />
-                <Route path="/laporan" element={<Laporan />} />
-                <Route path="/tanya" element={<TanyaSikanda />} />
+                <Route path="/dashboard" element={<GuardedPage menu="dashboard"><Dashboard /></GuardedPage>} />
+                <Route path="/pegawai" element={<GuardedPage menu="pegawai"><PegawaiPage /></GuardedPage>} />
+                <Route path="/buku-penjagaan" element={<GuardedPage menu="buku-penjagaan"><BukuPenjagaan /></GuardedPage>} />
+                <Route path="/kendaraan" element={<GuardedPage menu="kendaraan"><Kendaraan /></GuardedPage>} />
+                <Route path="/alat-mesin" element={<GuardedPage menu="alat-mesin"><AlatMesin /></GuardedPage>} />
+                <Route path="/inventaris" element={<GuardedPage menu="inventaris"><Inventaris /></GuardedPage>} />
+                <Route path="/pagu" element={<GuardedPage menu="pagu"><PaguAnggaran /></GuardedPage>} />
+                <Route path="/pemeliharaan-kendaraan" element={<GuardedPage menu="pemeliharaan-kendaraan"><PemeliharaanKendaraan /></GuardedPage>} />
+                <Route path="/peminjaman" element={<GuardedPage menu="peminjaman"><Peminjaman /></GuardedPage>} />
+                <Route path="/peta" element={<GuardedPage menu="peta"><PetaSebaran /></GuardedPage>} />
+                <Route path="/laporan" element={<GuardedPage menu="laporan"><Laporan /></GuardedPage>} />
+                <Route path="/tanya" element={<GuardedPage menu="tanya"><TanyaSikanda /></GuardedPage>} />
                 <Route
                   path="/kelola-akun"
                   element={

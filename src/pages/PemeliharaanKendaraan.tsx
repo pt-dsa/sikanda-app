@@ -24,7 +24,7 @@ export default function PemeliharaanKendaraan() {
           </h1>
           
           <p className="text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-            Menu <strong className="text-gray-900 dark:text-white font-semibold">Pemeliharaan Kendaraan</strong> ini akan dikembangkan pada <strong className="text-gray-900 dark:text-white font-semibold">SIKANDA V2</strong>. Silakan nantikan pembaruan kami selanjutnya.
+            Menu dalam pengembangan, nantikan pada SIKANDA Versi 2.
           </p>
         </div>
       </motion.div>

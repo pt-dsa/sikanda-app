@@ -35,8 +35,7 @@ export interface UnifiedAsset {
 
 export function buildUnifiedAssets(
   vehicles: any[],
-  equipment: any[],
-  inventory: any[]
+  equipment: any[]
 ): UnifiedAsset[] {
   return [
     ...vehicles.map((v: any) => ({
@@ -50,12 +49,6 @@ export function buildUnifiedAssets(
       assetId: String(eq.asset_id || ""),
       assetLabel: String(eq.nama_aset || "-"),
       holderName: String(eq.pengguna || ""),
-    })),
-    ...inventory.map((iv: any) => ({
-      sheet: "assets_inventory" as AssetSheetName,
-      assetId: String(iv.asset_id || ""),
-      assetLabel: String(iv.nama_aset || "-"),
-      holderName: String(iv.pengguna || ""),
     })),
   ].filter((a) => a.assetId);
 }

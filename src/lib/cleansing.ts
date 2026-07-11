@@ -16,12 +16,11 @@ import type { Pegawai } from "@/types";
 // Sheet aset yang didukung untuk auto-koreksi holder_name (lihat Code.gs
 // action `asset_fix_holder`). Nama harus PERSIS sama dengan nama sheet asli.
 // ---------------------------------------------------------------------------
-export type AssetSheetName = "assets_vehicle" | "assets_equipment" | "assets_inventory";
+export type AssetSheetName = "assets_vehicle" | "assets_equipment";
 
 export const ASSET_SHEET_LABEL: Record<AssetSheetName, string> = {
   assets_vehicle: "Kendaraan",
   assets_equipment: "Alat & Mesin",
-  assets_inventory: "Inventaris",
 };
 
 // ---------------------------------------------------------------------------

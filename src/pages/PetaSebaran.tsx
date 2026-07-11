@@ -6,7 +6,7 @@ import L from "leaflet";
 import { Card, CardContent } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { Car, Bike, Wrench, Package, MapPin, Eye, Map as MapIcon, Layers, Radio, ZoomIn, X, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Car, Bike, Wrench, MapPin, Eye, Map as MapIcon, Layers, Radio, ZoomIn, X, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { renderToString } from "react-dom/server";
 import { StatusBadge } from "@/components/ui/Badge";
 
@@ -20,7 +20,7 @@ L.Icon.Default.mergeOptions({
 
 interface MapLocation {
   id: string;
-  type: string; // 'Kendaraan', 'Alat & Mesin', 'Inventaris'
+  type: string; // 'Kendaraan' atau 'Alat & Mesin'
   lat: number;
   lng: number;
   title: string;
@@ -55,10 +55,9 @@ export default function PetaSebaran() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [vehicles, equipment, inventory] = await Promise.all([
+        const [vehicles, equipment] = await Promise.all([
           spreadsheetService.getVehicles(),
           spreadsheetService.getEquipment(),
-          spreadsheetService.getInventory(),
         ]);
 
         const parseCoordinate = (val: any) => {
@@ -138,48 +137,6 @@ export default function PetaSebaran() {
           }
         });
 
-        inventory.forEach((i: any) => {
-          let lat = parseCoordinate(i.latitude || i.lat);
-          let lng = parseCoordinate(i.longitude || i.lng);
-          
-          if (!lat || !lng) {
-            if (i.lokasi) {
-               const parts = String(i.lokasi).split(',');
-               if (parts.length >= 2) {
-                 lat = parseCoordinate(parts[0]);
-                 lng = parseCoordinate(parts[1]);
-               }
-            }
-          }
-
-          if (lat && lng) {
-            mapLocations.push({
-              id: i.asset_id || i.id || Math.random().toString(),
-              type: "Inventaris",
-              lat, 
-              lng,
-              title: i.nama_aset || "Inventaris",
-              subtitle: i.lokasi_ruangan || "-",
-              condition: i.kondisi || "BAIK",
-              pengguna: i.pengguna,
-              qrUrl: i.qr_url,
-              foto: i.foto,
-              data: {
-                "Asset ID": i.asset_id,
-                "Kode Barang": i.kode_barang,
-                "Nama Barang": i.nama_aset,
-                "Merk": i.merk,
-                "Lokasi Ruangan": i.lokasi_ruangan,
-                "Jumlah": i.jumlah ? `${i.jumlah} ${i.satuan || ''}` : '',
-                "Kondisi": i.kondisi,
-                "Tahun": i.tahun,
-                "Pengguna": i.pengguna,
-                "Harga Pembelian": i.harga_pembelian,
-              }
-            });
-          }
-        });
-
         setLocations(mapLocations);
       } finally {
         setLoading(false);
@@ -201,7 +158,7 @@ export default function PetaSebaran() {
 
   // Jumlah titik per tipe atas SELURUH lokasi (untuk chip klikable → filterType).
   const typeSummary = useMemo(() => {
-    const order = ["Kendaraan", "Alat & Mesin", "Inventaris"];
+    const order = ["Kendaraan", "Alat & Mesin"];
     const counts: Record<string, number> = {};
     locations.forEach((l) => { counts[l.type] = (counts[l.type] || 0) + 1; });
     const keys = Array.from(new Set([...order.filter((k) => counts[k]), ...Object.keys(counts)]));
@@ -226,9 +183,6 @@ export default function PetaSebaran() {
     } else if (loc.type === "Alat & Mesin") {
       color = "#16A34A";
       IconComponent = <Wrench size={16} />;
-    } else if (loc.type === "Inventaris") {
-      color = "#D97706";
-      IconComponent = <Package size={16} />;
     }
 
     const iconHtml = renderToString(IconComponent);
@@ -328,7 +282,6 @@ export default function PetaSebaran() {
               <option value="Semua Tipe">Jenis Aset</option>
               <option value="Kendaraan">Kendaraan</option>
               <option value="Alat & Mesin">Alat & Mesin</option>
-              <option value="Inventaris">Inventaris</option>
             </select>
             <select 
               value={filterCondition} 
@@ -486,13 +439,6 @@ export default function PetaSebaran() {
                   </div>
                   <span className="font-bold text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{stats['Alat & Mesin'] || 0}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-full bg-[#D97706] flex items-center justify-center text-white ring-2 ring-white dark:ring-gray-900 shadow-sm"><Package size={12} /></div>
-                    <span className="text-gray-700 dark:text-gray-300">Inventaris</span>
-                  </div>
-                  <span className="font-bold text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{stats['Inventaris'] || 0}</span>
-                </div>
               </div>
               
               <div className="space-y-2.5 pt-3 border-t border-gray-100 dark:border-gray-800">
@@ -525,4 +471,3 @@ export default function PetaSebaran() {
     </div>
   );
 }
-

@@ -85,15 +85,14 @@ export default function Cleansing() {
       const result = await spreadsheetService.getPegawai();
       setPegawaiList(result as Pegawai[]);
 
-      // Pindai kecocokan nama pegawai ↔ aset (3 sheet aset sekaligus)
-      const [vehicles, equipment, inventory] = await Promise.all([
+      // Pindai kecocokan nama pegawai pada modul aktif V1.
+      const [vehicles, equipment] = await Promise.all([
         spreadsheetService.getVehicles(),
         spreadsheetService.getEquipment(),
-        spreadsheetService.getInventory(),
       ]);
       // Bentuk baku baris aset — builder BERSAMA dengan halaman Pegawai &
       // getDashboardMetrics (@/lib/kelengkapan), satu definisi tanpa duplikasi.
-      const unifiedAssets = buildUnifiedAssets(vehicles, equipment, inventory);
+      const unifiedAssets = buildUnifiedAssets(vehicles, equipment);
 
       setAssetIssues(scanAssetNameMismatches(result as Pegawai[], unifiedAssets));
     } catch (err: any) {
