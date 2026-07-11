@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useMemo } from "react";
 import {
   UserCog, Plus, Save, X, RefreshCw, ShieldAlert, ShieldCheck, Download,
   CheckCircle2, Ban, Pencil, Mail, IdCard, Users as UsersIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { apiService, type AccessUser } from "@/services/apiService";
+import { spreadsheetService } from "@/services/spreadsheetService";
+import type { Pegawai } from "@/types";
 import { AuthContext } from "@/components/layout/AppShell";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -39,6 +41,7 @@ const emptyForm: FormState = { email: "", role: "pegawai", nip: "", nama: "", is
 export default function KelolaAkun() {
   const { user } = useContext(AuthContext);
   const [users, setUsers] = useState<AccessUser[]>([]);
+  const [pegawai, setPegawai] = useState<Pegawai[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +50,8 @@ export default function KelolaAkun() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [employeeQuery, setEmployeeQuery] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
@@ -63,9 +68,13 @@ export default function KelolaAkun() {
     setError(null);
     setDenied(false);
     try {
-      const res = await apiService.userList();
+      const [res, employeeRows] = await Promise.all([
+        apiService.userList(),
+        spreadsheetService.getPegawai(),
+      ]);
       const sorted = (res.users || []).slice().sort((a, b) => a.email.localeCompare(b.email));
       setUsers(sorted);
+      setPegawai((employeeRows || []).filter((p: Pegawai) => p.is_active !== false));
     } catch (e: any) {
       const msg = String(e?.message || e);
       if (/admin|akses ditolak|ditolak/i.test(msg)) setDenied(true);
@@ -82,6 +91,8 @@ export default function KelolaAkun() {
 
   function openAdd() {
     setForm(emptyForm);
+    setEmployeeQuery("");
+    setSuggestionsOpen(false);
     setIsEdit(false);
     setError(null);
     setIsFormOpen(true);
@@ -89,7 +100,9 @@ export default function KelolaAkun() {
 
   function openEdit(u: AccessUser) {
     setForm({ email: u.email, role: u.role, nip: String(u.nip || ""), nama: u.nama || "", is_active: u.is_active });
-    setIsEdit(!u.email); // isEdit=false (mode isi email baru) bila email kosong; true bila sudah ada email
+    setEmployeeQuery(u.nama || "");
+    setSuggestionsOpen(false);
+    setIsEdit(true);
     setError(null);
     setIsFormOpen(true);
   }
@@ -102,8 +115,8 @@ export default function KelolaAkun() {
       setError("Email Google yang valid wajib diisi.");
       return;
     }
-    if (form.role === "pegawai" && !form.nip.trim()) {
-      setError("NIP wajib diisi untuk peran Pegawai (penghubung ke data kepegawaian).");
+    if (!isEdit && !/^\d{18}$/.test(form.nip.trim())) {
+      setError("Pilih nama pegawai dari suggestion Database Pegawai terlebih dahulu.");
       return;
     }
     setSaving(true);
@@ -119,6 +132,35 @@ export default function KelolaAkun() {
       setError(String(e?.message || e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  const candidateEmployees = useMemo(() => {
+    const query = employeeQuery.trim().toLowerCase();
+    if (query.length < 2) return [];
+    const registeredNips = new Set(users.map((u) => String(u.nip || "").trim()).filter(Boolean));
+    return pegawai
+      .filter((p) => {
+        const text = `${p.nama || ""} ${p.nip || ""} ${p.email || ""}`.toLowerCase();
+        return text.includes(query) && !registeredNips.has(String(p.nip || "").trim());
+      })
+      .slice(0, 8);
+  }, [employeeQuery, pegawai, users]);
+
+  function selectEmployee(employee: Pegawai) {
+    const email = String(employee.email || "").toLowerCase().trim();
+    setForm((current) => ({
+      ...current,
+      nip: String(employee.nip || "").trim(),
+      nama: String(employee.nama || "").trim(),
+      email,
+    }));
+    setEmployeeQuery(String(employee.nama || "").trim());
+    setSuggestionsOpen(false);
+    if (!email || !email.includes("@")) {
+      setError("Pegawai ini belum memiliki email valid. Lengkapi email pada menu Data ASN/PPPK terlebih dahulu.");
+    } else {
+      setError(null);
     }
   }
 
@@ -152,11 +194,11 @@ export default function KelolaAkun() {
 
   function handleSeed() {
     askConfirm({
-      title: "Tarik dari Sheet Pegawai",
+      title: "Tarik dari Database Pegawai",
       message:
-        "Buat akun peran 'pegawai' dari sheet 'pegawai' untuk tiap pegawai aktif ber-NIP yang belum terdaftar?\n\n" +
-        "• Bila kolom EMAIL pegawai terisi (bukan placeholder), email dipakai & akun langsung AKTIF.\n" +
-        "• Bila EMAIL kosong, akun dibuat NONAKTIF — lengkapi email lalu aktifkan dari halaman ini.",
+        "Buat akun peran 'pegawai' dari Database Pegawai untuk tiap pegawai aktif ber-NIP yang belum terdaftar?\n\n" +
+        "• Bila email pegawai valid, akun dibuat dan langsung AKTIF.\n" +
+        "• Bila email kosong/tidak valid, data dilewati dan harus dilengkapi melalui Data ASN/PPPK.",
       confirmLabel: "Tarik Sekarang",
       confirmClass: "bg-blue-600 hover:bg-blue-700",
       onConfirm: async () => {
@@ -185,7 +227,7 @@ export default function KelolaAkun() {
             <ShieldAlert className="mx-auto mb-3 text-red-500" size={40} />
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Akses Ditolak</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Halaman Kelola Akun hanya untuk Administrator. Peran akun Anda saat ini tidak memiliki izin ini.
+              Halaman Kelola Akun hanya untuk Administrator dan Pimpinan. Peran akun Anda saat ini tidak memiliki izin ini.
             </p>
           </CardContent>
         </Card>
@@ -217,10 +259,10 @@ export default function KelolaAkun() {
             onClick={handleSeed}
             disabled={seeding}
             className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm"
-            title="Buat akun peran 'pegawai' dari sheet pegawai"
+            title="Buat akun peran Pegawai dari Database Pegawai"
           >
             {seeding ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-            Tarik dari sheet pegawai
+            Tarik dari Database Pegawai
           </button>
           <button
             onClick={openAdd}
@@ -250,7 +292,7 @@ export default function KelolaAkun() {
           {users.length === 0 ? (
             <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
               <UsersIcon className="mx-auto mb-3 text-gray-300" size={36} />
-              Belum ada akun terdaftar. Tambahkan akun atau tarik dari sheet pegawai.
+              Belum ada akun terdaftar. Tambahkan akun atau tarik dari Database Pegawai.
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -320,7 +362,7 @@ export default function KelolaAkun() {
             >
               <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
                 <h2 className="font-bold text-lg text-gray-900 dark:text-white">
-                  {isEdit ? "Tambah Akun" : form.email ? "Edit Akun" : "Lengkapi Email Akun"}
+                  {isEdit ? "Edit Akun" : "Tambah Akun"}
                 </h2>
                 <button onClick={() => setIsFormOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
                   <X size={20} />
@@ -335,17 +377,54 @@ export default function KelolaAkun() {
                   </div>
                 )}
 
+                {!isEdit && (
+                  <div className="relative">
+                    <label className={labelCls}>Nama Pegawai <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      value={employeeQuery}
+                      onFocus={() => setSuggestionsOpen(true)}
+                      onChange={(e: any) => {
+                        setEmployeeQuery(e.target.value);
+                        setSuggestionsOpen(true);
+                        setForm((current) => ({ ...current, nip: "", nama: "", email: "" }));
+                        setError(null);
+                      }}
+                      placeholder="Ketik minimal 2 huruf nama pegawai..."
+                      className={inputCls}
+                    />
+                    {suggestionsOpen && employeeQuery.trim().length >= 2 && (
+                      <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl">
+                        {candidateEmployees.length > 0 ? candidateEmployees.map((p) => (
+                          <button
+                            type="button"
+                            key={p.nip}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectEmployee(p)}
+                            className="w-full px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 border-b last:border-b-0 border-gray-100 dark:border-gray-800"
+                          >
+                            <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">{p.nama}</span>
+                            <span className="block text-xs text-gray-500">NIP {p.nip} · {p.email || "email belum tersedia"}</span>
+                          </button>
+                        )) : (
+                          <div className="px-3 py-3 text-xs text-gray-500">Nama tidak ditemukan atau pegawai sudah memiliki akun.</div>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-1">Suggestion hanya menampilkan pegawai aktif yang belum memiliki akun.</p>
+                  </div>
+                )}
+
                 <div>
-                  <label className={labelCls}><Mail size={12} className="inline mr-1" />Email Google <span className="text-red-500">*</span></label>
+                  <label className={labelCls}><Mail size={12} className="inline mr-1" />Email Google</label>
                   <input
                     type="email"
                     value={form.email}
-                    onChange={(e: any) => setForm({ ...form, email: e.target.value })}
-                    readOnly={!isEdit && !!form.email}
-                    placeholder="nama@gmail.com / nama@tangerangselatankota.go.id"
+                    readOnly
+                    placeholder="Terisi otomatis dari Database Pegawai"
                     className={inputCls}
                   />
-                  {!isEdit && form.email && <p className="text-[11px] text-gray-400 mt-1">Email adalah kunci akun dan tidak dapat diubah. Untuk mengganti email, nonaktifkan akun lama lalu buat baru.</p>}
                 </div>
 
                 <div>
@@ -355,22 +434,21 @@ export default function KelolaAkun() {
                     onChange={(e: any) => setForm({ ...form, role: e.target.value })}
                     className={inputCls}
                   >
-                    <option value="admin">Administrator — penuh + kelola akun</option>
-                    <option value="pimpinan">Pimpinan — penuh tanpa kelola akun</option>
-                    <option value="pegawai">Pegawai — lihat semua + edit profil sendiri</option>
+                    <option value="admin">Administrator — CRUD penuh, approval, konfigurasi, dan kelola akun</option>
+                    <option value="pimpinan">Pimpinan — kewenangan penuh setara Administrator</option>
+                    <option value="pegawai">Pegawai — profil sendiri dan field identitas yang diizinkan</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className={labelCls}><IdCard size={12} className="inline mr-1" />NIP {form.role === "pegawai" && <span className="text-red-500">*</span>}</label>
+                  <label className={labelCls}><IdCard size={12} className="inline mr-1" />NIP</label>
                   <input
                     type="text"
                     value={form.nip}
-                    onChange={(e: any) => setForm({ ...form, nip: e.target.value })}
-                    placeholder="18 digit NIP (penghubung ke data kepegawaian)"
+                    readOnly
+                    placeholder="Terisi otomatis dari Database Pegawai"
                     className={inputCls}
                   />
-                  <p className="text-[11px] text-gray-400 mt-1">Wajib untuk peran Pegawai — menautkan akun ke baris miliknya di sheet pegawai.</p>
                 </div>
 
                 <div>
@@ -378,13 +456,13 @@ export default function KelolaAkun() {
                   <input
                     type="text"
                     value={form.nama}
-                    onChange={(e: any) => setForm({ ...form, nama: e.target.value })}
-                    placeholder="Nama tampilan (opsional)"
+                    readOnly
+                    placeholder="Terisi otomatis dari Database Pegawai"
                     className={inputCls}
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none cursor-pointer">
+                {isEdit && <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.is_active}
@@ -392,7 +470,7 @@ export default function KelolaAkun() {
                     className="w-4 h-4 rounded"
                   />
                   Akun aktif (boleh login)
-                </label>
+                </label>}
               </div>
 
               <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex justify-end gap-3">

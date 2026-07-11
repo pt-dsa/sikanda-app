@@ -15,6 +15,20 @@ import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
 import { useLocation } from "react-router-dom";
 
+const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
+
+function optionalNumber(value: unknown): number | undefined {
+  if (value === "" || value === null || value === undefined) return undefined;
+  const parsed = Number(String(value).replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function displayNumber(value: unknown, suffix = ""): string {
+  const parsed = optionalNumber(value);
+  if (parsed === undefined) return "-";
+  return `${new Intl.NumberFormat("id-ID").format(parsed)}${suffix}`;
+}
+
 export default function Kendaraan() {
   const toast = useToast();
   const location = useLocation();
@@ -39,6 +53,7 @@ export default function Kendaraan() {
   // CRUD states
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
+  const [saving, setSaving] = useState(false);
 
   // Fungsi muat data di lingkup komponen agar bisa dipanggil ulang
   // (mis. sinkronisasi ulang saat operasi tulis gagal).
@@ -130,37 +145,56 @@ export default function Kendaraan() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsEditing(false); // Optimistic close
-    
+    if (saving) return;
+    const isNew = !formData.asset_id;
+    const payload: Partial<Vehicle> = {
+      ...formData,
+      no_polisi: String(formData.no_polisi || "").trim().toUpperCase(),
+      kode_barang: String(formData.kode_barang || "").trim(),
+      nama_aset: String(formData.nama_aset || "").trim(),
+      merk: String(formData.merk || "").trim(),
+      pengguna: String(formData.pengguna || "").trim(),
+      penanggung_jawab: String(formData.penanggung_jawab || "").trim(),
+      lokasi: String(formData.lokasi || formData.unit_kerja || "").trim(),
+      unit_kerja: String(formData.unit_kerja || formData.lokasi || "").trim(),
+      km_kendaraan: optionalNumber(formData.km_kendaraan),
+      kapasitas_mesin: optionalNumber(formData.kapasitas_mesin),
+      harga_pembelian: optionalNumber(formData.harga_pembelian),
+      latitude: optionalNumber(formData.latitude),
+      longitude: optionalNumber(formData.longitude),
+    };
+
+    if (!payload.no_polisi || !payload.nama_aset || !payload.merk) {
+      toast.error("Data Belum Lengkap", "Nomor Polisi, Nama Aset, dan Merk/Model wajib diisi.");
+      return;
+    }
+
+    setSaving(true);
     try {
-      if (formData.asset_id) {
-        // Edit
-        await spreadsheetService.saveVehicle(formData, false);
-        setData(prev => prev.map(item => item.asset_id === formData.asset_id ? { ...item, ...formData } as any : item));
+      const result = await spreadsheetService.saveVehicle(payload, isNew);
+      const savedItem = { ...payload, asset_id: result.asset_id } as Vehicle;
+      if (!isNew) {
+        setData(prev => prev.map(item => item.asset_id === payload.asset_id ? savedItem : item));
         toast.success("Data Disimpan", "Perubahan data kendaraan berhasil disimpan.");
       } else {
-        // Add
-        const newItem = {
-          ...formData,
-          asset_id: `${Date.now()}`, // Use timestamp for unique id if needed
-        };
-        await spreadsheetService.saveVehicle(newItem, true);
-        setData(prev => [newItem as any, ...prev]);
+        setData(prev => [savedItem, ...prev]);
         toast.success("Data Ditambahkan", "Data kendaraan baru berhasil ditambahkan.");
       }
+      setIsEditing(false);
+      setFormData({});
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
-      load(); // Reload on error to sync state
+      await load();
+    } finally {
+      setSaving(false);
     }
-    
-    setFormData({});
   };
 
   const openForm = (item?: Vehicle) => {
     if (item) {
-      setFormData(item);
+      setFormData({ ...item });
     } else {
-      setFormData({});
+      setFormData({ nama_aset: "Kendaraan Dinas", kondisi: "BAIK" });
     }
     setIsEditing(true);
   };
@@ -466,8 +500,8 @@ export default function Kendaraan() {
           "No. BPKB": (selectedItem as any).no_bpkb,
           "No. Rangka": (selectedItem as any).no_rangka,
           "No. Mesin": (selectedItem as any).no_mesin,
-          "Harga Pembelian": (selectedItem as any).harga_pembelian,
-          "KM Kendaraan": (selectedItem as any).km_kendaraan,
+          "Harga Pembelian": displayNumber(selectedItem.harga_pembelian, ""),
+          "KM Kendaraan": displayNumber(selectedItem.km_kendaraan, " KM"),
         } : null} 
       >
         {selectedItem && (
@@ -586,45 +620,109 @@ export default function Kendaraan() {
             </div>
             <form onSubmit={handleSave} className="flex flex-col overflow-hidden max-h-full">
               <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2">Identitas Kendaraan</div>
+                {formData.asset_id && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-500">Asset ID</label>
+                    <input readOnly value={formData.asset_id} className={`${vehicleInputCls} bg-gray-100 dark:bg-gray-800 opacity-70`} />
+                  </div>
+                )}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Nomor Polisi</label>
-                  <input required value={formData.no_polisi || ""} onChange={e => setFormData({...formData, no_polisi: e.target.value, kode_barang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: B 1234 ABC" />
+                  <label className="text-xs font-medium text-gray-500">Kode Barang</label>
+                  <input value={formData.kode_barang || ""} onChange={e => setFormData({...formData, kode_barang: e.target.value})} className={vehicleInputCls} placeholder="Kode inventaris/barang" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Merk / Model</label>
-                  <input required value={formData.merk || ""} onChange={e => setFormData({...formData, merk: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Toyota Kijang" />
+                  <label className="text-xs font-medium text-gray-500">Nomor Polisi <span className="text-red-500">*</span></label>
+                  <input required value={formData.no_polisi || ""} onChange={e => setFormData({...formData, no_polisi: e.target.value})} className={vehicleInputCls} placeholder="Contoh: B 1234 ABC" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Nama Aset <span className="text-red-500">*</span></label>
+                  <input required value={formData.nama_aset || ""} onChange={e => setFormData({...formData, nama_aset: e.target.value})} className={vehicleInputCls} placeholder="Contoh: Kendaraan Dinas Roda 4" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Merk / Model <span className="text-red-500">*</span></label>
+                  <input required value={formData.merk || ""} onChange={e => setFormData({...formData, merk: e.target.value})} className={vehicleInputCls} placeholder="Contoh: Toyota Innova" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Tipe</label>
-                  <input value={formData.tipe || ""} onChange={e => setFormData({...formData, tipe: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Minibus" />
+                  <input value={formData.tipe || ""} onChange={e => setFormData({...formData, tipe: e.target.value})} className={vehicleInputCls} placeholder="Contoh: Minibus" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Jenis Kendaraan</label>
-                  <input value={formData.jenis_kendaraan || ""} onChange={e => setFormData({...formData, jenis_kendaraan: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Kendaraan Roda 4" />
+                  <input value={formData.jenis_kendaraan || ""} onChange={e => setFormData({...formData, jenis_kendaraan: e.target.value})} className={vehicleInputCls} placeholder="Contoh: Kendaraan Roda 4" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Tahun Pembelian</label>
-                  <input type="number" value={formData.tahun || ""} onChange={e => setFormData({...formData, tahun: parseInt(e.target.value) || undefined})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: 2018" />
+                  <input type="number" min="1900" max="2100" value={formData.tahun || ""} onChange={e => setFormData({...formData, tahun: e.target.value})} className={vehicleInputCls} placeholder="Contoh: 2018" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Kondisi</label>
-                  <select value={formData.kondisi || "BAIK"} onChange={e => setFormData({...formData, kondisi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm">
+                  <select value={formData.kondisi || "BAIK"} onChange={e => setFormData({...formData, kondisi: e.target.value})} className={vehicleInputCls}>
                     <option value="BAIK">BAIK</option>
                     <option value="RUSAK RINGAN">RUSAK RINGAN</option>
                     <option value="RUSAK BERAT">RUSAK BERAT</option>
                   </select>
                 </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
+                <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Penguasaan dan Lokasi</div>
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Pengguna</label>
-                  <input value={formData.pengguna || ""} onChange={e => setFormData({...formData, pengguna: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nama Pengguna" />
+                  <input value={formData.pengguna || ""} onChange={e => setFormData({...formData, pengguna: e.target.value})} className={vehicleInputCls} placeholder="Nama pengguna kendaraan" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Penanggung Jawab</label>
+                  <input value={formData.penanggung_jawab || ""} onChange={e => setFormData({...formData, penanggung_jawab: e.target.value})} className={vehicleInputCls} placeholder="Nama penanggung jawab" />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">Lokasi / Unit Kerja</label>
+                  <input value={formData.lokasi || formData.unit_kerja || ""} onChange={e => setFormData({...formData, lokasi: e.target.value, unit_kerja: e.target.value})} className={vehicleInputCls} placeholder="Lokasi atau unit pengguna kendaraan" />
+                </div>
+
+                <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Dokumen dan Teknis</div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Kilometer Kendaraan</label>
+                  <input type="number" min="0" value={formData.km_kendaraan ?? ""} onChange={e => setFormData({...formData, km_kendaraan: e.target.value})} className={vehicleInputCls} placeholder="Contoh: 75000" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Kapasitas Mesin (CC)</label>
+                  <input type="number" min="0" value={formData.kapasitas_mesin ?? ""} onChange={e => setFormData({...formData, kapasitas_mesin: e.target.value})} className={vehicleInputCls} placeholder="Contoh: 2000" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Nomor BPKB</label>
+                  <input value={formData.no_bpkb || ""} onChange={e => setFormData({...formData, no_bpkb: e.target.value})} className={vehicleInputCls} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Nomor Rangka</label>
+                  <input value={formData.no_rangka || ""} onChange={e => setFormData({...formData, no_rangka: e.target.value})} className={vehicleInputCls} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Nomor Mesin</label>
+                  <input value={formData.no_mesin || ""} onChange={e => setFormData({...formData, no_mesin: e.target.value})} className={vehicleInputCls} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Harga Pembelian (Rp)</label>
+                  <input type="number" min="0" value={formData.harga_pembelian ?? ""} onChange={e => setFormData({...formData, harga_pembelian: e.target.value})} className={vehicleInputCls} />
+                </div>
+
+                <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Lokasi Koordinat dan Media</div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Latitude</label>
+                  <input type="number" step="any" min="-90" max="90" value={formData.latitude ?? ""} onChange={e => setFormData({...formData, latitude: e.target.value})} className={vehicleInputCls} placeholder="Contoh: -6.300000" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Longitude</label>
+                  <input type="number" step="any" min="-180" max="180" value={formData.longitude ?? ""} onChange={e => setFormData({...formData, longitude: e.target.value})} className={vehicleInputCls} placeholder="Contoh: 106.700000" />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">URL Foto Kendaraan</label>
+                  <input type="text" value={formData.foto || ""} onChange={e => setFormData({...formData, foto: e.target.value})} className={vehicleInputCls} placeholder="URL atau path foto kendaraan" />
                 </div>
               </div>
               <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2">
-                <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <button type="button" disabled={saving} onClick={() => setIsEditing(false)} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
                   Batal
                 </button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all">
-                  Simpan
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">
+                  {saving ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </form>

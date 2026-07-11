@@ -371,16 +371,16 @@ export default function Dashboard() {
             <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-widest">
               Komposisi SDM
             </h2>
-            <motion.div variants={itemVars} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <motion.div variants={itemVars} className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
               {/* Golongan Donut */}
-              <Card>
+              <Card className="h-full">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2"><Award size={16} className="text-blue-500" /><CardTitle className="text-sm">Distribusi Golongan</CardTitle></div>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center pb-4">
+                <CardContent className="pb-4 min-h-[188px] flex items-center">
                   {metrics.distribusiGolongan && metrics.distribusiGolongan.length > 0 ? (
-                    <>
-                      <div className="w-36 h-36 relative">
+                    <div className="w-full flex flex-col sm:flex-row lg:flex-col 2xl:flex-row items-center justify-center gap-4">
+                      <div className="w-40 h-40 relative shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie data={metrics.distribusiGolongan} cx="50%" cy="50%" innerRadius={42} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none">
@@ -394,7 +394,7 @@ export default function Dashboard() {
                           <span className="text-[10px] text-gray-500">Pegawai</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1.5 mt-3 w-full">
+                      <div className="flex flex-col gap-2 w-full min-w-0">
                         {metrics.distribusiGolongan.map((item, i) => (
                           <div key={item.name} className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -405,20 +405,20 @@ export default function Dashboard() {
                           </div>
                         ))}
                       </div>
-                    </>
+                    </div>
                   ) : <p className="text-sm text-gray-400 py-8">Data pegawai belum tersedia</p>}
                 </CardContent>
               </Card>
               
               {/* Pendidikan */}
-              <Card>
+              <Card className="h-full">
                 <CardHeader className="pb-2"><div className="flex items-center gap-2"><GraduationCap size={16} className="text-green-500" /><CardTitle className="text-sm">Distribusi Pendidikan</CardTitle></div></CardHeader>
-                <CardContent className="pb-4"><HorizontalBarChart data={metrics.distribusiPendidikan || []} /></CardContent>
+                <CardContent className="pb-4 min-h-[188px] flex flex-col justify-center"><HorizontalBarChart data={metrics.distribusiPendidikan || []} /></CardContent>
               </Card>
               {/* Masa Kerja */}
-              <Card>
+              <Card className="h-full">
                 <CardHeader className="pb-2"><div className="flex items-center gap-2"><Timer size={16} className="text-orange-500" /><CardTitle className="text-sm">Distribusi Masa Kerja</CardTitle></div></CardHeader>
-                <CardContent className="pb-4"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} /></CardContent>
+                <CardContent className="pb-4 min-h-[188px] flex flex-col justify-center"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} /></CardContent>
               </Card>
             </motion.div>
           </section>

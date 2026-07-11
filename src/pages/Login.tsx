@@ -75,8 +75,11 @@ export default function Login() {
               Masuk dengan Google
             </button>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-[300px]">
-              Hanya akun yang telah didaftarkan oleh admin yang dapat masuk.
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center max-w-[330px]">
+              Pilih email yang digunakan untuk login SIKANDA.
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-[300px] -mt-2">
+              Hanya akun yang telah didaftarkan Administrator yang dapat masuk.
             </p>
 
             {isDev && (

@@ -1,17 +1,14 @@
-# SIKANDA V1.1.1 Secure
+# SIKANDA V1.1.2 Secure
 
-Rilis ini memakai `sikanda_v1.zip` sebagai baseline dan menjalankan arsitektur berikut:
+SIKANDA adalah Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah dengan React/Vite, Firebase Authentication, backend Google Apps Script, Supabase PostgreSQL, Google Drive, dan Tanya SIKANDA.
 
-- React/Vite untuk antarmuka Google AI Studio dan GitHub Pages.
-- Firebase Authentication untuk login Google.
-- Google Apps Script sebagai backend terautentikasi dan pemegang secret.
-- Supabase PostgreSQL sebagai satu-satunya database aplikasi.
-- Google Drive untuk foto pegawai.
-- Gemini hanya dipanggil dari Apps Script; konteks disusun server sesuai role.
+Mulai implementasi dari:
 
-Mulai implementasi dari [00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.1_SECURE.md](00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.1_SECURE.md). Jalankan migrasi [supabase/001_sikanda_v1_security.sql](supabase/001_sikanda_v1_security.sql) sebelum memasang backend baru.
+**`00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.2_SECURE.md`**
 
-## Pemeriksaan lokal
+Untuk upgrade dari V1.1.1, jalankan migrasi `supabase/002_sikanda_v1_1_2_revision.sql`, ganti seluruh backend Apps Script, buat deployment version baru, kemudian deploy frontend V1.1.2.
+
+Pemeriksaan lokal:
 
 ```bash
 npm ci
@@ -19,4 +16,4 @@ npm run verify
 npm audit --omit=dev --audit-level=high
 ```
 
-Jangan pernah memasukkan Gemini API key atau Supabase service-role key ke source, AI Studio frontend secrets berawalan `VITE_`, maupun GitHub repository.
+Secret backend tidak boleh berada di source, AI Studio frontend, atau GitHub.

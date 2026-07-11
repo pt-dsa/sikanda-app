@@ -208,11 +208,18 @@ export const spreadsheetService = {
   },
 
   async saveVehicle(data: Partial<any>, isNew: boolean) {
-    const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'no_polisi', 'tipe', 'jenis_kendaraan', 'km_kendaraan', 'created_at'];
+    const allowed = [
+      'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
+      'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
+      'no_polisi', 'tipe', 'jenis_kendaraan', 'km_kendaraan', 'unit_kerja',
+      'kapasitas_mesin', 'no_bpkb', 'no_rangka', 'no_mesin',
+      'harga_pembelian', 'qr_url'
+    ];
     const sanitized = this._sanitizeData(data, allowed);
-    
-    await apiService.saveAsset('assets_vehicle', sanitized, isNew);
+
+    const result = await apiService.saveAsset('assets_vehicle', sanitized, isNew);
     this.clearCache();
+    return result;
   },
 
   async deleteVehicle(asset_id: string) {
@@ -272,21 +279,24 @@ export const spreadsheetService = {
         foto = "Kendaraan_Images/B 6924 NQA..jpg";
       return {
         asset_id: item.asset_id,
-        kode_barang: no_polisi || item.kode_barang,
+        kode_barang: item.asset_code || item.kode_barang || "",
+        nama_aset: item.asset_name || item.nama_aset || item.asset_category || "Kendaraan Dinas",
         no_polisi,
-        merk: item.brand || item.merk || "-",
-        tipe: item.vehicle_type || item.tipe || "-",
-        tahun: item.purchase_year || item.tahun || "-",
+        merk: item.brand || item.merk || "",
+        tipe: item.vehicle_type || item.tipe || "",
+        tahun: item.purchase_year || item.tahun || "",
         jenis_kendaraan: item.asset_category || item.jenis_kendaraan || item.nama_aset,
-        pengguna: item.holder_name || item.pengguna || "-",
-        unit_kerja: item.usage || item.unit_kerja || "-",
+        pengguna: item.holder_name || item.pengguna || "",
+        penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
+        lokasi: item.usage || item.lokasi || item.unit_kerja || "",
+        unit_kerja: item.usage || item.unit_kerja || item.lokasi || "",
         kondisi: (item.kondisi || item.condition || "BAIK").toUpperCase(),
-        kapasitas_mesin: item.engine_capacity_cc ? `${item.engine_capacity_cc} CC` : item.cc || "-",
-        no_bpkb: item.bpkb_number || item.no_bpkb || "-",
-        no_rangka: item.chassis_number || item.no_rangka || "-",
-        no_mesin: item.engine_number || item.no_mesin || "-",
-        harga_pembelian: item.acquisition_price ? `Rp ${new Intl.NumberFormat("id-ID").format(item.acquisition_price)}` : "-",
-        km_kendaraan: item.current_km ? `${new Intl.NumberFormat("id-ID").format(item.current_km)} KM` : "-",
+        kapasitas_mesin: item.engine_capacity_cc ?? item.kapasitas_mesin ?? item.cc ?? "",
+        no_bpkb: item.bpkb_number || item.no_bpkb || "",
+        no_rangka: item.chassis_number || item.no_rangka || "",
+        no_mesin: item.engine_number || item.no_mesin || "",
+        harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
+        km_kendaraan: item.current_km ?? item.km_kendaraan ?? "",
         latitude: item.lat || item.latitude,
         longitude: item.lng || item.longitude,
         foto,

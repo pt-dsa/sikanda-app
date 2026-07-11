@@ -17,6 +17,7 @@ var SUPABASE_SERVICE_ROLE_KEY = scriptProp_('SUPABASE_SERVICE_ROLE_KEY', '');
 var FIREBASE_API_KEY = scriptProp_('FIREBASE_API_KEY', '');
 var GEMINI_API_KEY = scriptProp_('GEMINI_API_KEY', '');
 var GEMINI_MODEL = scriptProp_('GEMINI_MODEL', 'gemini-2.5-flash');
+var GEMINI_FALLBACK_MODELS = scriptProp_('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash-lite');
 var BOOTSTRAP_ADMIN_EMAIL = scriptProp_('BOOTSTRAP_ADMIN_EMAIL', '');
 var DRIVE_FOLDER_NAME = scriptProp_('DRIVE_FOLDER_NAME', 'SIKANDA_Foto_Pegawai');
 
@@ -49,7 +50,9 @@ var ASSET_FIELDS = {
   assets_vehicle: [
     'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
     'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
-    'no_polisi', 'tipe', 'jenis_kendaraan', 'km_kendaraan'
+    'no_polisi', 'tipe', 'jenis_kendaraan', 'km_kendaraan', 'unit_kerja',
+    'kapasitas_mesin', 'no_bpkb', 'no_rangka', 'no_mesin',
+    'harga_pembelian', 'qr_url'
   ],
   assets_equipment: [
     'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
@@ -82,7 +85,13 @@ var COLUMN_ALIASES = {
     foto: ['photo_legacy', 'foto', 'photo'], latitude: ['lat', 'latitude'],
     longitude: ['lng', 'longitude'], no_polisi: ['plate_number', 'no_polisi'],
     tipe: ['vehicle_type', 'tipe'], jenis_kendaraan: ['asset_category', 'jenis_kendaraan'],
-    km_kendaraan: ['current_km', 'km_kendaraan']
+    km_kendaraan: ['current_km', 'km_kendaraan'],
+    unit_kerja: ['usage', 'unit_kerja', 'lokasi'],
+    kapasitas_mesin: ['engine_capacity_cc', 'kapasitas_mesin', 'cc'],
+    no_bpkb: ['bpkb_number', 'no_bpkb'], no_rangka: ['chassis_number', 'no_rangka'],
+    no_mesin: ['engine_number', 'no_mesin'],
+    harga_pembelian: ['acquisition_price', 'harga_pembelian'],
+    qr_url: ['qr_legacy_url', 'qr_url']
   },
   assets_equipment: {
     asset_id: ['asset_id', 'id'], kode_barang: ['asset_code', 'kode_barang'],
@@ -97,7 +106,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.1-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.2-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -694,11 +703,29 @@ function userList_() {
 }
 
 function userSave_(actor, data, isNew) {
-  var email = String(data.email || '').toLowerCase().trim();
   var requestedRole = String(data.role || '').toLowerCase().trim();
   if (['admin', 'pimpinan', 'pegawai'].indexOf(requestedRole) === -1) throw publicError_('Role akun tidak valid.');
   var role = normalizeRole_(data.role);
+  var email = String(data.email || '').toLowerCase().trim();
   var nip = String(data.nip || '').trim();
+  var name = String(data.nama || '').trim();
+
+  if (isNew) {
+    if (!/^\d{18}$/.test(nip)) throw publicError_('NIP pegawai wajib dipilih dari Database Pegawai.');
+    var employees = supaGet_('pegawai?select=*&nip=eq.' + encodeURIComponent(nip) + '&limit=1');
+    if (!employees.length || !isActive_(employees[0].is_active)) {
+      throw publicError_('Data pegawai aktif dengan NIP tersebut tidak ditemukan.');
+    }
+    var employee = employees[0];
+    email = String(employee.email || '').toLowerCase().trim();
+    name = String(employee.nama || employee.nama_pegawai || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw publicError_('Email pegawai belum valid. Lengkapi email pada Data ASN/PPPK terlebih dahulu.');
+    }
+    var duplicates = supaGet_('app_access?select=email,nip&or=(email.eq.' + encodeURIComponent(email) + ',nip.eq.' + encodeURIComponent(nip) + ')&limit=2');
+    if (duplicates.length) throw publicError_('Akun untuk pegawai atau email tersebut sudah terdaftar.');
+  }
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw publicError_('Email Google yang valid wajib diisi.');
   if (role === 'pegawai' && !/^\d{18}$/.test(nip)) throw publicError_('NIP pegawai wajib berupa 18 digit angka.');
   if (email === actor.email && (role === 'pegawai' || data.is_active === false)) {
@@ -706,7 +733,7 @@ function userSave_(actor, data, isNew) {
   }
   var payload = {
     email: email, role: role, nip: role === 'pegawai' ? nip : (nip || null),
-    nama: String(data.nama || '').trim() || null,
+    nama: name || null,
     is_active: data.is_active === false ? false : true,
     created_by: actor.email
   };
@@ -729,7 +756,7 @@ function userDelete_(actor, email) {
 function userSeedFromPegawai_(actor) {
   var employees = supaGet_('pegawai?select=nip,nama,email,is_active&limit=5000');
   var existing = supaGet_('app_access?select=email,nip&limit=5000');
-  var seenEmail = {}, seenNip = {}, rows = [];
+  var seenEmail = {}, seenNip = {}, rows = [], skippedMissingEmail = 0;
   for (var i = 0; i < existing.length; i++) {
     if (existing[i].email) seenEmail[String(existing[i].email).toLowerCase().trim()] = true;
     if (existing[i].nip) seenNip[String(existing[i].nip).trim()] = true;
@@ -739,22 +766,34 @@ function userSeedFromPegawai_(actor) {
     if (!isActive_(employee.is_active)) continue;
     var nip = String(employee.nip || '').trim();
     var email = String(employee.email || '').toLowerCase().trim();
-    if (!/^\d{18}$/.test(nip) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) continue;
+    if (!/^\d{18}$/.test(nip)) continue;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { skippedMissingEmail++; continue; }
     if (seenNip[nip] || seenEmail[email]) continue;
     rows.push({ email: email, role: 'pegawai', nip: nip, nama: String(employee.nama || '').trim(), is_active: true, created_by: actor.email });
     seenNip[nip] = true; seenEmail[email] = true;
   }
   if (rows.length) supaRequest_('post', 'app_access?on_conflict=email', rows, 'resolution=merge-duplicates,return=representation');
   auditLog_(actor, 'account.seed', 'app_access', '', { added: rows.length });
-  return { ok: true, added: rows.length };
+  return {
+    ok: true,
+    added: rows.length,
+    skipped_missing_email: skippedMissingEmail,
+    note: skippedMissingEmail ? skippedMissingEmail + ' pegawai dilewati karena email belum valid.' : ''
+  };
 }
 
 function aiAsk_(actor, body) {
-  if (!GEMINI_API_KEY) throw publicError_('Tanya SIKANDA belum dikonfigurasi oleh Administrator.');
-  enforceAiRateLimit_(actor.email);
   var question = String(body.question || '').trim();
   if (!question) throw publicError_('Pertanyaan tidak boleh kosong.');
   question = question.substring(0, AI_MAX_QUESTION_CHARS);
+  var databaseAnswer = answerFromDatabase_(actor, question);
+  if (databaseAnswer) {
+    auditLog_(actor, 'ai.ask.database', 'tanya_sikanda', '', { question_length: question.length });
+    return { ok: true, answer: databaseAnswer, route: 'database' };
+  }
+
+  if (!GEMINI_API_KEY) throw publicError_('Tanya SIKANDA belum siap menjawab pertanyaan naratif. Administrator perlu memeriksa konfigurasi asisten.');
+  enforceAiRateLimit_(actor.email);
   var context = buildAiContext_(actor, question).substring(0, AI_MAX_CONTEXT_CHARS);
 
   var contents = [];
@@ -772,8 +811,9 @@ function aiAsk_(actor, body) {
     ? 'Pengguna ini adalah Administrator/Pimpinan dan boleh menerima konteks seluruh data aktif SIKANDA.'
     : 'Pengguna ini adalah pegawai. Jawaban HANYA boleh memakai data profil dan aset miliknya yang tersedia dalam konteks.';
   var systemText =
-    'Anda adalah Tanya SIKANDA, rekan kerja digital resmi untuk Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah.\n' +
-    'Gunakan Bahasa Indonesia yang hangat, natural, humanis, profesional, dan tidak kaku. Jawab langsung ke inti dengan paragraf nyaman dibaca.\n' +
+    'Anda adalah Tanya SIKANDA, rekan kerja digital untuk Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah.\n' +
+    'Gunakan Bahasa Indonesia yang hangat, natural, humanis, profesional, dan tidak kaku. Mulai dari jawaban inti, lalu jelaskan seperlunya.\n' +
+    'Gunakan sapaan secara wajar, jangan mengulang permintaan pengguna, dan jangan memakai kalimat seperti robot atau layanan otomatis.\n' +
     'Gunakan penebalan seperlunya untuk angka atau kesimpulan penting. Jangan menyebut istilah teknis backend, database internal, API, prompt, atau token.\n' +
     'Hanya jawab topik SIKANDA: profil pegawai, Buku Penjagaan, kendaraan, alat dan mesin, serta cara menggunakan aplikasi.\n' +
     'Modul Pagu Anggaran, Pemeliharaan, Inventaris, dan Peminjaman masih dikembangkan untuk SIKANDA Versi 2.\n' +
@@ -781,19 +821,20 @@ function aiAsk_(actor, body) {
     'Jaga kerahasiaan data dan jangan menampilkan data di luar lingkup hak pengguna. ' + scopeText + '\n\n' +
     '<DATA_SIKANDA>\n' + context + '\n</DATA_SIKANDA>';
 
-  var response = fetchGeminiWithRetry_({
+  var geminiResult = fetchGeminiWithRetry_({
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     payload: JSON.stringify({
       system_instruction: { parts: [{ text: systemText }] }, contents: contents,
       generationConfig: { temperature: 0.35, maxOutputTokens: 900 }
     })
   });
-  if (response.getResponseCode() !== 200) {
-    var geminiCode = response.getResponseCode();
-    console.error('[SIKANDA][Gemini] HTTP ' + geminiCode + ' pada model ' + GEMINI_MODEL + '.');
-    if (geminiCode === 404) throw publicError_('Model Tanya SIKANDA belum tersedia. Administrator perlu memeriksa GEMINI_MODEL di Apps Script.');
-    if (geminiCode === 429) throw publicError_('Tanya SIKANDA sedang ramai. Silakan coba kembali beberapa saat lagi.');
-    throw publicError_('Tanya SIKANDA sedang beristirahat sebentar. Silakan coba kembali beberapa saat lagi.');
+  var response = geminiResult.response;
+  if (!response || response.getResponseCode() !== 200) {
+    var geminiCode = response ? response.getResponseCode() : 0;
+    console.error('[SIKANDA][Gemini] Semua model gagal. HTTP terakhir ' + geminiCode + '; detail=' + String(geminiResult.error || '').substring(0, 500));
+    if (geminiCode === 429) throw publicError_('Tanya SIKANDA sedang menerima banyak pertanyaan. Tunggu sebentar, lalu coba lagi ya.');
+    if (geminiCode === 401 || geminiCode === 403) throw publicError_('Tanya SIKANDA belum dapat terhubung. Administrator perlu menjalankan pemeriksaan konfigurasi asisten.');
+    throw publicError_('Maaf ya, jawaban naratif belum berhasil diproses. Coba kirim ulang beberapa saat lagi.');
   }
   var result = JSON.parse(response.getContentText() || '{}');
   var candidate = result.candidates && result.candidates[0];
@@ -801,20 +842,82 @@ function aiAsk_(actor, body) {
     ? String(candidate.content.parts[0].text || '').trim() : '';
   if (!answer) throw publicError_('Tanya SIKANDA belum memperoleh jawaban yang tepat. Silakan coba dengan kalimat berbeda.');
   auditLog_(actor, 'ai.ask', 'tanya_sikanda', '', { question_length: question.length });
-  return { ok: true, answer: answer, model: GEMINI_MODEL };
+  return { ok: true, answer: answer, model: geminiResult.model, route: 'gemini' };
 }
 
 function fetchGeminiWithRetry_(options) {
-  var url = AI_ENDPOINT_BASE + encodeURIComponent(GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+  var models = configuredGeminiModels_();
   var response = null;
-  for (var attempt = 0; attempt < 3; attempt++) {
-    response = UrlFetchApp.fetch(url, options);
-    var code = response.getResponseCode();
-    if (code === 200) return response;
-    if (code !== 429 && code < 500) return response;
-    if (attempt < 2) Utilities.sleep((attempt + 1) * 750);
+  var lastError = '';
+  for (var m = 0; m < models.length; m++) {
+    var model = models[m];
+    var url = AI_ENDPOINT_BASE + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = UrlFetchApp.fetch(url, options);
+      } catch (fetchErr) {
+        lastError = String(fetchErr && fetchErr.message || fetchErr);
+        if (attempt < 2) Utilities.sleep((attempt + 1) * 750);
+        continue;
+      }
+      var code = response.getResponseCode();
+      if (code === 200) return { response: response, model: model, error: '' };
+      lastError = safeGeminiError_(response);
+      if (code === 401 || code === 403 || code === 400) return { response: response, model: model, error: lastError };
+      if (code === 404) break;
+      if (code !== 429 && code < 500) break;
+      if (attempt < 2) Utilities.sleep((attempt + 1) * 750);
+    }
   }
-  return response;
+  return { response: response, model: models[models.length - 1] || GEMINI_MODEL, error: lastError };
+}
+
+function configuredGeminiModels_() {
+  var raw = [GEMINI_MODEL].concat(String(GEMINI_FALLBACK_MODELS || '').split(','));
+  var seen = {};
+  var models = [];
+  for (var i = 0; i < raw.length; i++) {
+    var model = String(raw[i] || '').trim();
+    if (model && /^[A-Za-z0-9._-]+$/.test(model) && !seen[model]) {
+      seen[model] = true;
+      models.push(model);
+    }
+  }
+  return models.length ? models : ['gemini-2.5-flash'];
+}
+
+function safeGeminiError_(response) {
+  try {
+    var data = JSON.parse(response.getContentText() || '{}');
+    return String(data && data.error && data.error.message || '').substring(0, 500);
+  } catch (ignore) {
+    return 'Respons Gemini tidak dapat dibaca.';
+  }
+}
+
+/**
+ * Jalankan MANUAL dari editor Apps Script untuk memeriksa API key dan model.
+ * Fungsi ini tidak menampilkan API key dan tidak mengubah database.
+ */
+function ujiKonfigurasiTanyaSikanda() {
+  var report = { configured: !!GEMINI_API_KEY, models: [], success: false };
+  if (!GEMINI_API_KEY) {
+    console.log(JSON.stringify(report));
+    return report;
+  }
+  var models = configuredGeminiModels_();
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+    var response = UrlFetchApp.fetch(
+      AI_ENDPOINT_BASE + encodeURIComponent(model) + '?key=' + encodeURIComponent(GEMINI_API_KEY),
+      { method: 'get', muteHttpExceptions: true }
+    );
+    var item = { model: model, http: response.getResponseCode(), available: response.getResponseCode() === 200 };
+    report.models.push(item);
+    if (item.available) report.success = true;
+  }
+  console.log(JSON.stringify(report));
+  return report;
 }
 
 function enforceAiRateLimit_(email) {
@@ -865,6 +968,108 @@ function compactAsset_(row, type) {
     lokasi: row.usage || row.location || row.lokasi,
     tahun: row.purchase_year || row.tahun
   };
+}
+
+function answerFromDatabase_(actor, question) {
+  var q = normalizeQuestion_(question);
+  var agendaCode = '';
+  var agendaLabel = '';
+  if (/\bkgb\b|kenaikan gaji/.test(q)) { agendaCode = 'KGB'; agendaLabel = 'KGB'; }
+  else if (/kenaikan pangkat|\bpangkat\b/.test(q)) { agendaCode = 'PANGKAT'; agendaLabel = 'kenaikan pangkat'; }
+  else if (/\bbup\b|pensiun/.test(q)) { agendaCode = 'BUP'; agendaLabel = 'BUP/pensiun'; }
+
+  if (agendaCode && /(siapa|daftar|jatuh tempo|agenda|bulan ke depan|mendatang)/.test(q)) {
+    var monthMatch = q.match(/(\d{1,2})\s*bulan/);
+    var months = monthMatch ? Math.max(1, Math.min(60, parseInt(monthMatch[1], 10))) : 6;
+    return agendaAnswer_(actor, agendaCode, agendaLabel, months);
+  }
+
+  if (/(berapa|jumlah|total)/.test(q) && /(pegawai|asn|pppk)/.test(q)) {
+    var employees = selectForActor_(actor, 'pegawai', []);
+    var filtered = employees;
+    var label = 'pegawai aktif';
+    if (/pppk/.test(q)) {
+      filtered = employees.filter(function (row) { return String(row.status || '').toUpperCase().indexOf('PPPK') !== -1; });
+      if (/penuh/.test(q)) {
+        filtered = filtered.filter(function (row) { return String(row.kategori_pppk || '').toLowerCase() === 'penuh_waktu'; });
+        label = 'PPPK Penuh Waktu';
+      } else if (/paruh/.test(q)) {
+        filtered = filtered.filter(function (row) { return String(row.kategori_pppk || '').toLowerCase() === 'paruh_waktu'; });
+        label = 'PPPK Paruh Waktu';
+      } else label = 'pegawai PPPK';
+    } else if (/\basn\b/.test(q)) {
+      filtered = employees.filter(function (row) { return ['ASN', 'PNS'].indexOf(String(row.status || '').toUpperCase()) !== -1; });
+      label = 'pegawai ASN';
+    }
+    return 'Saya sudah cek data aktif SIKANDA. Saat ini terdapat **' + filtered.length + ' ' + label + '** dalam lingkup akses Anda.';
+  }
+
+  if (/(berapa|jumlah|total)/.test(q) && /(kendaraan|mobil|motor)/.test(q)) {
+    var vehicles = selectForActor_(actor, 'assets_vehicle', []);
+    var vehicleLabel = 'kendaraan dinas';
+    if (/roda\s*2|motor/.test(q)) {
+      vehicles = vehicles.filter(function (row) { return /roda\s*2|motor/.test(normalizeQuestion_(row.asset_category || row.jenis_kendaraan || row.asset_name || row.nama_aset)); });
+      vehicleLabel = 'kendaraan roda 2';
+    } else if (/roda\s*4|mobil/.test(q)) {
+      vehicles = vehicles.filter(function (row) { return /roda\s*4|mobil/.test(normalizeQuestion_(row.asset_category || row.jenis_kendaraan || row.asset_name || row.nama_aset)); });
+      vehicleLabel = 'kendaraan roda 4';
+    }
+    return 'Berdasarkan data aktif SIKANDA, terdapat **' + vehicles.length + ' ' + vehicleLabel + '** dalam lingkup akses Anda.';
+  }
+
+  return '';
+}
+
+function agendaAnswer_(actor, code, label, months) {
+  var config = getPublicConfig_();
+  var kgbCycle = intConfig_(config, 'KGB_CYCLE_YEARS', 2);
+  var rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4);
+  var bupAge = intConfig_(config, 'BUP_USIA', 58);
+  var employees = selectForActor_(actor, 'pegawai', []);
+  var today = startOfDay_(new Date());
+  var ceiling = addCalendarMonths_(today, months);
+  var rows = [];
+
+  for (var i = 0; i < employees.length; i++) {
+    var employee = employees[i];
+    var rules = employmentRules_(employee);
+    var due = null;
+    if (code === 'KGB' && rules.kgb) due = nextCycleDate_(employee.tgl_mulai_golongan || employee.terhitung_mulai_tanggal_golongan, kgbCycle);
+    if (code === 'PANGKAT' && rules.pangkat) due = nextCycleDate_(employee.tgl_mulai_golongan || employee.terhitung_mulai_tanggal_golongan, rankCycle);
+    if (code === 'BUP' && rules.bup) due = pensionDate_(employee.tgl_lahir || employee.tanggal_lahir, bupAge);
+    if (due && due >= today && due <= ceiling) {
+      rows.push({
+        name: String(employee.nama || employee.nama_pegawai || '').trim(),
+        nip: String(employee.nip || '').trim(),
+        due: due
+      });
+    }
+  }
+  rows.sort(function (a, b) { return a.due.getTime() - b.due.getTime() || a.name.localeCompare(b.name); });
+  if (!rows.length) {
+    return 'Saya sudah cek. **Tidak ada agenda ' + label + '** yang jatuh tempo dalam ' + months + ' bulan ke depan pada lingkup data Anda.';
+  }
+
+  var limit = Math.min(rows.length, 50);
+  var lines = ['Saya sudah cek. Ada **' + rows.length + ' pegawai** dengan agenda ' + label + ' dalam ' + months + ' bulan ke depan:'];
+  for (var r = 0; r < limit; r++) {
+    lines.push((r + 1) + '. **' + rows[r].name + '** — NIP ' + rows[r].nip + ' — ' + formatIndo_(rows[r].due));
+  }
+  if (rows.length > limit) lines.push('\nDaftar dibatasi 50 nama. Gunakan Buku Penjagaan untuk melihat seluruh hasil.');
+  return lines.join('\n');
+}
+
+function normalizeQuestion_(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function addCalendarMonths_(date, months) {
+  var targetYear = date.getFullYear();
+  var targetMonth = date.getMonth() + months;
+  targetYear += Math.floor(targetMonth / 12);
+  targetMonth = targetMonth % 12;
+  var day = Math.min(date.getDate(), new Date(targetYear, targetMonth + 1, 0).getDate());
+  return startOfDay_(new Date(targetYear, targetMonth, day));
 }
 
 function employmentRules_(row) {
@@ -1180,7 +1385,10 @@ function isLeapYear_(year) {
 }
 
 function formatIndo_(date) {
-  return date ? Utilities.formatDate(date, 'Asia/Jakarta', 'dd MMMM yyyy') : '-';
+  if (!date) return '-';
+  var parts = Utilities.formatDate(date, 'Asia/Jakarta', 'dd-MM-yyyy').split('-');
+  var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  return parseInt(parts[0], 10) + ' ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[2];
 }
 
 function auditLog_(actor, action, entity, entityId, metadata) {

@@ -58,7 +58,7 @@ export const apiService = {
     question: string,
     history: Array<{ role: "user" | "assistant"; content: string }>,
     dataContext: string
-  ): Promise<{ ok: true; answer: string; model?: string }> => {
+  ): Promise<{ ok: true; answer: string; model?: string; route?: "database" | "gemini" }> => {
     return callBackend({ action: "ai_ask", question, history, dataContext });
   },
 
@@ -72,7 +72,7 @@ export const apiService = {
     callBackend<{ ok: true; email: string }>({ action: "user_delete", email }),
 
   userSeedFromPegawai: async () =>
-    callBackend<{ ok: true; added: number; note?: string }>({ action: "user_seed_from_pegawai" }),
+    callBackend<{ ok: true; added: number; skipped_missing_email?: number; note?: string }>({ action: "user_seed_from_pegawai" }),
 };
 
 // Helper: ubah File -> base64 (tanpa prefix data URL) untuk dikirim ke backend.

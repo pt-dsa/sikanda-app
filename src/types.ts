@@ -19,6 +19,13 @@ export interface Vehicle extends Asset {
   tipe?: string;
   jenis_kendaraan?: string;
   km_kendaraan?: string | number;
+  unit_kerja?: string;
+  kapasitas_mesin?: string | number;
+  no_bpkb?: string;
+  no_rangka?: string;
+  no_mesin?: string;
+  harga_pembelian?: string | number;
+  qr_url?: string;
 }
 
 export interface Equipment extends Asset {

@@ -1,27 +1,20 @@
-# Deploy Backend Apps Script SIKANDA
+# Deploy Backend Apps Script SIKANDA V1.1.2
 
-1. Jalankan migrasi `supabase/001_sikanda_v1_security.sql` dan pastikan berhasil.
-2. Ganti seluruh isi `Code.gs` pada project Backend SIKANDA dengan `apps-script/Code.gs` dari rilis ini.
-3. Isi Script Properties berikut tanpa membagikan nilainya:
+1. Upgrade V1.1.1: jalankan seluruh `supabase/002_sikanda_v1_1_2_revision.sql` sebagai satu blok.
+2. Ganti seluruh `Code.gs` dengan `apps-script/Code.gs` V1.1.2.
+3. Pastikan Script Properties lengkap, termasuk:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `FIREBASE_API_KEY`
+   - `GEMINI_API_KEY`
+   - `GEMINI_MODEL=gemini-2.5-flash`
+   - `GEMINI_FALLBACK_MODELS=gemini-2.5-flash-lite`
+   - `BOOTSTRAP_ADMIN_EMAIL`
+   - `DRIVE_FOLDER_NAME`
+4. Pilih `ujiKonfigurasiTanyaSikanda` lalu Run satu kali. Fungsi ini hanya memeriksa key/model dan tidak mengubah data.
+5. Deploy → Manage deployments → Edit → New version → Deploy.
+6. Buka `/exec`; versi sehat adalah `1.1.2-secure`.
+7. Pastikan hanya satu trigger harian `kirimNotifikasiBukuPenjagaan` aktif.
 
-| Properti | Keterangan |
-|---|---|
-| `SUPABASE_URL` | URL project Supabase |
-| `SUPABASE_ANON_KEY` | Anon/publishable key project; tidak dipakai untuk otorisasi server |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service-role/secret key baru, hanya di Apps Script |
-| `FIREBASE_API_KEY` | Firebase Web API key untuk verifikasi ID token |
-| `GEMINI_API_KEY` | Gemini API key baru, hanya di Apps Script |
-| `GEMINI_MODEL` | Model yang diizinkan, default `gemini-2.5-flash` |
-| `BOOTSTRAP_ADMIN_EMAIL` | Email admin pertama |
-| `DRIVE_FOLDER_NAME` | Contoh `SIKANDA_Foto_Pegawai` |
-
-Hapus properti lama `SPREADSHEET_ID`, `SHARED_SECRET`, dan `ALLOW_LEGACY_SECRET`; backend V1 Secure tidak memakainya.
-
-4. Deploy → **New deployment** → **Web app** → Execute as **Me** → Who has access **Anyone**.
-5. Salin URL yang berakhir `/exec` ke `VITE_APPS_SCRIPT_URL` pada frontend.
-6. Buka URL `/exec`; respons sehat berisi `ok: true` dan versi `1.1.1-secure`.
-7. Jalankan trigger harian `kirimNotifikasiBukuPenjagaan` pada timezone `Asia/Jakarta`.
-
-Rekap notifikasi diambil otomatis dari email akun aktif Administrator/Pimpinan pada `app_access`; tidak ada Script Property alamat rekap manual.
-
-Panduan lengkap ada di root proyek: `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.1_SECURE.md`.
+Panduan lengkap: `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.2_SECURE.md`.

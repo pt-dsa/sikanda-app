@@ -1,30 +1,26 @@
-# SIKANDA V1.1.1 Secure — Release Notes
+# SIKANDA V1.1.2 Secure — Release Notes
 
-Baseline awal: `sikanda_v1.zip` (SHA-256 `a0cdba5fc271209323dc2e5e66e13df6dd119e42ca830dea1cb86638ec9a4a24`).
+Baseline: `SIKANDA_v1.1.1_SECURE_AI_STUDIO_FINAL_REV1_2026-07-11.zip`.
 
-## Koreksi V1.1.1
+## Perubahan V1.1.2
 
-- Logo sementara diganti dengan `logo_kota_tangerang_selatan.png` asli yang dibundel melalui Vite.
-- Instruksi Firebase Environment type yang sudah tidak relevan dihapus.
-- Notifikasi diubah menjadi satu kali pada ambang enam bulan kalender, dengan ledger `notification_logs`.
-- Email individual hanya ke pegawai terkait; rekap otomatis ke Administrator/Pimpinan aktif tanpa alamat manual.
-- Opsi form menjadi ASN, PPPK (Penuh Waktu), PPPK (Paruh Waktu), dan Pensiun.
-- PPPK penuh waktu memperoleh KGB saja; PPPK paruh waktu tidak memperoleh agenda.
-- Empat halaman Versi 2 menampilkan nama menu masing-masing dalam pesan pengembangan.
-- Rekap Laporan hanya berisi Data ASN/PPPK, Buku Penjagaan, dan Data Kendaraan.
-- Tanya SIKANDA memakai default `gemini-2.5-flash`, retry terbatas untuk 429/5xx, dan pesan error yang lebih spesifik.
-- Berkas netral `src/lib/supabase.ts` menimpa file lama penyebab GitHub Actions gagal tanpa membuka akses database dari browser.
-- GitHub Actions memakai Node.js 22 dan menjalankan typecheck, test, audit produksi, serta build sebelum deploy.
-- Panduan implementasi disatukan dan diperbarui untuk import bersih, staging, production, rollback, dan troubleshooting.
+- Form Tambah/Edit Kendaraan diperluas dan Nomor Polisi tidak lagi menimpa Kode Barang.
+- Backend kendaraan mendukung field lokasi, penanggung jawab, dokumen, teknis, koordinat, harga, dan foto.
+- Tambah Akun memakai autocomplete Database Pegawai; Nama, NIP, dan Email terisi otomatis.
+- Backend memverifikasi ulang akun baru ke tabel pegawai dan menolak duplikasi NIP/email.
+- Deskripsi kewenangan Pimpinan dan Pegawai diselaraskan dengan RBAC resmi.
+- Tanya SIKANDA memakai database-first untuk agenda/jumlah, fallback model stabil, retry, dan fungsi pemeriksaan konfigurasi.
+- Pesan pembuka dan kendala Tanya SIKANDA dibuat lebih humanis serta tidak menggandakan detail teknis.
+- Rekap Laporan memperoleh filter per kategori, CSV berdasarkan filter, nama file informatif, serta halaman cetak bertabel.
+- Halaman login menampilkan petunjuk pemilihan email; panduan branding OAuth ditambahkan.
+- Card Komposisi SDM dibuat ringkas, seimbang, dan responsif.
+- Ditambahkan `reporting-tests` dan migrasi Supabase V1.1.2.
 
-## Arsitektur dan keamanan yang dipertahankan
+## Keamanan
 
-- Supabase adalah database tunggal; Firebase Authentication tetap untuk login Google.
-- Apps Script memverifikasi Firebase ID token dan menegakkan RBAC di server.
-- Service-role key Supabase serta Gemini API key hanya berada di Script Properties.
-- Foto tetap disimpan Restricted di Google Drive.
-- Admin dan Pimpinan memiliki izin identik; Pegawai terbatas pada profil sendiri.
-- Endpoint CRUD Supabase generik tetap dinonaktifkan.
-- Modul Inventaris, Pagu Anggaran, Pemeliharaan Kendaraan, dan Peminjaman tidak memproses data pada V1.
-
-Ikuti `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.1_SECURE.md` dari awal dan lakukan rotasi key sebelum production/public.
+- Service-role key Supabase dan Gemini API key tetap hanya berada di Apps Script Properties.
+- `GEMINI_API_KEY` bawaan AI Studio boleh tetap ada tetapi tidak pernah dibaca frontend.
+- Akun baru tidak mempercayai email/NIP dari browser.
+- Endpoint mutasi generik tetap dinonaktifkan.
+- CSV/cetak melakukan escaping dan hanya tersedia pada route manager.
+- Administrator dan Pimpinan tetap setara; Pegawai tetap dibatasi pada data sendiri.

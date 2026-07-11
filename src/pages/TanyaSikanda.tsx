@@ -159,11 +159,13 @@ export default function TanyaSikanda() {
       ]);
     } catch (err: any) {
       const msg = err?.message || "Terjadi kendala saat menghubungi asisten.";
-      let errorMessage = `Maaf, saya sedang mengalami kendala: ${msg}\nSilakan coba kirim ulang pertanyaannya.`;
-      
-      if (msg.includes("Kuota semua API Key Gemini habis")) {
-        errorMessage = "maaf saya kelelahan hari ini, besok tanya lagi ya....";
-      }
+      const isBusy = /ramai|batas|kuota|429/i.test(msg);
+      const needsAdmin = /administrator|konfigurasi|terhubung/i.test(msg);
+      const errorMessage = isBusy
+        ? "Pertanyaannya bagus, tetapi saya sedang menerima cukup banyak permintaan. Tunggu sebentar ya, lalu coba kirim lagi."
+        : needsAdmin
+          ? "Maaf ya, saya belum bisa memproses jawaban naratif saat ini. Administrator SIKANDA perlu memeriksa konfigurasi asisten."
+          : "Maaf ya, jawaban itu belum berhasil saya proses. Coba kirim ulang beberapa saat lagi dengan kalimat yang sedikit lebih spesifik.";
 
       setMessages((prev) => [
         ...prev,
@@ -175,7 +177,7 @@ export default function TanyaSikanda() {
           isError: true,
         },
       ]);
-      toast.error("Tanya SIKANDA", msg.includes("Kuota semua API Key Gemini habis") ? "API Quota Habis" : msg);
+      toast.error("Tanya SIKANDA", "Jawaban belum berhasil diproses. Silakan coba kembali.");
     } finally {
       setSending(false);
       // Kembalikan fokus ke input agar percakapan mengalir
@@ -242,7 +244,7 @@ export default function TanyaSikanda() {
                 if (hour >= 15 && hour < 18) return "Sore";
                 if (hour >= 18 || hour < 3) return "Malam";
                 return "Pagi";
-              })()} ${namaDepan || "Administrator"}! apa kabar? mau tanya apa ke KANDA hari ini?\n\nSilahkan tanya apa saja seputar data kepegawaian, aset atau agenda Buku Penjagaan. saya jawab berdasarkan data SIKANDA terkini ya Sobat.`,
+              })()}, ${namaDepan || "Sobat SIKANDA"}. Apa kabar? Saya siap membantu Anda hari ini.\n\nSilakan tanyakan data kepegawaian, aset, kendaraan, atau agenda Buku Penjagaan. Untuk pertanyaan faktual, saya akan memeriksa data SIKANDA terlebih dahulu agar jawabannya lebih cepat dan tepat.`,
             time: nowLabel(),
           }}
         />
@@ -250,7 +252,7 @@ export default function TanyaSikanda() {
         {/* Saran pertanyaan — hanya saat percakapan masih kosong */}
         {messages.length === 0 && (
           <div className="pl-10 space-y-2">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">yang paling sering ditanyakan..</p>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Pertanyaan yang sering diajukan</p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((q) => (
                 <button
