@@ -52,7 +52,7 @@ export default function AlatMesin() {
     try {
       const [res, employeeRows] = await Promise.all([
         spreadsheetService.getEquipment(),
-        spreadsheetService.getPegawai(),
+        spreadsheetService.getEmployeeDirectory(),
       ]);
       setData(res);
       setEmployees(employeeRows as Pegawai[]);
@@ -419,7 +419,7 @@ export default function AlatMesin() {
         </CardContent>
       </Card>
 
-      {selectedRows.length > 0 && (
+      {false && selectedRows.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-medium">
             <CheckSquare size={18} />
@@ -443,29 +443,8 @@ export default function AlatMesin() {
         data={filteredData} 
         columns={columns} 
         searchQuery={search}
-        renderMobileCard={(row, isSelected, onToggle) => (
-          <div className="relative">
-            {onToggle && (
-              <div 
-                className="absolute -left-2 -top-2 z-10 p-3 cursor-pointer" 
-                onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              >
-                <input 
-                  type="checkbox" 
-                  checked={isSelected} 
-                  readOnly 
-                  className="w-5 h-5 rounded-md border-gray-300 text-blue-600 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:border-gray-600 shadow-sm pointer-events-none" 
-                />
-              </div>
-            )}
-            {renderMobileCard(row)}
-          </div>
-        )}
+        renderMobileCard={(row) => renderMobileCard(row)}
         onRowClick={(row) => setSelectedItem(row)} 
-        selectable={true}
-        selectedItems={selectedRows}
-        onSelectionChange={setSelectedRows}
-        getId={(row) => (row.asset_id || (row as any).id) as string}
       />
 
       <DetailModal 

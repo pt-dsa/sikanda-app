@@ -274,10 +274,34 @@ export const spreadsheetService = {
     }
   },
 
+  /** Direktori ringan untuk suggestion/pemetaan nama tanpa menghitung relasi aset. */
+  async getEmployeeDirectory() {
+    const rows = await fetchFromSheet("pegawai");
+    return rows.map((item: any) => {
+      const nama = String(item.nama_pegawai || item.nama || item.nama_lengkap || "").trim();
+      const aktif = String(item.is_active ?? "TRUE").trim().toUpperCase();
+      if (!nama || ["FALSE", "0", "TIDAK"].includes(aktif)) return null;
+      const statusSource = String(item.status || "").trim().toUpperCase();
+      return {
+        nip: String(item.nip || item.nomer_induk_pegawai || "").trim(),
+        nama,
+        jabatan: String(item.jabatan || "").trim(),
+        unit_kerja: String(item.unit_kerja || "").trim(),
+        status: statusSource.startsWith("PPPK") ? "PPPK" : (["PNS", "CPNS"].includes(statusSource) ? "ASN" : statusSource),
+        kategori_pppk: String(item.kategori_pppk || "").trim(),
+        email: String(item.email || "").trim(),
+        tgl_lahir: String(item.tgl_lahir || item.tanggal_lahir || "").trim(),
+        is_active: true,
+      };
+    }).filter(Boolean);
+  },
+
   async getVehicles() {
     const data = await fetchFromSheet("assets_vehicle");
     return data.map((item: any) => {
-      let no_polisi = item.plate_number || item.no_polisi || item.asset_code;
+      // Nomor polisi dan kode barang adalah dua identitas berbeda. Jangan
+      // menyalin kode barang ke nomor polisi ketika data nomor polisi kosong.
+      let no_polisi = item.plate_number || item.no_polisi || "";
       let foto = item.photo_legacy || item.foto || item.photo;
       if (no_polisi === "B 6590 WAQ" || no_polisi === "B 6590 MAQ")
         foto = "Kendaraan_Images/B 6590 WAQ.jpg";

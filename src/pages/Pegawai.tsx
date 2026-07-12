@@ -63,6 +63,7 @@ function KelengkapanBadge({ hasil, size = "sm" }: { hasil: KelengkapanResult; si
 export default function PegawaiPage() {
   const { user } = useContext(AuthContext);
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [data, setData] = useState<Pegawai[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -143,10 +144,18 @@ export default function PegawaiPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Deep-link notifikasi membuka profil pegawai yang tepat, bukan hanya hasil pencarian.
+  useEffect(() => {
+    const nip = String(searchParams.get("profile") || "").trim();
+    if (!nip || data.length === 0) return;
+    const found = data.find((pegawai) => String(pegawai.nip || "").trim() === nip);
+    if (found) setSelectedPegawai(found);
+  }, [data, searchParams]);
+
   // Deep-link dari Dashboard (KPI ASN/PPPK → /pegawai?status=ASN) dan filter aset.
-  const [searchParams] = useSearchParams();
   useEffect(() => {
     const s = (searchParams.get("status") || "").toUpperCase();
     if (["ASN", "PPPK_PENUH_WAKTU", "PPPK_PARUH_WAKTU", "PENSIUN"].includes(s)) setFilterStatus(s);
@@ -155,8 +164,7 @@ export default function PegawaiPage() {
     // Deep-link KPI Kelengkapan Dashboard → /pegawai?kelengkapan=lengkap|belum
     const k = (searchParams.get("kelengkapan") || "").toLowerCase();
     if (k === "lengkap" || k === "belum") setFilterKelengkapan(k as any);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   // Golongan level options for filter
   const golonganLevels = useMemo(() => {
@@ -275,7 +283,7 @@ export default function PegawaiPage() {
   }
 
   return (
-    <div className="space-y-5 h-[calc(100vh-6rem)] md:h-full flex flex-col overflow-hidden">
+    <div className="space-y-5 min-h-full pb-20 md:pb-0 md:h-full md:flex md:flex-col md:overflow-hidden">
 
       {/* Page header */}
       <div className="md:shrink-0 flex flex-col md:flex-row md:justify-between md:items-start gap-4">

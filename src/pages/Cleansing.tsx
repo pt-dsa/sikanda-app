@@ -463,7 +463,7 @@ export default function Cleansing() {
               <UserCheck2 size={18} className="text-indigo-600" /> Kecocokan Nama Pegawai ↔ Aset
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Nama pengguna aset yang mirip namun tidak identik dengan nama baku di sheet pegawai.
+              Saran selalu merujuk nama baku pada Database Pegawai (menu Data ASN / PPPK), bukan nama yang tersimpan di aset.
               Setiap item harus ditinjau &amp; diterapkan satu per satu (tidak ada penerapan massal).
             </p>
           </div>

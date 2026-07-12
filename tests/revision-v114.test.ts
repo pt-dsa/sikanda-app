@@ -19,7 +19,7 @@ const employeeBase: any = {
 
 const birthdays = buildUpcomingBirthdays([
   { ...employeeBase, nip: "1", nama: "Hari Ini", tgl_lahir: "1990-07-12" },
-  { ...employeeBase, nip: "2", nama: "Tujuh Hari", tgl_lahir: "1992-07-19" },
+  { ...employeeBase, nip: "2", nama: "Tujuh Hari", tgl_lahir: "19 JULY 1992" },
   { ...employeeBase, nip: "3", nama: "Delapan Hari", tgl_lahir: "1993-07-20" },
 ], 7, new Date(2026, 6, 12));
 assert(birthdays.length === 2, "Notifikasi ulang tahun harus mencakup hari ini sampai tujuh hari mendatang secara inklusif");
@@ -41,12 +41,15 @@ const backend = read("apps-script/Code.gs");
 
 assert(dashboard.includes("Sinkronisasi Data") && dashboard.includes("Terlewat") && dashboard.includes("min-h-[310px]"), "Dashboard harus memiliki sinkronisasi, istilah Terlewat, dan komposisi SDM proporsional");
 for (const option of ["Data ASN / PPPK", "Buku Penjagaan", "Data Kendaraan", "Data Alat & Mesin", "Seluruh Data"]) assert(report.includes(option), `Pilihan cetak ${option} harus tersedia`);
-assert(report.includes("display:flex") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
+assert(report.includes("display:grid") && report.includes("grid-template-columns:58px") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
 assert(vehicle.includes("EmployeeAutocomplete") && vehicle.includes("AssetMediaFields") && vehicle.includes("uploadAssetFoto"), "Kendaraan harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(machine.includes("EmployeeAutocomplete") && machine.includes("AssetMediaFields") && machine.includes("uploadAssetFoto"), "Alat & Mesin harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(account.includes("Jabatan Pegawai") && account.includes("selectedEmployee?.jabatan"), "Tambah Akun harus menampilkan Jabatan Pegawai");
 assert(shell.includes("buildUpcomingBirthdays") && shell.includes("totalNotif") && shell.includes("Ulang Tahun Hari Ini–7 Hari"), "Lonceng harus menghitung agenda dan ulang tahun yang ditampilkan");
+assert(shell.includes("/pegawai?profile=") && shell.includes("100dvh"), "Notifikasi harus membuka profil tepat dan tidak terpotong di mobile");
+assert(!vehicle.includes("selectable={true}") && !machine.includes("selectable={true}"), "Checkbox seleksi kendaraan dan alat/mesin harus dihilangkan");
 assert(backend.includes("uploadAssetFoto_") && backend.includes("asset.photo.update"), "Backend harus menyimpan foto aset secara aman");
+assert(backend.includes("birthdayMonthAnswer_") && backend.includes("activeEmployees_") && backend.includes("JULY: 6"), "Tanya SIKANDA harus menghitung ulang tahun dari data aktif dan format bulan bilingual");
 assert(backend.includes("birthdayAnswer_") && backend.includes("employeeCompositionAnswer_") && backend.includes("assetListAnswer_"), "Tanya SIKANDA database-first harus menguasai konteks pegawai dan aset");
 
 console.log("revision-v114-tests: OK");

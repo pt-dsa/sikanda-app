@@ -108,7 +108,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.4-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.5-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -997,7 +997,7 @@ function enforceAiRateLimit_(email) {
 }
 
 function buildAiContext_(actor, question) {
-  var employees = selectForActor_(actor, 'pegawai', []);
+  var employees = activeEmployees_(actor);
   var vehicles = selectForActor_(actor, 'assets_vehicle', []);
   var equipment = selectForActor_(actor, 'assets_equipment', []);
   var config = getPublicConfig_();
@@ -1063,18 +1063,19 @@ function answerFromDatabase_(actor, question) {
   }
 
   if (/ulang tahun|berulang tahun|hari lahir/.test(q)) {
+    if (/bulan ini/.test(q)) return birthdayMonthAnswer_(actor, q);
     var birthdayDays = 7;
     var dayMatch = q.match(/(\d{1,2})\s*hari/);
     if (dayMatch) birthdayDays = Math.max(0, Math.min(60, parseInt(dayMatch[1], 10)));
     if (/hari ini/.test(q)) birthdayDays = 0;
-    return birthdayAnswer_(actor, birthdayDays);
+    return birthdayAnswer_(actor, birthdayDays, q);
   }
 
   var mentionedEmployee = employeeMentionAnswer_(actor, q);
   if (mentionedEmployee) return mentionedEmployee;
 
   if (/(berapa|jumlah|total)/.test(q) && /(pegawai|asn|pppk)/.test(q)) {
-    var employees = selectForActor_(actor, 'pegawai', []);
+    var employees = activeEmployees_(actor);
     var filtered = employees;
     var label = 'pegawai aktif';
     if (/pppk/.test(q) && /\basn\b/.test(q)) {
@@ -1098,7 +1099,7 @@ function answerFromDatabase_(actor, question) {
   }
 
   if (/(tampilkan|daftar|siapa saja)/.test(q) && /(pegawai|asn|pppk)/.test(q)) {
-    var listedEmployees = selectForActor_(actor, 'pegawai', []);
+    var listedEmployees = activeEmployees_(actor);
     var employeeLabel = 'pegawai aktif';
     if (/pppk/.test(q) && /\basn\b/.test(q)) {
       employeeLabel = 'pegawai ASN dan PPPK';
@@ -1118,7 +1119,7 @@ function answerFromDatabase_(actor, question) {
     var yearsMatch = q.match(/(\d{1,2})\s*tahun/);
     if (yearsMatch) {
       var threshold = parseInt(yearsMatch[1], 10);
-      var workRows = selectForActor_(actor, 'pegawai', []).filter(function (row) { return parseInt(row.masa_kerja_tahun || 0, 10) > threshold; });
+      var workRows = activeEmployees_(actor).filter(function (row) { return parseInt(row.masa_kerja_tahun || 0, 10) > threshold; });
       return namedEmployeeListAnswer_(workRows, 'pegawai dengan masa kerja lebih dari ' + threshold + ' tahun');
     }
   }
@@ -1176,6 +1177,14 @@ function pppkCategory_(row) {
   return category;
 }
 
+function activeEmployees_(actor) {
+  return selectForActor_(actor, 'pegawai', []).filter(function (row) {
+    var active = String(row.is_active == null ? 'TRUE' : row.is_active).trim().toUpperCase();
+    var note = String(row.keterangan || '').trim().toUpperCase();
+    return ['FALSE', '0', 'TIDAK'].indexOf(active) === -1 && note !== 'DATA DUMMY' && String(row.nama || row.nama_pegawai || '').trim();
+  });
+}
+
 function monthsUntilYearEnd_() {
   var now = new Date();
   return Math.max(1, 12 - now.getMonth());
@@ -1198,7 +1207,7 @@ function namedEmployeeListAnswer_(rows, label) {
 }
 
 function employeeCompositionAnswer_(actor) {
-  var rows = selectForActor_(actor, 'pegawai', []);
+  var rows = activeEmployees_(actor);
   var asn = 0, full = 0, part = 0, grade = {}, education = {};
   for (var i = 0; i < rows.length; i++) {
     var status = String(rows[i].status || '').toUpperCase();
@@ -1236,7 +1245,7 @@ function assetListAnswer_(rows, label, vehicle) {
 
 function employeeMentionAnswer_(actor, normalizedQuestion) {
   if (!/(siapa|profil|data|jabatan|golongan|unit kerja|status|nip)/.test(normalizedQuestion)) return '';
-  var employees = selectForActor_(actor, 'pegawai', []);
+  var employees = activeEmployees_(actor);
   var best = null;
   for (var i = 0; i < employees.length; i++) {
     var normalizedName = normalizeQuestion_(employees[i].nama || employees[i].nama_pegawai || '');
@@ -1254,8 +1263,10 @@ function employeeMentionAnswer_(actor, normalizedQuestion) {
     '- Golongan: **' + escapeMarkdown_(row.golongan || '-') + '**';
 }
 
-function birthdayAnswer_(actor, daysAhead) {
-  var employees = selectForActor_(actor, 'pegawai', []);
+function birthdayAnswer_(actor, daysAhead, normalizedQuestion) {
+  var employees = activeEmployees_(actor);
+  var named = findMentionedEmployee_(employees, normalizedQuestion || '');
+  if (named) employees = [named];
   var today = startOfDay_(new Date());
   var end = new Date(today.getTime() + daysAhead * 86400000);
   var rows = [];
@@ -1272,14 +1283,50 @@ function birthdayAnswer_(actor, daysAhead) {
     if (next <= end) rows.push({ row: employees[i], date: next, days: Math.round((next.getTime() - today.getTime()) / 86400000) });
   }
   rows.sort(function (a, b) { return a.days - b.days || String(a.row.nama || '').localeCompare(String(b.row.nama || '')); });
-  if (!rows.length) return daysAhead === 0 ? 'Hari ini **tidak ada pegawai yang berulang tahun** pada lingkup data Anda.' : 'Dalam **' + daysAhead + ' hari ke depan belum ada pegawai yang berulang tahun** pada lingkup data Anda.';
+  if (!rows.length) {
+    if (named) return '**' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** tidak berulang tahun dalam rentang ' + (daysAhead === 0 ? 'hari ini' : daysAhead + ' hari ke depan') + '. Tanggal lahir pada Database Pegawai: **' + escapeMarkdown_(named.tgl_lahir || named.tanggal_lahir || 'belum tersedia') + '**.';
+    return daysAhead === 0 ? 'Hari ini **tidak ada pegawai yang berulang tahun** pada lingkup data Anda.' : 'Dalam **' + daysAhead + ' hari ke depan belum ada pegawai yang berulang tahun** pada lingkup data Anda.';
+  }
   var lines = [daysAhead === 0 ? 'Hari ini ada **' + rows.length + ' pegawai yang berulang tahun**:' : 'Dalam ' + daysAhead + ' hari ke depan ada **' + rows.length + ' pegawai yang berulang tahun**:'];
   for (var r = 0; r < rows.length; r++) lines.push((r + 1) + '. **' + escapeMarkdown_(rows[r].row.nama || rows[r].row.nama_pegawai || '-') + '** — ' + formatIndo_(rows[r].date) + (rows[r].days === 0 ? ' (hari ini)' : ' (' + rows[r].days + ' hari lagi)'));
   return lines.join('\n');
 }
 
+function birthdayMonthAnswer_(actor, normalizedQuestion) {
+  var employees = activeEmployees_(actor);
+  var named = findMentionedEmployee_(employees, normalizedQuestion || '');
+  if (named) employees = [named];
+  var today = startOfDay_(new Date());
+  var month = today.getMonth();
+  var rows = [];
+  for (var i = 0; i < employees.length; i++) {
+    var birth = parseDate_(employees[i].tgl_lahir || employees[i].tanggal_lahir);
+    if (birth && birth.getMonth() === month) rows.push({ row: employees[i], day: birth.getDate() });
+  }
+  rows.sort(function (a, b) { return a.day - b.day || String(a.row.nama || '').localeCompare(String(b.row.nama || '')); });
+  if (!rows.length) return named ? '**' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** tidak berulang tahun pada bulan ini.' : 'Pada bulan ini **tidak ada pegawai yang berulang tahun** dalam lingkup data Anda.';
+  var lines = ['Pada bulan ini ada **' + rows.length + ' pegawai yang berulang tahun**:'];
+  for (var r = 0; r < rows.length; r++) {
+    var date = new Date(today.getFullYear(), month, rows[r].day);
+    lines.push((r + 1) + '. **' + escapeMarkdown_(rows[r].row.nama || rows[r].row.nama_pegawai || '-') + '** — ' + formatIndo_(date) + (rows[r].day === today.getDate() ? ' (hari ini)' : ''));
+  }
+  return lines.join('\n');
+}
+
+function findMentionedEmployee_(employees, normalizedQuestion) {
+  var best = null;
+  for (var i = 0; i < employees.length; i++) {
+    var normalizedName = normalizeQuestion_(employees[i].nama || employees[i].nama_pegawai || '');
+    var baseName = normalizedName.split(/\s+(?:s kom|st|se|s ip|m si|mt|mm|m ap)\b/)[0];
+    var matched = normalizedName && normalizedQuestion.indexOf(normalizedName) !== -1;
+    if (!matched && baseName.length >= 5) matched = normalizedQuestion.indexOf(baseName) !== -1;
+    if (matched && (!best || normalizedName.length > best.length)) best = { row: employees[i], length: normalizedName.length };
+  }
+  return best ? best.row : null;
+}
+
 function systemSummaryAnswer_(actor) {
-  var employees = selectForActor_(actor, 'pegawai', []);
+  var employees = activeEmployees_(actor);
   var vehicles = selectForActor_(actor, 'assets_vehicle', []);
   var equipment = selectForActor_(actor, 'assets_equipment', []);
   var asn = employees.filter(function (row) { return ['ASN', 'PNS'].indexOf(String(row.status || '').toUpperCase()) !== -1; }).length;
@@ -1296,7 +1343,7 @@ function agendaAnswer_(actor, code, label, months) {
   var kgbCycle = intConfig_(config, 'KGB_CYCLE_YEARS', 2);
   var rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4);
   var bupAge = intConfig_(config, 'BUP_USIA', 58);
-  var employees = selectForActor_(actor, 'pegawai', []);
+  var employees = activeEmployees_(actor);
   var today = startOfDay_(new Date());
   var ceiling = addCalendarMonths_(today, months);
   var rows = [];
@@ -1611,7 +1658,20 @@ function parseDate_(input) {
   if (match) return validDate_(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
   match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (match) return validDate_(parseInt(match[3], 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10));
-  var months = { JANUARI: 0, FEBRUARI: 1, PEBRUARI: 1, MARET: 2, APRIL: 3, MEI: 4, JUNI: 5, JULI: 6, AGUSTUS: 7, SEPTEMBER: 8, OKTOBER: 9, NOVEMBER: 10, DESEMBER: 11 };
+  var months = {
+    JANUARI: 0, JANUARY: 0, JAN: 0,
+    FEBRUARI: 1, FEBRUARY: 1, FEB: 1, PEBRUARI: 1,
+    MARET: 2, MARCH: 2, MAR: 2,
+    APRIL: 3, APR: 3,
+    MEI: 4, MAY: 4,
+    JUNI: 5, JUNE: 5, JUN: 5,
+    JULI: 6, JULY: 6, JUL: 6,
+    AGUSTUS: 7, AUGUST: 7, AUG: 7, AGU: 7,
+    SEPTEMBER: 8, SEPT: 8, SEP: 8,
+    OKTOBER: 9, OCTOBER: 9, OCT: 9, OKT: 9,
+    NOVEMBER: 10, NOV: 10, NOPEMBER: 10,
+    DESEMBER: 11, DECEMBER: 11, DEC: 11, DES: 11
+  };
   var parts = text.toUpperCase().split(/[\s,]+/);
   if (parts.length >= 3 && months[parts[1]] !== undefined) return validDate_(parseInt(parts[2], 10), months[parts[1]], parseInt(parts[0], 10));
   return null;

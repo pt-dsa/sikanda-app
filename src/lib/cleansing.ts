@@ -64,6 +64,10 @@ export function normalizeNamaForMatch(s: string): string {
     .trim();
 }
 
+function normalizeNamaPenuh(s: string): string {
+  return String(s || "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 // Ambang kemiripan: di bawah ini dianggap tidak berhubungan sama sekali.
 const SIMILARITY_MIN_RELEVANT = 0.70;
 // Di atas/sama ambang ini: kemiripan "Tinggi" (kemungkinan typo/format kecil).
@@ -108,15 +112,22 @@ export function scanAssetNameMismatches(
     const holderNorm = normalizeNamaForMatch(holder);
     if (!holderNorm) continue;
 
-    // Sudah exact match ke salah satu pegawai → tidak ada masalah, lewati.
-    if (pegawaiNorm.some((p) => p.norm === holderNorm)) continue;
+    // Exact berarti ejaan nama lengkap (termasuk gelar) sudah sama dengan
+    // database pegawai. Nama dasar yang sama tetapi gelarnya berbeda tetap
+    // disarankan menuju nama baku database pegawai.
+    if (pegawaiNorm.some((p) => normalizeNamaPenuh(p.nama) === normalizeNamaPenuh(holder))) continue;
 
-    let best: { nip: string; nama: string; score: number } | null = null;
+    const ranked: Array<{ nip: string; nama: string; score: number }> = [];
     for (const p of pegawaiNorm) {
       const score = nameSimilarity(holderNorm, p.norm);
-      if (!best || score > best.score) best = { nip: p.nip, nama: p.nama, score };
+      ranked.push({ nip: p.nip, nama: p.nama, score });
     }
+    ranked.sort((x, y) => y.score - x.score);
+    const best = ranked[0] || null;
     if (!best || best.score < SIMILARITY_MIN_RELEVANT) continue;
+    // Jangan memberi saran otomatis bila dua pegawai berbeda sama-sama
+    // sangat mungkin. Ini mencegah pemetaan nama kepada orang yang keliru.
+    if (ranked[1] && best.score - ranked[1].score < 0.06 && normalizeNamaForMatch(ranked[1].nama) !== normalizeNamaForMatch(best.nama)) continue;
 
     issues.push({
       id: `${a.sheet}|${a.assetId}`,
@@ -308,7 +319,7 @@ export function scanPegawai(list: Pegawai[]): CleansingIssue[] {
         field: "nama", fieldLabel: "Match Aset",
         nilaiLama: nama,
         saranPerbaikan:
-          "Tidak ada aset yang cocok — periksa konsistensi ejaan nama di sheet aset",
+          "Pegawai ini belum memiliki relasi aset. Jika ada aset terkait, pilih nama baku persis dari Database Pegawai.",
         bisaAutoKoreksi: false,
         level: "info",
       });

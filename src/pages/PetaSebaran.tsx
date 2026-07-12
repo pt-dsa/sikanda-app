@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -9,6 +9,8 @@ import { SafeImage } from "@/components/ui/SafeImage";
 import { Car, Bike, Wrench, MapPin, Eye, Map as MapIcon, Layers, Radio, ZoomIn, X, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { renderToString } from "react-dom/server";
 import { StatusBadge } from "@/components/ui/Badge";
+import { nameSimilarity, normalizeNamaForMatch } from "@/lib/cleansing";
+import type { Pegawai } from "@/types";
 
 // Fix Leaflet's default icon path issues in React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -40,6 +42,42 @@ const BASEMAPS = [
   { id: "cartodark", name: "CartoDB Dark", url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", attribution: "© CartoDB" },
 ];
 
+function MapResizeSync() {
+  const map = useMap();
+  useEffect(() => {
+    const refresh = () => window.setTimeout(() => map.invalidateSize({ animate: false }), 60);
+    refresh();
+    window.addEventListener("resize", refresh);
+    window.addEventListener("orientationchange", refresh);
+    return () => {
+      window.removeEventListener("resize", refresh);
+      window.removeEventListener("orientationchange", refresh);
+    };
+  }, [map]);
+  return null;
+}
+
+function canonicalEmployeeName(raw: unknown, employees: Pegawai[]): string {
+  const source = String(raw || "").trim();
+  if (!source || source === "-") return "";
+  const norm = normalizeNamaForMatch(source);
+  const exact = employees.find((employee) => normalizeNamaForMatch(employee.nama) === norm);
+  if (exact) return exact.nama;
+  const ranked = employees
+    .map((employee) => ({ employee, score: nameSimilarity(norm, normalizeNamaForMatch(employee.nama)) }))
+    .sort((a, b) => b.score - a.score);
+  if (ranked[0] && ranked[0].score >= 0.86 && (!ranked[1] || ranked[0].score - ranked[1].score >= 0.06)) return ranked[0].employee.nama;
+  return source;
+}
+
+function assetPhotoUrl(photo: unknown, type: string): string {
+  const raw = String(photo || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
+  const table = type === "Alat & Mesin" ? "Alat%20%26%20Mesin" : "Kendaraan";
+  return `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=${table}&fileName=${encodeURIComponent(raw)}`;
+}
+
 export default function PetaSebaran() {
   const [locations, setLocations] = useState<MapLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,14 +89,17 @@ export default function PetaSebaran() {
   const [radarPulse, setRadarPulse] = useState(true);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [isLegendOpen, setIsLegendOpen] = useState(true);
+  const [basemapOpen, setBasemapOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [vehicles, equipment] = await Promise.all([
+        const [vehicles, equipment, employees] = await Promise.all([
           spreadsheetService.getVehicles(),
           spreadsheetService.getEquipment(),
+          spreadsheetService.getEmployeeDirectory(),
         ]);
+        const employeeDirectory = employees as Pegawai[];
 
         const parseCoordinate = (val: any) => {
           if (!val) return null;
@@ -85,15 +126,17 @@ export default function PetaSebaran() {
               subtitle: `${v.merk || ""} - ${v.jenis_kendaraan || ""}`,
               condition: v.kondisi || "BAIK",
               isMotorcycle: isMotor,
-              pengguna: v.pengguna,
+              pengguna: canonicalEmployeeName(v.pengguna, employeeDirectory),
               qrUrl: v.qr_url,
               foto: v.foto,
               data: {
-                "Kode Barang": v.kode_barang,
+                "Kode Barang": String(v.kode_barang || "").trim() !== String(v.no_polisi || "").trim() ? v.kode_barang : "",
                 "No. Polisi": v.no_polisi,
                 "Merk": v.merk,
                 "Tipe": v.tipe,
                 "Tahun": v.tahun,
+                "Pengguna": canonicalEmployeeName(v.pengguna, employeeDirectory),
+                "Penanggung Jawab": canonicalEmployeeName(v.penanggung_jawab, employeeDirectory),
                 "Unit Kerja": v.unit_kerja,
                 "Kapasitas Mesin": v.kapasitas_mesin,
                 "No. BPKB": v.no_bpkb,
@@ -117,7 +160,7 @@ export default function PetaSebaran() {
               title: e.nama_aset || "Alat & Mesin",
               subtitle: e.merk || "-",
               condition: e.kondisi || "BAIK",
-              pengguna: e.pengguna,
+              pengguna: canonicalEmployeeName(e.pengguna, employeeDirectory),
               qrUrl: e.qr_url,
               foto: e.foto,
               data: {
@@ -129,8 +172,9 @@ export default function PetaSebaran() {
                 "Jumlah": e.jumlah ? `${e.jumlah} ${e.satuan || ''}` : '',
                 "Kondisi": e.kondisi,
                 "Tahun": e.tahun,
-                "Pengguna": e.pengguna,
-                "Penanggung Jawab": e.penanggung_jawab,
+                "Pengguna": canonicalEmployeeName(e.pengguna, employeeDirectory),
+                "Penanggung Jawab": canonicalEmployeeName(e.penanggung_jawab, employeeDirectory),
+                "Lokasi / Unit": e.lokasi,
                 "Harga Pembelian": e.harga_pembelian,
               }
             });
@@ -151,7 +195,9 @@ export default function PetaSebaran() {
       const matchCond = filterCondition === "Semua Kondisi" || loc.condition.toUpperCase() === filterCondition.toUpperCase();
       const matchSearch = searchQuery === "" || 
         loc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        loc.subtitle.toLowerCase().includes(searchQuery.toLowerCase());
+        loc.subtitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(loc.pengguna || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        Object.values(loc.data).some((value) => String(value || "").toLowerCase().includes(searchQuery.toLowerCase()));
       return matchType && matchCond && matchSearch;
     });
   }, [locations, filterType, filterCondition, searchQuery]);
@@ -221,8 +267,8 @@ export default function PetaSebaran() {
   const uniqueConditions = ["Semua Kondisi", ...Array.from(new Set(locations.map(l => l.condition.toUpperCase())))];
 
   return (
-    <div className="-m-4 md:-m-6 lg:-m-8 h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] flex flex-col relative bg-gray-50 border-t border-gray-100">
-      <div className="absolute top-4 left-4 right-4 z-[400] flex flex-col sm:flex-row gap-4 justify-between items-start pointer-events-none">
+    <div className="-m-4 md:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] flex flex-col relative bg-gray-50 border-t border-gray-100 overflow-hidden">
+      <div className="absolute top-3 left-3 right-3 z-[25] flex flex-col sm:flex-row gap-2 sm:gap-4 justify-between items-start pointer-events-none">
         
         {/* Title & Info Card + chip tipe klikable */}
         <div className="flex flex-col gap-2 w-full sm:w-auto pointer-events-auto">
@@ -302,23 +348,23 @@ export default function PetaSebaran() {
             >
               <Radio size={14} className={radarPulse ? "animate-pulse" : ""} /> Radar 
             </button>
-            <div className="relative group flex-1 sm:flex-none">
-              <button className="w-full h-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-2 text-gray-700 dark:text-gray-300">
+            <div className="relative flex-1 sm:flex-none">
+              <button type="button" onClick={() => setBasemapOpen((open) => !open)} aria-expanded={basemapOpen} className="w-full h-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-2 text-gray-700 dark:text-gray-300 touch-manipulation">
                 <Layers size={14} /> Basemaps
               </button>
-              <div className="absolute right-0 sm:right-0 left-0 sm:left-auto top-full pt-2 w-full sm:w-48 z-[450] pointer-events-auto hidden group-hover:block">
+              {basemapOpen && <div className="absolute right-0 left-auto top-full pt-2 w-48 z-[35] pointer-events-auto">
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-2">
                   {BASEMAPS.map(map => (
                     <button 
                       key={map.id}
-                      onClick={() => setActiveBasemap(map.id)}
+                      onClick={() => { setActiveBasemap(map.id); setBasemapOpen(false); }}
                       className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg transition-colors ${activeBasemap === map.id ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' : 'hover:bg-gray-50 text-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'}`}
                     >
                       {map.name}
                     </button>
                   ))}
                 </div>
-              </div>
+              </div>}
             </div>
           </div>
         </div>
@@ -326,6 +372,7 @@ export default function PetaSebaran() {
 
       <div className="absolute inset-0 z-10 bg-gray-100">
         <MapContainer center={center} zoom={16} style={{ height: "100%", width: "100%", zIndex: 10 }} maxZoom={20}>
+          <MapResizeSync />
           <TileLayer
             key={activeBasemap}
             attribution={selectedBasemap.attribution}
@@ -339,15 +386,12 @@ export default function PetaSebaran() {
                   {item.foto && (
                     <div 
                       className="w-full h-36 bg-gray-100 relative overflow-hidden group cursor-pointer"
-                      onClick={(e) => { e.stopPropagation(); setZoomedImage(item.foto?.startsWith('http') ? item.foto : `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=${item.type === 'Alat & Mesin' ? 'Alat%20%26%20Mesin' : item.type}&fileName=${encodeURIComponent(item.foto || '')}`); }}
+                      onClick={(e) => { e.stopPropagation(); setZoomedImage(assetPhotoUrl(item.foto, item.type)); }}
                     >
-                      <img 
-                        src={item.foto.startsWith('http') ? item.foto : `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=${item.type === 'Alat & Mesin' ? 'Alat%20%26%20Mesin' : item.type}&fileName=${encodeURIComponent(item.foto)}`} 
+                      <SafeImage 
+                        src={assetPhotoUrl(item.foto, item.type)} 
                         alt={item.title} 
                         className="w-full h-full object-contain bg-gray-900 group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://placehold.co/400x200/e2e8f0/64748b?text=Image+Unavailable';
-                        }}
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                         <ZoomIn size={32} className="text-white drop-shadow-md" />
@@ -409,7 +453,7 @@ export default function PetaSebaran() {
           ))}
         </MapContainer>
         
-        <div className="absolute bottom-6 left-4 sm:left-6 z-[400] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 text-xs font-medium space-y-3 min-w-[220px] pointer-events-auto transition-all duration-300">
+        <div className="absolute bottom-4 left-3 sm:bottom-6 sm:left-6 z-[25] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-3 sm:p-4 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 text-xs font-medium space-y-3 min-w-[210px] max-w-[calc(100vw-1.5rem)] pointer-events-auto transition-all duration-300">
           <div 
             className="flex justify-between items-center cursor-pointer select-none"
             onClick={() => setIsLegendOpen(!isLegendOpen)}

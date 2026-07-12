@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera, Crosshair, ImagePlus, LoaderCircle, MapPin, X } from "lucide-react";
+import { SafeImage } from "@/components/ui/SafeImage";
 
 interface AssetMediaFieldsProps {
   latitude: string | number | undefined;
@@ -17,6 +18,14 @@ const inputCls = "w-full px-3 py-2 rounded-xl border border-gray-300 dark:border
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+function resolveStoredPhoto(raw: string | undefined, photoLabel: string): string {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (/^(https?:\/\/|data:|blob:)/i.test(value)) return value;
+  const tableName = /kendaraan/i.test(photoLabel) ? "Kendaraan" : "Alat%20%26%20Mesin";
+  return `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=${tableName}&fileName=${encodeURIComponent(value)}`;
+}
+
 export function AssetMediaFields({
   latitude,
   longitude,
@@ -30,7 +39,7 @@ export function AssetMediaFields({
 }: AssetMediaFieldsProps) {
   const [locating, setLocating] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
-  const [preview, setPreview] = useState(existingPhoto || "");
+  const [preview, setPreview] = useState(resolveStoredPhoto(existingPhoto, photoLabel));
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const autoLocateAttempted = useRef(false);
@@ -46,13 +55,13 @@ export function AssetMediaFields({
 
   useEffect(() => {
     if (!selectedFile) {
-      setPreview(existingPhoto || "");
+      setPreview(resolveStoredPhoto(existingPhoto, photoLabel));
       return;
     }
     const url = URL.createObjectURL(selectedFile);
     setPreview(url);
     return () => URL.revokeObjectURL(url);
-  }, [existingPhoto, selectedFile]);
+  }, [existingPhoto, photoLabel, selectedFile]);
 
   function takeLocation() {
     if (!navigator.geolocation) {
@@ -131,7 +140,12 @@ export function AssetMediaFields({
         </div>
         {preview && (
           <div className="relative w-full max-w-sm aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-            <img src={preview} alt={`Pratinjau ${photoLabel}`} className="w-full h-full object-cover" />
+            <SafeImage
+              src={preview}
+              alt={`Pratinjau ${photoLabel}`}
+              className="w-full h-full object-cover"
+              fallbackClassName="min-h-full"
+            />
             <span className="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/65 text-white text-[10px]">{selectedFile ? "Foto baru" : "Foto tersimpan"}</span>
           </div>
         )}

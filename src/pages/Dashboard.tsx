@@ -278,9 +278,9 @@ export default function Dashboard() {
       )}
 
       {metrics && (
-        <>
+        <div className="flex flex-col gap-6">
           {/* ── SECTION 1: Metrik Kepegawaian Utama ── */}
-          <section>
+          <section className="order-1">
             <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-wider">
               Metrik Kepegawaian Utama
             </h2>
@@ -301,7 +301,7 @@ export default function Dashboard() {
           </section>
 
           {/* ── SECTION 2: Buku Penjagaan ── */}
-          <section>
+          <section className="order-2">
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                 Buku Penjagaan — Rekapitulasi Agenda ≤ 12 Bulan
@@ -328,7 +328,7 @@ export default function Dashboard() {
 
           {/* ── SECTION 2b: Kelengkapan Data Pegawai (Core Value) ── */}
           {typeof metrics.kelengkapanLengkap === "number" && (
-            <section>
+            <section className="order-4">
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-800">
                 <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                   Kelengkapan Data Pegawai &amp; Relasi Aset
@@ -388,7 +388,7 @@ export default function Dashboard() {
           )}
 
           {/* ── SECTION 3: Komposisi SDM ── */}
-          <section>
+          <section className="order-3">
             <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-wider">
               Komposisi SDM
             </h2>
@@ -400,7 +400,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="pb-5 min-h-[250px] flex items-center justify-center">
                   {metrics.distribusiGolongan && metrics.distribusiGolongan.length > 0 ? (
-                    <div className="w-full grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[170px_minmax(0,1fr)] items-center gap-5">
+                    <div className="w-full grid grid-cols-1 sm:grid-cols-[170px_150px] xl:grid-cols-1 2xl:grid-cols-[170px_150px] items-center justify-center gap-4">
                       <div className="w-[170px] h-[170px] relative shrink-0 mx-auto">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -415,14 +415,12 @@ export default function Dashboard() {
                           <span className="text-[10px] text-gray-500">Pegawai</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 w-full min-w-0">
+                      <div className="flex flex-col gap-2 w-full max-w-[150px] min-w-0">
                         {metrics.distribusiGolongan.map((item, i) => (
-                          <div key={item.name} className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0">
+                          <div key={item.name} className="grid grid-cols-[12px_minmax(0,1fr)_26px] items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                               <span className="text-xs text-gray-600 dark:text-gray-400 truncate">Gol. {item.name}</span>
-                            </div>
-                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 shrink-0">{item.value}</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 text-right">{item.value}</span>
                           </div>
                         ))}
                       </div>
@@ -445,7 +443,7 @@ export default function Dashboard() {
           </section>
 
 
-        </>
+        </div>
       )}
     </motion.div>
   );

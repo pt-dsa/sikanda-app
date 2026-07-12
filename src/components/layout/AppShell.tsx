@@ -287,7 +287,7 @@ function BirthdaySection({ items, close }: { items: BirthdayReminder[]; close: (
         <span className="ml-auto text-[11px] font-bold text-gray-400">{items.length}</span>
       </div>
       {items.slice(0, 8).map((item) => (
-        <Link key={`${item.nip}-${item.tanggal}`} to={`/pegawai?search=${encodeURIComponent(item.nama)}`} onClick={close} className="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+        <Link key={`${item.nip}-${item.tanggal}`} to={`/pegawai?profile=${encodeURIComponent(item.nip)}`} onClick={close} className="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
           <div className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate">{item.nama}</div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{item.jabatan || "Jabatan belum tersedia"} · {item.tanggal}</span>
@@ -399,7 +399,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
           {notifOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-              <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[92vw] max-h-[72vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="fixed left-2 right-2 top-[4.25rem] max-h-[calc(100dvh-4.75rem)] overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 z-[70] animate-in fade-in slide-in-from-top-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[340px] sm:max-h-[72vh]">
                 <div className="sticky top-0 bg-white dark:bg-gray-800 px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell size={15} className="text-blue-600 dark:text-blue-400" />
@@ -425,7 +425,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                       title="Terlewat (Lewat Tenggat)"
                       items={notif.overdue}
                       dot="bg-red-500"
-                      to={(e) => `/buku-penjagaan?kategori=${e.kategori}&rentang=terlambat`}
+                      to={(e) => `/pegawai?profile=${encodeURIComponent(e.nip)}`}
                       seeAll="/buku-penjagaan?rentang=terlambat"
                       close={() => setNotifOpen(false)}
                     />
@@ -433,7 +433,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                       title="KGB ≤ 6 bulan"
                       items={notif.kgb}
                       dot="bg-amber-500"
-                      to={() => `/buku-penjagaan?kategori=KGB&rentang=le6`}
+                      to={(e) => `/pegawai?profile=${encodeURIComponent(e.nip)}`}
                       seeAll="/buku-penjagaan?kategori=KGB&rentang=le6"
                       close={() => setNotifOpen(false)}
                     />
@@ -441,7 +441,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                       title="Kenaikan Pangkat ≤ 6 bulan"
                       items={notif.pangkat}
                       dot="bg-blue-500"
-                      to={() => `/buku-penjagaan?kategori=PANGKAT&rentang=le6`}
+                      to={(e) => `/pegawai?profile=${encodeURIComponent(e.nip)}`}
                       seeAll="/buku-penjagaan?kategori=PANGKAT&rentang=le6"
                       close={() => setNotifOpen(false)}
                     />
@@ -449,7 +449,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                       title="Pensiun / BUP ≤ 6 bulan"
                       items={notif.bup}
                       dot="bg-rose-500"
-                      to={() => `/buku-penjagaan?kategori=BUP&rentang=le6`}
+                      to={(e) => `/pegawai?profile=${encodeURIComponent(e.nip)}`}
                       seeAll="/buku-penjagaan?kategori=BUP&rentang=le6"
                       close={() => setNotifOpen(false)}
                     />
