@@ -6,6 +6,7 @@ import {
 import { motion } from "motion/react";
 import { formatDate } from "@/lib/utils";
 import type { Pegawai } from "@/types";
+import { employmentStatusLabel } from "@/lib/employmentStatus";
 
 // ---------------------------------------------------------------------------
 // Atom bersama (dipakai juga oleh halaman Data ASN/PPPK) — dipusatkan di sini
@@ -242,7 +243,7 @@ export function PegawaiDetailModal({
                     ? "bg-purple-100 text-purple-700"
                     : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
               }`}>
-                {pegawai.status || "-"}
+                {employmentStatusLabel(pegawai)}
               </span>
               {pegawai.match_quality !== "none" && (
                 <div className="mt-2">
@@ -302,7 +303,7 @@ export function PegawaiDetailModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                   <InfoRow label="Nomor Induk Pegawai (NIP)" value={pegawai.nip} />
                   <InfoRow label="Nama Lengkap" value={pegawai.nama} />
-                  <InfoRow label="Status Kepegawaian" value={pegawai.status || "-"} />
+                  <InfoRow label="Status Kepegawaian" value={employmentStatusLabel(pegawai)} />
                   <InfoRow label="Golongan / Ruang" value={pegawai.golongan} />
                   <InfoRow label="Jabatan" value={pegawai.jabatan} />
                   <InfoRow label="Unit Kerja / Bidang" value={pegawai.unit_kerja} />

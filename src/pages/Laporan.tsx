@@ -6,6 +6,8 @@ import Papa from "papaparse";
 import { useToast } from "@/components/ui/Toast";
 import { buildPenjagaanEvents, type PenjagaanEvent } from "@/lib/penjagaan";
 import type { Pegawai, Vehicle } from "@/types";
+import logoKota from "@/assets/logo_kop_dcktr.png";
+import { employmentStatusLabel } from "@/lib/employmentStatus";
 import {
   filterAgendaReport,
   filterPegawaiReport,
@@ -22,16 +24,9 @@ const initialPegawaiFilter: PegawaiReportFilter = { search: "", status: "", kate
 const initialAgendaFilter: AgendaReportFilter = { search: "", kategori: "", rentang: "", unitKerja: "", tanggalMulai: "", tanggalSelesai: "" };
 const initialVehicleFilter: VehicleReportFilter = { search: "", jenis: "", kondisi: "", tahun: "", pengguna: "" };
 
-function statusLabel(p: Pegawai): string {
-  if (p.status !== "PPPK") return p.status;
-  if (p.kategori_pppk === "penuh_waktu") return "PPPK (Penuh Waktu)";
-  if (p.kategori_pppk === "paruh_waktu") return "PPPK (Paruh Waktu)";
-  return "PPPK (Belum Dikategorikan)";
-}
-
 function employeeRows(rows: Pegawai[]) {
   return rows.map((p) => ({
-    nip: p.nip, nama: p.nama, status: statusLabel(p), golongan: p.golongan,
+    nip: p.nip, nama: p.nama, status: employmentStatusLabel(p), golongan: p.golongan,
     jabatan: p.jabatan, unit_kerja: p.unit_kerja, tanggal_lahir: p.tgl_lahir,
     tmt_golongan: p.tgl_mulai_golongan, tmt_jabatan: p.tgl_mulai_jabatan,
     masa_kerja_tahun: p.masa_kerja_tahun, masa_kerja_bulan: p.masa_kerja_bulan,
@@ -83,12 +78,20 @@ function filterSlug(filter: Record<string, string>): string {
   return values.join("_").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "FILTER";
 }
 
+function letterheadHtml(): string {
+  return `<div class="letterhead"><img src="${escapeHtml(logoKota)}" alt="Logo Kota Tangerang Selatan"><div class="letterhead-copy"><div class="gov">PEMERINTAH KOTA TANGERANG SELATAN</div><div class="agency">DINAS CIPTA KARYA DAN TATA RUANG</div><div class="office">Kawasan Perkantoran Lengkong Wetan,</div><div>Jl. Promoter No. 3 Kelurahan Lengkong Wetan, Kecamatan Serpong Kota Tangerang Selatan, Kode Pos 15322</div><div>Telp/Fax: (021) 75685907, e-mail: dcktr.tangsel@gmail.com</div></div></div><div class="letterhead-lines"><span></span><span></span></div>`;
+}
+
+function reportHeadingHtml(): string {
+  return `<div class="report-title">Rekapitulasi Laporan SIKANDA</div><div class="meta">Dicetak: ${escapeHtml(new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }))} WIB</div>`;
+}
+
 function rowsToPrintTable(title: string, rows: Record<string, unknown>[], filterText: string): string {
-  if (!rows.length) return `<section><h2>${escapeHtml(title)}</h2><p><b>Filter:</b> ${escapeHtml(filterText)}</p><p>Tidak ada data sesuai filter.</p></section>`;
+  if (!rows.length) return `<section>${letterheadHtml()}${reportHeadingHtml()}<h2>${escapeHtml(title)}</h2><p><b>Filter:</b> ${escapeHtml(filterText)}</p><p>Tidak ada data sesuai filter.</p></section>`;
   const keys = Object.keys(rows[0]);
   const head = keys.map((key) => `<th>${escapeHtml(key.replace(/_/g, " "))}</th>`).join("");
   const body = rows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(row[key])}</td>`).join("")}</tr>`).join("");
-  return `<section><h2>${escapeHtml(title)} <small>(${rows.length} data)</small></h2><p><b>Filter:</b> ${escapeHtml(filterText)}</p><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
+  return `<section>${letterheadHtml()}${reportHeadingHtml()}<h2>${escapeHtml(title)} <small>(${rows.length} data)</small></h2><p><b>Filter:</b> ${escapeHtml(filterText)}</p><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
 }
 
 export default function Laporan() {
@@ -153,8 +156,8 @@ export default function Laporan() {
     const agendaData = agendaRows(filteredAgenda);
     const vehicleData = vehicleRows(filteredVehicles);
     const content = `<!doctype html><html><head><meta charset="utf-8"><title>Rekap SIKANDA</title><style>
-      @page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;color:#172033;font-size:9px}h1{font-size:18px;margin:0}p{color:#536176}section{page-break-before:always}section:first-of-type{page-break-before:auto}h2{font-size:13px;margin:18px 0 7px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:4px;text-align:left;vertical-align:top}th{background:#eaf1fb;text-transform:capitalize}.meta{margin:5px 0 12px}
-    </style></head><body><h1>Rekapitulasi Laporan SIKANDA</h1><div class="meta">Dicetak: ${escapeHtml(new Date().toLocaleString("id-ID"))}</div>
+      @page{size:A4 landscape;margin:9mm 8mm 10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111827;font-size:8px;margin:0}p{color:#334155;margin:5px 0 8px}section{break-before:page;page-break-before:always}section:first-of-type{break-before:auto;page-break-before:auto}h2{font-size:13px;margin:12px 0 4px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:1px solid #94a3b8;padding:3px;text-align:left;vertical-align:top;word-break:break-word}th{background:#eaf1fb;text-transform:capitalize;font-weight:700}.letterhead{display:grid;grid-template-columns:88px 1fr 88px;align-items:center;min-height:83px;padding:0 14px}.letterhead img{width:78px;height:78px;object-fit:contain}.letterhead-copy{text-align:center;line-height:1.25}.letterhead-copy .gov{font-size:18px;font-weight:800}.letterhead-copy .agency{font-size:17px;font-weight:800}.letterhead-copy .office{font-size:10px;font-weight:700;margin-top:2px}.letterhead-lines{margin:1px 8px 8px}.letterhead-lines span{display:block;border-top:2px solid #000;margin-top:2px}.letterhead-lines span+span{border-top-width:1px}.report-title{font-size:15px;font-weight:800;margin:8px 0 2px}.meta{font-size:8px;color:#475569;margin-bottom:8px}
+    </style></head><body>
       ${rowsToPrintTable("Data ASN / PPPK", employeeData, filterDescription(pegawaiFilter as unknown as Record<string, string>))}
       ${rowsToPrintTable("Buku Penjagaan", agendaData, filterDescription(agendaFilter as unknown as Record<string, string>))}
       ${rowsToPrintTable("Data Kendaraan", vehicleData, filterDescription(vehicleFilter as unknown as Record<string, string>))}

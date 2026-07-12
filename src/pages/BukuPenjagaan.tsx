@@ -515,7 +515,8 @@ export default function BukuPenjagaan() {
             className="rounded-full neuglass-pressed text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none">
             <option value="all">Semua Status</option>
             <option value="ASN">ASN</option>
-            <option value="PPPK">PPPK</option>
+            <option value="PPPK (Penuh Waktu)">PPPK (Penuh Waktu)</option>
+            <option value="PPPK (Paruh Waktu)">PPPK (Paruh Waktu)</option>
           </select>
           {hasActiveFilter && (
             <button onClick={resetFilters}

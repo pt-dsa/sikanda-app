@@ -56,7 +56,7 @@ export function SummaryCards({
               active ? "border-blue-500 ring-2 ring-blue-500/40" : "border-white/40 dark:border-white/5"
             }`}
           >
-            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize pr-2 line-clamp-1" title={c.label}>
+            <p className="text-xs font-bold text-gray-600 dark:text-gray-300 capitalize pr-2 line-clamp-1" title={c.label}>
               {c.label.toLowerCase()}
             </p>
             <p className={`text-2xl font-bold mt-1 ${tone.text}`}>{c.count}</p>

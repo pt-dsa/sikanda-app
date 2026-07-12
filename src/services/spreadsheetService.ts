@@ -228,11 +228,12 @@ export const spreadsheetService = {
   },
 
   async saveEquipment(data: Partial<any>, isNew: boolean) {
-    const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'jenis', 'jumlah', 'satuan', 'created_at'];
+    const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'jenis', 'jumlah', 'satuan', 'harga_pembelian', 'qr_url'];
     const sanitized = this._sanitizeData(data, allowed);
     
-    await apiService.saveAsset('assets_equipment', sanitized, isNew);
+    const result = await apiService.saveAsset('assets_equipment', sanitized, isNew);
     this.clearCache();
+    return result;
   },
 
   async deleteEquipment(asset_id: string) {
@@ -318,12 +319,13 @@ export const spreadsheetService = {
       satuan: item.unit || item.satuan || "Unit",
       tahun: item.purchase_year || item.tahun || "-",
       pengguna: item.holder_name || item.pengguna || "-",
-      penanggung_jawab: item.person_in_charge || item.holder_name || "-",
+      penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
+      lokasi: item.location || item.lokasi || "",
       kondisi: (item.condition || item.kondisi || "BAIK").toUpperCase(),
-      harga_pembelian: item.acquisition_price ? `Rp ${new Intl.NumberFormat("id-ID").format(item.acquisition_price)}` : "-",
+      harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
       latitude: item.lat || item.latitude,
       longitude: item.lng || item.longitude,
-      foto: item.photo_legacy || item.foto,
+      foto: item.photo_legacy || item.foto || item.photo,
       qr_url: item.qr_legacy_url || item.qr_url,
     }));
   },
@@ -411,7 +413,7 @@ export const spreadsheetService = {
         const kategoriPppkRaw = String(item.kategori_pppk || item.pppk_category || "").trim().toLowerCase();
         const kategori_pppk = kategoriPppkRaw.includes('paruh') || kategoriPppkRaw.includes('part') || statusSource.includes('PARUH')
           ? 'paruh_waktu' as const
-          : kategoriPppkRaw.includes('penuh') || kategoriPppkRaw.includes('full') || statusSource.includes('PENUH')
+          : statusRaw === 'PPPK' || kategoriPppkRaw.includes('penuh') || kategoriPppkRaw.includes('full') || statusSource.includes('PENUH')
             ? 'penuh_waktu' as const
             : '' as const;
         const isIncomplete = !nip || !jabatanRaw || !golonganRaw || !statusRaw;
@@ -509,6 +511,8 @@ export const spreadsheetService = {
 
     const pegawaiASN = pegawai.filter((p: any) => p.status === "ASN").length;
     const pegawaiPPPK = pegawai.filter((p: any) => String(p.status || '').startsWith("PPPK")).length;
+    const pegawaiPPPKParuhWaktu = pegawai.filter((p: any) => String(p.status || '').startsWith("PPPK") && p.kategori_pppk === 'paruh_waktu').length;
+    const pegawaiPPPKPenuhWaktu = pegawaiPPPK - pegawaiPPPKParuhWaktu;
 
     // ---------------------------------------------------------------------------
     // Hitung agenda kepegawaian via buildPenjagaanEvents (SAMA dengan Buku
@@ -540,6 +544,8 @@ export const spreadsheetService = {
       pegawaiPensiun: 0,
       pegawaiASN,
       pegawaiPPPK,
+      pegawaiPPPKPenuhWaktu,
+      pegawaiPPPKParuhWaktu,
       peringatanKGB,
       peringatanPangkat,
       peringatanPensiun,

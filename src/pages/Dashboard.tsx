@@ -32,7 +32,7 @@ function KpiCard({ title, value, icon: Icon, colorClass, subtitle }: {
       <CardContent className="p-5 flex items-center gap-4">
         <div className={`p-3 rounded-2xl shrink-0 ${colorClass}`}><Icon size={22} /></div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 truncate">{title}</p>
+          <p className="text-sm font-bold text-gray-600 dark:text-gray-300 leading-snug">{title}</p>
           <h4 className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">
             {typeof value === "number" && (title.toLowerCase().includes("pagu") || title.toLowerCase().includes("realisasi"))
               ? formatCurrency(value) : typeof value === "number" ? formatNumber(value) : value}
@@ -191,7 +191,7 @@ export default function Dashboard() {
           ]);
           setMetrics({
             totalPegawai: 0, pegawaiAktif: 0, pegawaiPensiun: 0,
-            pegawaiASN: 0, pegawaiPPPK: 0,
+            pegawaiASN: 0, pegawaiPPPK: 0, pegawaiPPPKPenuhWaktu: 0, pegawaiPPPKParuhWaktu: 0,
             peringatanKGB: 0, peringatanPangkat: 0, peringatanPensiun: 0, peringatanTerlambat: 0,
             distribusiGolongan: [], distribusiPendidikan: [], distribusiMasaKerja: [],
             totalKendaraan: vehicles.length, totalAlatMesin: equipment.length,
@@ -264,15 +264,18 @@ export default function Dashboard() {
             <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-widest">
               Metrik Kepegawaian Utama
             </h2>
-            <motion.div variants={itemVars} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <motion.div variants={itemVars} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
               <Link to="/pegawai" className="block transition-transform hover:-translate-y-0.5">
                 <KpiCard title="Total Pegawai" value={metrics.totalPegawai} icon={Users} colorClass="bg-blue-100/60 text-blue-600" subtitle="Seluruh pegawai aktif" />
               </Link>
               <Link to="/pegawai?status=ASN" className="block transition-transform hover:-translate-y-0.5">
                 <KpiCard title="ASN" value={metrics.pegawaiASN} icon={UserCheck} colorClass="bg-green-100/60 text-green-600" subtitle="Aparatur Sipil Negara" />
               </Link>
-              <Link to="/pegawai?status=PPPK" className="block transition-transform hover:-translate-y-0.5">
-                <KpiCard title="PPPK" value={metrics.pegawaiPPPK} icon={Users} colorClass="bg-purple-100/60 text-purple-600" subtitle="Pegawai Pemerintah Perjanjian Kerja" />
+              <Link to="/pegawai?status=PPPK_PENUH_WAKTU" className="block transition-transform hover:-translate-y-0.5">
+                <KpiCard title="PPPK (Penuh Waktu)" value={metrics.pegawaiPPPKPenuhWaktu} icon={Users} colorClass="bg-purple-100/60 text-purple-600" subtitle="Termasuk data PPPK lama tanpa kategori" />
+              </Link>
+              <Link to="/pegawai?status=PPPK_PARUH_WAKTU" className="block transition-transform hover:-translate-y-0.5">
+                <KpiCard title="PPPK (Paruh Waktu)" value={metrics.pegawaiPPPKParuhWaktu} icon={Users} colorClass="bg-fuchsia-100/60 text-fuchsia-600" subtitle="Pegawai pemerintah paruh waktu" />
               </Link>
             </motion.div>
           </section>
@@ -314,9 +317,8 @@ export default function Dashboard() {
                   Lihat Data ASN / PPPK <ExternalLink size={12} />
                 </Link>
               </div>
-              <motion.div variants={itemVars} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
-                  <Link to="/pegawai?kelengkapan=lengkap" className="block transition-transform hover:-translate-y-0.5">
+              <motion.div variants={itemVars} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
+                  <Link to="/pegawai?kelengkapan=lengkap" className="block h-full transition-transform hover:-translate-y-0.5">
                     <KpiCard
                       title="Data Lengkap"
                       value={metrics.kelengkapanLengkap ?? 0}
@@ -325,7 +327,7 @@ export default function Dashboard() {
                       subtitle="Pegawai memenuhi 9 kriteria kelengkapan"
                     />
                   </Link>
-                  <Link to="/pegawai?kelengkapan=belum" className="block transition-transform hover:-translate-y-0.5">
+                  <Link to="/pegawai?kelengkapan=belum" className="block h-full transition-transform hover:-translate-y-0.5">
                     <KpiCard
                       title="Belum Lengkap"
                       value={metrics.kelengkapanBelum ?? 0}
@@ -334,8 +336,7 @@ export default function Dashboard() {
                       subtitle={`Rata-rata kelengkapan ${metrics.kelengkapanRata ?? 0}%`}
                     />
                   </Link>
-                </div>
-                <Card className="lg:col-span-2">
+                <Card className="md:col-span-2 xl:col-span-2 h-full">
                   <CardHeader className="pb-2">
                     <div className="flex items-center gap-2">
                       <ClipboardList size={16} className="text-amber-500" />

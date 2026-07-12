@@ -11,6 +11,7 @@ import { AuthContext } from "@/components/layout/AppShell";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
+import { employmentStatusLabel } from "@/lib/employmentStatus";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Administrator",
@@ -146,6 +147,7 @@ export default function KelolaAkun() {
       })
       .slice(0, 8);
   }, [employeeQuery, pegawai, users]);
+  const selectedEmployee = useMemo(() => pegawai.find((p) => String(p.nip) === String(form.nip)), [pegawai, form.nip]);
 
   function selectEmployee(employee: Pegawai) {
     const email = String(employee.email || "").toLowerCase().trim();
@@ -405,7 +407,7 @@ export default function KelolaAkun() {
                             className="w-full px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 border-b last:border-b-0 border-gray-100 dark:border-gray-800"
                           >
                             <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">{p.nama}</span>
-                            <span className="block text-xs text-gray-500">NIP {p.nip} · {p.email || "email belum tersedia"}</span>
+                            <span className="block text-xs text-gray-500">NIP {p.nip} · {employmentStatusLabel(p)} · {p.email || "email belum tersedia"}</span>
                           </button>
                         )) : (
                           <div className="px-3 py-3 text-xs text-gray-500">Nama tidak ditemukan atau pegawai sudah memiliki akun.</div>
@@ -460,6 +462,11 @@ export default function KelolaAkun() {
                     placeholder="Terisi otomatis dari Database Pegawai"
                     className={inputCls}
                   />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Status Pegawai</label>
+                  <input type="text" value={selectedEmployee ? employmentStatusLabel(selectedEmployee) : "-"} readOnly className={inputCls} />
                 </div>
 
                 {isEdit && <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none cursor-pointer">

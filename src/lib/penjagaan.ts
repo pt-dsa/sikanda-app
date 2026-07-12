@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { parseAnyDate } from "@/lib/utils";
+import { employmentStatusLabel, kategoriPppk } from "@/lib/employmentStatus";
 
 export type KategoriPenjagaan = "KGB" | "PANGKAT" | "BUP";
 export type BucketPenjagaan = "terlambat" | "le3" | "le6" | "le12" | "jauh";
@@ -182,7 +183,7 @@ function baseOf(p: any) {
     golongan: String(p.golongan || "").trim(),
     jabatan: String(p.jabatan || "").trim(),
     bidang: String(p.unit_kerja || "").trim() || NO_BIDANG,
-    status: String(p.status || "").trim().toUpperCase(),
+    status: employmentStatusLabel(p),
   };
 }
 
@@ -254,8 +255,8 @@ export function buildPenjagaanEvents(pegawaiList: any[], today: Date = startOfTo
   const events: PenjagaanEvent[] = [];
   for (const p of pegawaiList) {
     const base = baseOf(p);
-    const status = base.status;
-    const category = String(p.kategori_pppk || '').toLowerCase();
+    const status = String(p.status || '').trim().toUpperCase();
+    const category = kategoriPppk(p);
     const isAsn = status === 'ASN';
     const isFullTimePppk = status.startsWith('PPPK') && category === 'penuh_waktu';
     const kgbCycle = Number(p.kgb_cycle_years) || 2;

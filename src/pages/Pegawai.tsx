@@ -26,6 +26,7 @@ import {
   PegawaiDetailModal, PegawaiAvatar, MatchBadge, KGBStatus, PensiunStatus,
 } from "@/components/ui/PegawaiDetailModal";
 import { AssetDetailModal } from "@/components/ui/AssetDetailModal";
+import { employmentStatusLabel, matchesEmploymentStatus } from "@/lib/employmentStatus";
 
 // ---------------------------------------------------------------------------
 // Badge Kelengkapan Data (Core Value) — 9 kriteria via @/lib/kelengkapan.
@@ -68,6 +69,7 @@ export default function PegawaiPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterGolongan, setFilterGolongan] = useState("all");
+  const [filterBidang, setFilterBidang] = useState("all");
   const [filterMatch, setFilterMatch] = useState<"all" | "exact" | "fuzzy" | "none">("all");
   const [filterIncomplete, setFilterIncomplete] = useState(false);
   // PENGUATAN KEPEGAWAIAN: filter berdasar kelengkapan 9 kriteria (core value).
@@ -147,7 +149,7 @@ export default function PegawaiPage() {
   const [searchParams] = useSearchParams();
   useEffect(() => {
     const s = (searchParams.get("status") || "").toUpperCase();
-    if (s === "ASN" || s === "PPPK") setFilterStatus(s);
+    if (["ASN", "PPPK_PENUH_WAKTU", "PPPK_PARUH_WAKTU", "PENSIUN"].includes(s)) setFilterStatus(s);
     const m = (searchParams.get("match") || "").toLowerCase();
     if (m === "exact" || m === "fuzzy" || m === "none") setFilterMatch(m as any);
     // Deep-link KPI Kelengkapan Dashboard → /pegawai?kelengkapan=lengkap|belum
@@ -161,6 +163,7 @@ export default function PegawaiPage() {
     const levels = new Set(data.map((p) => (p.golongan || "").split("/")[0]).filter(Boolean));
     return Array.from(levels).sort();
   }, [data]);
+  const bidangOptions = useMemo(() => Array.from(new Set(data.map((p) => String(p.unit_kerja || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "id")), [data]);
 
   const filteredData = useMemo(() => {
     return data.filter((p) => {
@@ -173,7 +176,8 @@ export default function PegawaiPage() {
         (p.jabatan || "").toLowerCase().includes(search) ||
         (p.golongan || "").toLowerCase().includes(search);
 
-      const matchStatus = filterStatus === "all" || p.status === filterStatus;
+      const matchStatus = matchesEmploymentStatus(p, filterStatus);
+      const matchBidang = filterBidang === "all" || (filterBidang === "__empty__" ? !String(p.unit_kerja || "").trim() : p.unit_kerja === filterBidang);
       // PERBAIKAN QA: bandingkan LEVEL golongan secara EKSAK (mis. "III/d" → "III"),
       // bukan startsWith. "III/d".startsWith("II") === true sehingga filter "II"
       // keliru ikut menarik semua golongan III. Level diambil identik dgn opsi dropdown.
@@ -191,9 +195,9 @@ export default function PegawaiPage() {
         filterKelengkapan === "all" ||
         (filterKelengkapan === "lengkap") === hitungKelengkapan(p, fuzzyNipSet).lengkap;
 
-      return matchSearch && matchStatus && matchGolongan && matchMatch && matchIncomplete && matchKelengkapan;
+      return matchSearch && matchStatus && matchBidang && matchGolongan && matchMatch && matchIncomplete && matchKelengkapan;
     }).sort((a, b) => (a.nama || "").localeCompare(b.nama || ""));
-  }, [data, searchTerm, filterStatus, filterGolongan, filterMatch, filterIncomplete, filterKelengkapan, fuzzyNipSet]);
+  }, [data, searchTerm, filterStatus, filterBidang, filterGolongan, filterMatch, filterIncomplete, filterKelengkapan, fuzzyNipSet]);
 
   // Ringkasan kelengkapan (untuk kartu kecil di banner): dihitung dari SEMUA
   // data (bukan hasil filter). hitungKelengkapan murah (9 cek string per
@@ -223,7 +227,7 @@ export default function PegawaiPage() {
         "GOLONGAN": p.golongan || "",
         "JABATAN": p.jabatan || "",
         "BIDANG": p.unit_kerja || "",
-        "STATUS": p.status || "",
+        "STATUS": employmentStatusLabel(p),
         "TMT GOLONGAN": p.tgl_mulai_golongan || "",
         "TANGGAL LAHIR": p.tgl_lahir || "",
         "EMAIL": p.email || "",
@@ -383,8 +387,14 @@ export default function PegawaiPage() {
           >
             <option value="all">Semua Status</option>
             <option value="ASN">ASN</option>
-            <option value="PPPK">PPPK</option>
+            <option value="PPPK_PENUH_WAKTU">PPPK (Penuh Waktu)</option>
+            <option value="PPPK_PARUH_WAKTU">PPPK (Paruh Waktu)</option>
+            <option value="PENSIUN">PENSIUN</option>
             <option value="">Status Kosong</option>
+          </select>
+          <select value={filterBidang} onChange={(e) => setFilterBidang(e.target.value)} className="rounded-full neuglass-pressed text-gray-900 dark:text-gray-100 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none max-w-[230px]">
+            <option value="all">Semua Bidang</option><option value="__empty__">(Tanpa Bidang)</option>
+            {bidangOptions.map((bidang) => <option key={bidang} value={bidang}>{bidang}</option>)}
           </select>
           <select
             value={filterGolongan}
@@ -417,9 +427,9 @@ export default function PegawaiPage() {
             <AlertTriangle size={14} />
             Data Tidak Lengkap
           </button>
-          {(filterStatus !== "all" || filterGolongan !== "all" || filterMatch !== "all" || filterIncomplete || filterKelengkapan !== "all" || searchTerm) && (
+          {(filterStatus !== "all" || filterBidang !== "all" || filterGolongan !== "all" || filterMatch !== "all" || filterIncomplete || filterKelengkapan !== "all" || searchTerm) && (
             <button
-              onClick={() => { setFilterStatus("all"); setFilterGolongan("all"); setFilterMatch("all"); setFilterIncomplete(false); setFilterKelengkapan("all"); setSearchTerm(""); }}
+              onClick={() => { setFilterStatus("all"); setFilterBidang("all"); setFilterGolongan("all"); setFilterMatch("all"); setFilterIncomplete(false); setFilterKelengkapan("all"); setSearchTerm(""); }}
               className="text-sm px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
             >
               Reset Filter
@@ -500,7 +510,7 @@ export default function PegawaiPage() {
                           ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400"
                           : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
                     }`}>
-                      {pegawai.status || "-"}
+                      {employmentStatusLabel(pegawai)}
                     </span>
                   </td>
                   <td className="p-4">
@@ -579,7 +589,7 @@ export default function PegawaiPage() {
                             ? "bg-purple-100 text-purple-700"
                             : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
                       }`}>
-                        {pegawai.status || "-"}
+                        {employmentStatusLabel(pegawai)}
                       </span>
                       <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-gray-100 text-gray-700">
                         {pegawai.golongan || "-"}
@@ -658,6 +668,7 @@ export default function PegawaiPage() {
             isOpen={isFormModalOpen}
             initialData={editingPegawai}
             user={user}
+            bidangOptions={bidangOptions}
             onClose={() => setIsFormModalOpen(false)}
             onSuccess={() => {
               setIsFormModalOpen(false);

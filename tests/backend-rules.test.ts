@@ -61,6 +61,7 @@ assert(
   vm.runInContext("!employmentRules_({status:'PPPK',kategori_pppk:'paruh_waktu'}).kgb", context),
   "PPPK paruh waktu tidak memperoleh agenda",
 );
+assert(vm.runInContext("employmentRules_({status:'PPPK'}).kgb", context), "PPPK lama tanpa kategori harus dianggap penuh waktu");
 assert(vm.runInContext("GEMINI_MODEL", context) === "gemini-2.5-flash", "Model default harus Gemini 2.5 Flash");
 assert(
   vm.runInContext("configuredGeminiModels_().indexOf('gemini-2.5-flash-lite') !== -1", context),
@@ -72,6 +73,7 @@ assert(
 );
 assert(source.includes("NIP pegawai wajib dipilih dari Database Pegawai"), "Tambah akun harus diverifikasi ulang terhadap Database Pegawai");
 assert(source.includes("kapasitas_mesin") && source.includes("no_bpkb") && source.includes("harga_pembelian"), "Backend harus menerima field kendaraan lengkap");
+assert(source.includes("assets_equipment") && source.includes("qr_url") && source.includes("jumlah"), "Backend harus menerima field Alat & Mesin lengkap");
 assert(!source.includes("NOTIF_ADMIN_EMAIL"), "Backend tidak boleh memakai alamat rekap manual");
 
 vm.runInContext(`

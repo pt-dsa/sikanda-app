@@ -32,6 +32,8 @@ export interface Equipment extends Asset {
   jenis?: string;
   jumlah?: number;
   satuan?: string;
+  harga_pembelian?: string | number;
+  qr_url?: string;
 }
 
 export interface Inventory extends Asset {
@@ -163,6 +165,8 @@ export interface DashboardMetrics {
   pegawaiPensiun: number;
   pegawaiASN: number;
   pegawaiPPPK: number;
+  pegawaiPPPKPenuhWaktu: number;
+  pegawaiPPPKParuhWaktu: number;
 
   // HR — Buku Penjagaan (akan datang ≤12 bulan; terlambat dihitung TERPISAH)
   peringatanKGB: number;

@@ -33,6 +33,7 @@ export default function AlatMesin() {
   // CRUD states
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Equipment>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -130,37 +131,31 @@ export default function AlatMesin() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsEditing(false); // Optimistic close
-    
+    if (!String(formData.kode_barang || "").trim() || !String(formData.nama_aset || "").trim()) {
+      toast.warning("Data Belum Lengkap", "Kode Barang dan Nama Barang wajib diisi.");
+      return;
+    }
+    setIsSaving(true);
     try {
-      if (formData.asset_id) {
-        // Edit
-        await spreadsheetService.saveEquipment(formData, false);
-        setData(prev => prev.map(item => item.asset_id === formData.asset_id ? { ...item, ...formData } as any : item));
-        toast.success("Data Disimpan", "Perubahan data alat/mesin berhasil disimpan.");
-      } else {
-        // Add
-        const newItem = {
-          ...formData,
-          asset_id: `${Date.now()}`, // Use timestamp for unique id if needed
-        };
-        await spreadsheetService.saveEquipment(newItem, true);
-        setData(prev => [newItem as any, ...prev]);
-        toast.success("Data Ditambahkan", "Data alat/mesin baru berhasil ditambahkan.");
-      }
+      const isNew = !formData.asset_id;
+      await spreadsheetService.saveEquipment({ ...formData, kondisi: formData.kondisi || "BAIK", jumlah: Number(formData.jumlah || 1) }, isNew);
+      setIsEditing(false);
+      setFormData({});
+      spreadsheetService.clearCache();
+      await load();
+      toast.success(isNew ? "Data Ditambahkan" : "Data Disimpan", isNew ? "Data alat/mesin baru berhasil ditambahkan." : "Perubahan data alat/mesin berhasil disimpan.");
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
-      load(); // Reload on error to sync state
+    } finally {
+      setIsSaving(false);
     }
-    
-    setFormData({});
   };
 
   const openForm = (item?: Equipment) => {
     if (item) {
       setFormData(item);
     } else {
-      setFormData({});
+      setFormData({ kondisi: "BAIK", jumlah: 1, satuan: "Unit" });
     }
     setIsEditing(true);
   };
@@ -597,8 +592,18 @@ export default function AlatMesin() {
             </div>
             <form onSubmit={handleSave} className="flex flex-col overflow-hidden max-h-full">
               <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formData.asset_id && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Asset ID</label>
+                    <input readOnly value={formData.asset_id} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-sm opacity-70" />
+                  </div>
+                )}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Nama Barang</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Kode Barang *</label>
+                  <input required value={formData.kode_barang || ""} onChange={e => setFormData({...formData, kode_barang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kode barang sesuai database" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Nama Barang *</label>
                   <input required value={formData.nama_aset || ""} onChange={e => setFormData({...formData, nama_aset: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Papan Tulis" />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -637,13 +642,37 @@ export default function AlatMesin() {
                     <option value="RUSAK BERAT" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">RUSAK BERAT</option>
                   </select>
                 </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Harga Pembelian</label>
+                  <input type="number" min="0" step="1" value={formData.harga_pembelian || ""} onChange={e => setFormData({...formData, harga_pembelian: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nilai rupiah tanpa pemisah" />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">Lokasi</label>
+                  <input value={formData.lokasi || ""} onChange={e => setFormData({...formData, lokasi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Lokasi/unit penempatan" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Latitude</label>
+                  <input inputMode="decimal" value={formData.latitude || ""} onChange={e => setFormData({...formData, latitude: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: -6.288" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Longitude</label>
+                  <input inputMode="decimal" value={formData.longitude || ""} onChange={e => setFormData({...formData, longitude: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: 106.665" />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">URL Foto</label>
+                  <input type="url" value={formData.foto || ""} onChange={e => setFormData({...formData, foto: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="https://..." />
+                </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">URL / Isi QR</label>
+                  <input value={formData.qr_url || ""} onChange={e => setFormData({...formData, qr_url: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kosongkan untuk memakai Asset ID" />
+                </div>
               </div>
               <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2">
                 <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
                   Batal
                 </button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all">
-                  Simpan
+                <button type="submit" disabled={isSaving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">
+                  {isSaving ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
             </form>

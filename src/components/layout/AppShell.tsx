@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { withinMonths, buildPenjagaanEvents, sisaWaktuLabel, type PenjagaanEvent } from "@/lib/penjagaan";
+import { buildPenjagaanEvents, sisaWaktuLabel, type PenjagaanEvent } from "@/lib/penjagaan";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/ui/GlobalSearch";
 import { spreadsheetService } from "@/services/spreadsheetService";
@@ -14,6 +14,9 @@ import { apiService } from "@/services/apiService";
 import { signInWithGoogle, firebaseSignOut, onFirebaseAuth, getFirebaseIdToken } from "@/lib/firebase";
 import { canViewMenu, type AppUser, type MenuKey } from "@/lib/rbac";
 import { motion, AnimatePresence } from "motion/react";
+import { PegawaiFormModal } from "@/components/ui/PegawaiFormModal";
+import { useToast } from "@/components/ui/Toast";
+import type { Pegawai } from "@/types";
 
 const SESSION_KEY = "sikanda_session";
 const DEV_KEY = "sikanda_dev";
@@ -273,7 +276,7 @@ function NotifSection({
   );
 }
 
-function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpen }: { setMobileSidebarOpen: (v: boolean) => void, desktopSidebarOpen: boolean, setDesktopSidebarOpen: (v: boolean) => void }) {
+function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpen, onEditProfile }: { setMobileSidebarOpen: (v: boolean) => void, desktopSidebarOpen: boolean, setDesktopSidebarOpen: (v: boolean) => void, onEditProfile: () => void }) {
   const { user, logout } = useContext(AuthContext);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
@@ -285,17 +288,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
       try {
         const pegawai = await spreadsheetService.getPegawai();
         setPegawaiList(pegawai);
-        let alerts = 0;
-
-        pegawai.forEach((p) => {
-          // status berisi "ASN"/"PPPK"/"PENSIUN" — lewati yang sudah pensiun.
-          if (String(p.status || "").toUpperCase() === "PENSIUN") return;
-          // tgl_kgb / tgl_pangkat / tgl_pensiun sudah dihitung service memakai BUP dari system_config.
-          // withinMonths bersama → hitungan identik dengan Dashboard & Buku Penjagaan.
-          if (withinMonths(p.tgl_kgb, 6)) alerts++;
-          if (withinMonths(p.tgl_pangkat, 6)) alerts++;
-          if (withinMonths(p.tgl_pensiun, 6)) alerts++;
-        });
+        const alerts = buildPenjagaanEvents(pegawai).filter((event) => !event.isOverdue && event.selisihHari <= 182).length;
         setAlertCount(alerts);
       } catch (err) {
         console.error("Error loading alerts:", err);
@@ -462,8 +455,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                   className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors flex items-center gap-2"
                   onClick={() => {
                     setProfileDropdownOpen(false);
-                    // Add profile edit logic here later if needed
-                    alert("Edit Profile clicked");
+                    onEditProfile();
                   }}
                 >
                   <Settings size={16} />
@@ -493,6 +485,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const { user } = useContext(AuthContext);
+  const toast = useToast();
+  const [profileEmployee, setProfileEmployee] = useState<Pegawai | null>(null);
+
+  const openOwnProfile = async () => {
+    try {
+      const rows = await spreadsheetService.getPegawai();
+      const nip = String(user?.nip || "").trim();
+      const email = String(user?.email || "").trim().toLowerCase();
+      const own = rows.find((p: Pegawai) => (nip && String(p.nip) === nip) || (!nip && email && String(p.email || "").trim().toLowerCase() === email));
+      if (!own) {
+        toast.warning("Profil Belum Tertaut", "Akun ini belum tertaut ke data pegawai. Administrator perlu menautkan NIP melalui Kelola Akun.");
+        return;
+      }
+      setProfileEmployee(own);
+    } catch (error: any) {
+      toast.error("Profil Belum Dapat Dibuka", String(error?.message || "Data pegawai belum berhasil dimuat."));
+    }
+  };
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -528,7 +538,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           setMobileSidebarOpen={setMobileSidebarOpen} 
           desktopSidebarOpen={desktopSidebarOpen}
           setDesktopSidebarOpen={setDesktopSidebarOpen}
+          onEditProfile={() => void openOwnProfile()}
         />
+        <AnimatePresence>
+          {profileEmployee && (
+            <PegawaiFormModal
+              isOpen
+              initialData={profileEmployee}
+              user={user}
+              bidangOptions={[]}
+              onClose={() => setProfileEmployee(null)}
+              onSuccess={() => {
+                spreadsheetService.clearCache();
+                setProfileEmployee(null);
+                toast.success("Profil Diperbarui", "Perubahan profil Anda berhasil disimpan.");
+              }}
+            />
+          )}
+        </AnimatePresence>
         <main className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full md:h-full">
             {children}

@@ -57,7 +57,7 @@ var ASSET_FIELDS = {
   assets_equipment: [
     'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
     'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
-    'jenis', 'jumlah', 'satuan'
+    'jenis', 'jumlah', 'satuan', 'harga_pembelian', 'qr_url'
   ]
 };
 
@@ -101,12 +101,14 @@ var COLUMN_ALIASES = {
     lokasi: ['location', 'lokasi'], kondisi: ['condition', 'kondisi'],
     foto: ['photo_legacy', 'foto', 'photo'], latitude: ['lat', 'latitude'],
     longitude: ['lng', 'longitude'], jenis: ['asset_category', 'jenis'],
-    jumlah: ['quantity', 'jumlah'], satuan: ['unit', 'satuan']
+    jumlah: ['quantity', 'jumlah'], satuan: ['unit', 'satuan'],
+    harga_pembelian: ['acquisition_price', 'harga_pembelian'],
+    qr_url: ['qr_legacy_url', 'qr_url']
   }
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.2-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.3-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -508,10 +510,8 @@ function savePegawai_(actor, data, isNew) {
     if (['ASN', 'PPPK', 'PENSIUN'].indexOf(status) === -1) throw publicError_('Status pegawai tidak valid.');
     data.status = status;
     if (status === 'PPPK') {
-      var category = String(data.kategori_pppk || '').toLowerCase().replace(/[\s-]+/g, '_');
-      if (['penuh_waktu', 'paruh_waktu'].indexOf(category) === -1) {
-        throw publicError_('Kategori PPPK wajib dipilih: penuh waktu atau paruh waktu.');
-      }
+      var category = String(data.kategori_pppk || 'penuh_waktu').toLowerCase().replace(/[\s-]+/g, '_');
+      if (['penuh_waktu', 'paruh_waktu'].indexOf(category) === -1) throw publicError_('Kategori PPPK tidak valid.');
       data.kategori_pppk = category;
     } else {
       data.kategori_pppk = null;
@@ -1075,6 +1075,7 @@ function addCalendarMonths_(date, months) {
 function employmentRules_(row) {
   var status = String(row.status || '').toUpperCase().trim();
   var category = String(row.kategori_pppk || '').toLowerCase().replace(/[\s-]+/g, '_');
+  if (status.indexOf('PPPK') !== -1 && !category) category = 'penuh_waktu';
   if (status === 'ASN' || status === 'PNS') return { kgb: true, pangkat: true, bup: true };
   if (status.indexOf('PPPK') !== -1 && (category === 'penuh_waktu' || status.indexOf('PENUH') !== -1)) {
     return { kgb: true, pangkat: false, bup: false };

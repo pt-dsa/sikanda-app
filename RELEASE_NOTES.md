@@ -1,26 +1,23 @@
-# SIKANDA V1.1.2 Secure — Release Notes
+# SIKANDA V1.1.3 Secure - Release Notes
 
-Baseline: `SIKANDA_v1.1.1_SECURE_AI_STUDIO_FINAL_REV1_2026-07-11.zip`.
+Baseline: SIKANDA V1.1.2 Secure.
 
-## Perubahan V1.1.2
+## Perubahan
 
-- Form Tambah/Edit Kendaraan diperluas dan Nomor Polisi tidak lagi menimpa Kode Barang.
-- Backend kendaraan mendukung field lokasi, penanggung jawab, dokumen, teknis, koordinat, harga, dan foto.
-- Tambah Akun memakai autocomplete Database Pegawai; Nama, NIP, dan Email terisi otomatis.
-- Backend memverifikasi ulang akun baru ke tabel pegawai dan menolak duplikasi NIP/email.
-- Deskripsi kewenangan Pimpinan dan Pegawai diselaraskan dengan RBAC resmi.
-- Tanya SIKANDA memakai database-first untuk agenda/jumlah, fallback model stabil, retry, dan fungsi pemeriksaan konfigurasi.
-- Pesan pembuka dan kendala Tanya SIKANDA dibuat lebih humanis serta tidak menggandakan detail teknis.
-- Rekap Laporan memperoleh filter per kategori, CSV berdasarkan filter, nama file informatif, serta halaman cetak bertabel.
-- Halaman login menampilkan petunjuk pemilihan email; panduan branding OAuth ditambahkan.
-- Card Komposisi SDM dibuat ringkas, seimbang, dan responsif.
-- Ditambahkan `reporting-tests` dan migrasi Supabase V1.1.2.
+- Edit Profile aktif dan terikat pada NIP akun login; RBAC backend tetap menjadi sumber kebenaran.
+- Dashboard membedakan PPPK Penuh Waktu dan Paruh Waktu serta memakai card yang lebih proporsional.
+- PPPK lama tanpa kategori dinormalisasi sebagai Penuh Waktu.
+- Form Pegawai memakai dropdown masa kerja dan tingkat pendidikan.
+- Bidang memakai data eksisting Buku Penjagaan, menerima nilai baru, dan memiliki filter.
+- Label serta filter status Data ASN/PPPK dan Buku Penjagaan diperbarui.
+- Tambah Akun menampilkan Status Pegawai.
+- Cetak Halaman memakai kop resmi dengan logo, garis ganda, dan layout A4 landscape.
+- CRUD Alat & Mesin diperluas sesuai kolom database dan tidak membuat ID lokal semu.
+- Migrasi idempoten `003_sikanda_v1_1_3_revision.sql` ditambahkan.
 
-## Keamanan
+## Keamanan dan kualitas
 
-- Service-role key Supabase dan Gemini API key tetap hanya berada di Apps Script Properties.
-- `GEMINI_API_KEY` bawaan AI Studio boleh tetap ada tetapi tidak pernah dibaca frontend.
-- Akun baru tidak mempercayai email/NIP dari browser.
-- Endpoint mutasi generik tetap dinonaktifkan.
-- CSV/cetak melakukan escaping dan hanya tersedia pada route manager.
-- Administrator dan Pimpinan tetap setara; Pegawai tetap dibatasi pada data sendiri.
+- Service-role Supabase dan Gemini backend tetap hanya berada di Apps Script Properties.
+- Semua mutasi profil/aset diverifikasi Apps Script dan dicatat pada audit log.
+- RLS dan pencabutan akses browser dipertahankan.
+- TypeScript, pengujian agenda/backend/laporan, production build, dan npm audit produksi lulus.

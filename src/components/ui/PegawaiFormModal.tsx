@@ -12,6 +12,9 @@ const DATE_FIELDS: (keyof Pegawai)[] = ["tgl_lahir", "tgl_mulai_golongan", "tgl_
 const inputCls =
   "w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none read-only:opacity-60";
 const labelCls = "block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1";
+const WORK_YEAR_OPTIONS = Array.from({ length: 51 }, (_, value) => value);
+const WORK_MONTH_OPTIONS = Array.from({ length: 12 }, (_, value) => value);
+const EDUCATION_OPTIONS = ["SD", "SMP", "SMA/SMK/SLTA", "D-I", "D-II", "D-III", "D-IV", "S-1/STRATA I", "S-2/STRATA II", "S-3/STRATA III"];
 
 function computeUsia(tglLahir?: string): string {
   const d = parseAnyDate(tglLahir);
@@ -88,12 +91,14 @@ export function PegawaiFormModal({
   initialData,
   onSuccess,
   user,
+  bidangOptions = [],
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialData?: Pegawai | null;
   onSuccess: () => void;
   user?: AppUser | null;
+  bidangOptions?: string[];
 }) {
   const [formData, setFormData] = useState<Partial<Pegawai>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -109,6 +114,7 @@ export function PegawaiFormModal({
     setPhotoFile(null);
     if (initialData) {
       const seeded: Partial<Pegawai> = { ...initialData };
+      if (String(seeded.status || "").toUpperCase() === "PPPK" && !seeded.kategori_pppk) seeded.kategori_pppk = "penuh_waktu";
       DATE_FIELDS.forEach((f) => {
         const v = (initialData as any)[f];
         if (v) (seeded as any)[f] = toInputDate(v); // ke format <input type="date">
@@ -208,7 +214,7 @@ export function PegawaiFormModal({
     if (status !== "PPPK") return status || "ASN";
     if (V("kategori_pppk") === "penuh_waktu") return "PPPK_PENUH_WAKTU";
     if (V("kategori_pppk") === "paruh_waktu") return "PPPK_PARUH_WAKTU";
-    return "PPPK_BELUM_DIKATEGORIKAN";
+    return "PPPK_PENUH_WAKTU";
   })();
 
   return (
@@ -318,9 +324,6 @@ export function PegawaiFormModal({
                 className={inputCls}
               >
                 <option value="ASN">ASN</option>
-                {employmentStatusValue === "PPPK_BELUM_DIKATEGORIKAN" && (
-                  <option value="PPPK_BELUM_DIKATEGORIKAN" disabled>PPPK — kategori belum ditetapkan</option>
-                )}
                 <option value="PPPK_PENUH_WAKTU">PPPK (Penuh Waktu) — mendapat KGB</option>
                 <option value="PPPK_PARUH_WAKTU">PPPK (Paruh Waktu) — tanpa agenda</option>
                 <option value="PENSIUN">PENSIUN</option>
@@ -336,16 +339,30 @@ export function PegawaiFormModal({
               value={V("tgl_mulai_golongan")} onChange={handleChange} locked={L("tgl_mulai_golongan")} />
             <Field label="Jabatan" name="jabatan" placeholder="Nama jabatan" colSpan
               value={V("jabatan")} onChange={handleChange} locked={L("jabatan")} />
+            <div className="md:col-span-2">
+              <label className={labelCls}>Bidang</label>
+              <input list="pegawai-bidang-options" name="unit_kerja" value={V("unit_kerja")} onChange={handleChange}
+                readOnly={L("unit_kerja")} className={inputCls} placeholder="Pilih bidang eksisting atau ketik bidang baru" />
+              <datalist id="pegawai-bidang-options">
+                {bidangOptions.map((bidang) => <option key={bidang} value={bidang} />)}
+              </datalist>
+              <p className="text-[10px] text-gray-400 mt-1">Daftar berasal dari Bidang pada Buku Penjagaan. Nilai baru dapat langsung diketik.</p>
+            </div>
             <Field label="TMT Jabatan" name="tgl_mulai_jabatan" type="date"
               value={V("tgl_mulai_jabatan")} onChange={handleChange} locked={L("tgl_mulai_jabatan")} />
-            <Field label="Masa Kerja (Tahun)" name="masa_kerja_tahun" type="number"
-              value={V("masa_kerja_tahun")} onChange={handleChange} locked={L("masa_kerja_tahun")} />
-            <Field label="Masa Kerja (Bulan)" name="masa_kerja_bulan" type="number"
-              value={V("masa_kerja_bulan")} onChange={handleChange} locked={L("masa_kerja_bulan")} />
+            <div><label className={labelCls}>Masa Kerja (Tahun)</label><select name="masa_kerja_tahun" value={V("masa_kerja_tahun")} onChange={handleChange} disabled={L("masa_kerja_tahun")} className={inputCls}>
+              <option value="">Pilih tahun</option>{WORK_YEAR_OPTIONS.map((value) => <option key={value} value={value}>{value} tahun</option>)}
+            </select></div>
+            <div><label className={labelCls}>Masa Kerja (Bulan)</label><select name="masa_kerja_bulan" value={V("masa_kerja_bulan")} onChange={handleChange} disabled={L("masa_kerja_bulan")} className={inputCls}>
+              <option value="">Pilih bulan</option>{WORK_MONTH_OPTIONS.map((value) => <option key={value} value={value}>{value} bulan</option>)}
+            </select></div>
 
             <SectionTitle>Pendidikan</SectionTitle>
-            <Field label="Tingkat" name="tingkat" placeholder="Contoh: STRATA I"
-              value={V("tingkat")} onChange={handleChange} locked={L("tingkat")} />
+            <div><label className={labelCls}>Tingkat</label><select name="tingkat" value={V("tingkat")} onChange={handleChange} disabled={L("tingkat")} className={inputCls}>
+              <option value="">Pilih tingkat pendidikan</option>
+              {V("tingkat") && !EDUCATION_OPTIONS.includes(V("tingkat")) && <option value={V("tingkat")}>{V("tingkat")} (data lama)</option>}
+              {EDUCATION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select></div>
             <Field label="Pendidikan (Jurusan)" name="pendidikan_jurusan" placeholder="Contoh: S-1 Sistem Informasi"
               value={V("pendidikan_jurusan")} onChange={handleChange} locked={L("pendidikan_jurusan")} />
             <Field label="Universitas / Sekolah" name="universitas"
