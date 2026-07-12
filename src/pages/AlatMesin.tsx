@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
-import { Equipment } from "@/types";
+import { Equipment, Pegawai } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -14,12 +14,16 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
+import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
+import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
+import { apiService, fileToBase64 } from "@/services/apiService";
 
 export default function AlatMesin() {
   const location = useLocation();
   const toast = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [data, setData] = useState<Equipment[]>([]);
+  const [employees, setEmployees] = useState<Pegawai[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [search, setSearch] = useState("");
@@ -34,6 +38,7 @@ export default function AlatMesin() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Equipment>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -45,8 +50,12 @@ export default function AlatMesin() {
   // (mis. sinkronisasi ulang saat operasi tulis gagal).
   const load = async () => {
     try {
-      const res = await spreadsheetService.getEquipment();
+      const [res, employeeRows] = await Promise.all([
+        spreadsheetService.getEquipment(),
+        spreadsheetService.getPegawai(),
+      ]);
       setData(res);
+      setEmployees(employeeRows as Pegawai[]);
     } catch (err: any) {
       toast.error("Gagal Memuat", err?.message || "Tidak dapat memuat data alat/mesin.");
     } finally {
@@ -135,15 +144,42 @@ export default function AlatMesin() {
       toast.warning("Data Belum Lengkap", "Kode Barang dan Nama Barang wajib diisi.");
       return;
     }
+    if (!isOfficialEmployeeName(formData.pengguna, employees) || !isOfficialEmployeeName(formData.penanggung_jawab, employees)) {
+      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari suggestion Database Pegawai.");
+      return;
+    }
+    const lat = formData.latitude === "" || formData.latitude === undefined ? undefined : Number(formData.latitude);
+    const lng = formData.longitude === "" || formData.longitude === undefined ? undefined : Number(formData.longitude);
+    if ((lat === undefined) !== (lng === undefined) || (lat !== undefined && (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || Number(lng) < -180 || Number(lng) > 180))) {
+      toast.error("Koordinat Tidak Valid", "Latitude dan longitude harus diisi berpasangan dalam rentang koordinat yang benar.");
+      return;
+    }
     setIsSaving(true);
     try {
       const isNew = !formData.asset_id;
-      await spreadsheetService.saveEquipment({ ...formData, kondisi: formData.kondisi || "BAIK", jumlah: Number(formData.jumlah || 1) }, isNew);
+      const result = await spreadsheetService.saveEquipment({ ...formData, latitude: lat, longitude: lng, kondisi: formData.kondisi || "BAIK", jumlah: Number(formData.jumlah || 1) }, isNew);
+      if (photoFile) {
+        try {
+          const encoded = await fileToBase64(photoFile);
+          await apiService.uploadAssetFoto({
+            table: "assets_equipment",
+            assetId: result.asset_id,
+            holderName: String(formData.pengguna || ""),
+            ...encoded,
+          });
+        } catch (photoError: any) {
+          setFormData({ ...formData, asset_id: result.asset_id });
+          await load();
+          toast.warning("Data Tersimpan, Foto Belum Terunggah", photoError?.message || "Silakan pilih foto dan simpan kembali.");
+          return;
+        }
+      }
       setIsEditing(false);
       setFormData({});
+      setPhotoFile(null);
       spreadsheetService.clearCache();
       await load();
-      toast.success(isNew ? "Data Ditambahkan" : "Data Disimpan", isNew ? "Data alat/mesin baru berhasil ditambahkan." : "Perubahan data alat/mesin berhasil disimpan.");
+      toast.success(isNew ? "Data Alat & Mesin Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data alat & mesin dan media telah tersimpan." : "Perubahan data alat & mesin telah tersimpan dan tervalidasi.");
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
     } finally {
@@ -152,6 +188,7 @@ export default function AlatMesin() {
   };
 
   const openForm = (item?: Equipment) => {
+    setPhotoFile(null);
     if (item) {
       setFormData(item);
     } else {
@@ -626,13 +663,11 @@ export default function AlatMesin() {
                   <label className="text-xs font-medium text-gray-500">Tahun Pembelian</label>
                   <input type="number" value={formData.tahun || ""} onChange={e => setFormData({...formData, tahun: parseInt(e.target.value) || undefined})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: 2018" />
                 </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <label className="text-xs font-medium text-gray-500">Pengguna</label>
-                  <input value={formData.pengguna || ""} onChange={e => setFormData({...formData, pengguna: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nama Pengguna" />
+                <div className="md:col-span-2">
+                  <EmployeeAutocomplete label="Pengguna" value={String(formData.pengguna || "")} employees={employees} onChange={(pengguna) => setFormData({ ...formData, pengguna })} placeholder="Ketik nama pengguna alat/mesin..." />
                 </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <label className="text-xs font-medium text-gray-500">Penanggung Jawab</label>
-                  <input value={formData.penanggung_jawab || ""} onChange={e => setFormData({...formData, penanggung_jawab: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nama Penanggung Jawab" />
+                <div className="md:col-span-2">
+                  <EmployeeAutocomplete label="Penanggung Jawab" value={String(formData.penanggung_jawab || "")} employees={employees} onChange={(penanggung_jawab) => setFormData({ ...formData, penanggung_jawab })} placeholder="Ketik nama penanggung jawab..." />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Kondisi</label>
@@ -650,25 +685,25 @@ export default function AlatMesin() {
                   <label className="text-xs font-medium text-gray-500">Lokasi</label>
                   <input value={formData.lokasi || ""} onChange={e => setFormData({...formData, lokasi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Lokasi/unit penempatan" />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Latitude</label>
-                  <input inputMode="decimal" value={formData.latitude || ""} onChange={e => setFormData({...formData, latitude: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: -6.288" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Longitude</label>
-                  <input inputMode="decimal" value={formData.longitude || ""} onChange={e => setFormData({...formData, longitude: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: 106.665" />
-                </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <label className="text-xs font-medium text-gray-500">URL Foto</label>
-                  <input type="url" value={formData.foto || ""} onChange={e => setFormData({...formData, foto: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="https://..." />
-                </div>
+                <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Lokasi Koordinat dan Media</div>
+                <AssetMediaFields
+                  latitude={formData.latitude}
+                  longitude={formData.longitude}
+                  existingPhoto={formData.foto}
+                  selectedFile={photoFile}
+                  onCoordinatesChange={(latitude, longitude) => setFormData({ ...formData, latitude, longitude })}
+                  onFileChange={setPhotoFile}
+                  onError={(message) => toast.error("Lokasi/Media Belum Siap", message)}
+                  photoLabel="Foto Alat & Mesin"
+                  autoLocate={!formData.asset_id}
+                />
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <label className="text-xs font-medium text-gray-500">URL / Isi QR</label>
                   <input value={formData.qr_url || ""} onChange={e => setFormData({...formData, qr_url: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kosongkan untuk memakai Asset ID" />
                 </div>
               </div>
               <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2">
-                <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <button type="button" disabled={isSaving} onClick={() => { setIsEditing(false); setPhotoFile(null); }} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
                   Batal
                 </button>
                 <button type="submit" disabled={isSaving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">

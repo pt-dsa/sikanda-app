@@ -1,7 +1,7 @@
 {
   "name": "sikanda",
   "private": true,
-  "version": "1.1.3",
+  "version": "1.1.4",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "esbuild tests/agenda.test.ts tests/backend-rules.test.ts tests/reporting.test.ts tests/revision-ui.test.ts --bundle --platform=node --format=esm --outdir=.test-dist && node .test-dist/agenda.test.js && node .test-dist/backend-rules.test.js && node .test-dist/reporting.test.js && node .test-dist/revision-ui.test.js",
+    "test": "esbuild tests/agenda.test.ts tests/backend-rules.test.ts tests/reporting.test.ts tests/revision-ui.test.ts tests/revision-v114.test.ts --bundle --platform=node --format=esm --outdir=.test-dist && node .test-dist/agenda.test.js && node .test-dist/backend-rules.test.js && node .test-dist/reporting.test.js && node .test-dist/revision-ui.test.js && node .test-dist/revision-v114.test.js",
     "verify": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {

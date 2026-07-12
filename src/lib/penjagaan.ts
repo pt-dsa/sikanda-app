@@ -306,7 +306,7 @@ export function bucketMeta(bucket: BucketPenjagaan): {
   dot: string;
 } {
   switch (bucket) {
-    case "terlambat": return { label: "Terlambat", badge: "danger", dot: "bg-red-500" };
+    case "terlambat": return { label: "Terlewat", badge: "danger", dot: "bg-red-500" };
     case "le3":       return { label: "≤ 3 bulan", badge: "danger", dot: "bg-red-500" };
     case "le6":       return { label: "≤ 6 bulan", badge: "warning", dot: "bg-amber-500" };
     case "le12":      return { label: "≤ 12 bulan", badge: "info", dot: "bg-blue-500" };

@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { PegawaiFormModal } from "@/components/ui/PegawaiFormModal";
 import { useToast } from "@/components/ui/Toast";
 import type { Pegawai } from "@/types";
+import { birthdayTimeLabel, buildUpcomingBirthdays, type BirthdayReminder } from "@/lib/birthdays";
 
 const SESSION_KEY = "sikanda_session";
 const DEV_KEY = "sikanda_dev";
@@ -276,10 +277,31 @@ function NotifSection({
   );
 }
 
+function BirthdaySection({ items, close }: { items: BirthdayReminder[]; close: () => void }) {
+  if (!items.length) return null;
+  return (
+    <div className="py-1">
+      <div className="px-4 py-2 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-fuchsia-500" />
+        <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Ulang Tahun Hari Ini–7 Hari</span>
+        <span className="ml-auto text-[11px] font-bold text-gray-400">{items.length}</span>
+      </div>
+      {items.slice(0, 8).map((item) => (
+        <Link key={`${item.nip}-${item.tanggal}`} to={`/pegawai?search=${encodeURIComponent(item.nama)}`} onClick={close} className="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+          <div className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate">{item.nama}</div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{item.jabatan || "Jabatan belum tersedia"} · {item.tanggal}</span>
+            <span className={`text-[11px] font-bold shrink-0 ${item.daysUntil === 0 ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-gray-500 dark:text-gray-400"}`}>{birthdayTimeLabel(item)}</span>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpen, onEditProfile }: { setMobileSidebarOpen: (v: boolean) => void, desktopSidebarOpen: boolean, setDesktopSidebarOpen: (v: boolean) => void, onEditProfile: () => void }) {
   const { user, logout } = useContext(AuthContext);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [alertCount, setAlertCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const [pegawaiList, setPegawaiList] = useState<any[]>([]);
 
@@ -288,17 +310,22 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
       try {
         const pegawai = await spreadsheetService.getPegawai();
         setPegawaiList(pegawai);
-        const alerts = buildPenjagaanEvents(pegawai).filter((event) => !event.isOverdue && event.selisihHari <= 182).length;
-        setAlertCount(alerts);
       } catch (err) {
         console.error("Error loading alerts:", err);
       }
     }
-    loadAlerts();
+    void loadAlerts();
+    const refresh = () => void loadAlerts();
+    window.addEventListener("sikanda:data-changed", refresh);
+    const timer = window.setInterval(refresh, 5 * 60 * 1000);
+    return () => {
+      window.removeEventListener("sikanda:data-changed", refresh);
+      window.clearInterval(timer);
+    };
   }, []);
 
   // Agenda untuk panel lonceng (data NYATA via modul bersama buildPenjagaanEvents).
-  // Badge tetap = alertCount (≤6 bln). Panel: bagian Terlambat + ≤6 bln per kategori.
+  // Badge mengikuti seluruh item yang benar-benar tampil pada panel.
   const notif = useMemo(() => {
     const events = buildPenjagaanEvents(pegawaiList);
     const within6 = (k: PenjagaanEvent["kategori"]) =>
@@ -310,10 +337,11 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
       kgb: within6("KGB"),
       pangkat: within6("PANGKAT"),
       bup: within6("BUP"),
+      birthdays: buildUpcomingBirthdays(pegawaiList, 7),
     };
   }, [pegawaiList]);
 
-  const totalNotif = notif.overdue.length + notif.kgb.length + notif.pangkat.length + notif.bup.length;
+  const totalNotif = notif.overdue.length + notif.kgb.length + notif.pangkat.length + notif.bup.length + notif.birthdays.length;
 
   const getGreeting = () => {
     const hour = parseInt(new Intl.DateTimeFormat('id-ID', {
@@ -361,9 +389,9 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
             className="relative p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
             <Bell size={20} />
-            {alertCount > 0 && (
+            {totalNotif > 0 && (
               <span className="absolute top-1 right-1 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-gray-900">
-                {alertCount > 99 ? '99+' : alertCount}
+                {totalNotif > 99 ? '99+' : totalNotif}
               </span>
             )}
           </button>
@@ -375,7 +403,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                 <div className="sticky top-0 bg-white dark:bg-gray-800 px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell size={15} className="text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">Agenda Kepegawaian</span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">Notifikasi Kepegawaian</span>
                   </div>
                   <Link
                     to="/buku-penjagaan"
@@ -392,8 +420,9 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                    <BirthdaySection items={notif.birthdays} close={() => setNotifOpen(false)} />
                     <NotifSection
-                      title="Terlambat (Lewat Tenggat)"
+                      title="Terlewat (Lewat Tenggat)"
                       items={notif.overdue}
                       dot="bg-red-500"
                       to={(e) => `/buku-penjagaan?kategori=${e.kategori}&rentang=terlambat`}
@@ -551,7 +580,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onSuccess={() => {
                 spreadsheetService.clearCache();
                 setProfileEmployee(null);
-                toast.success("Profil Diperbarui", "Perubahan profil Anda berhasil disimpan.");
               }}
             />
           )}

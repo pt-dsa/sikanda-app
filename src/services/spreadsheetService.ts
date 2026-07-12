@@ -130,9 +130,13 @@ function buildGolonganDistribusi(list: any[]): DistribusiItem[] {
     const level = String(p.golongan || "").split("/")[0].trim();
     if (level) counts[level] = (counts[level] || 0) + 1;
   }
-  const ORDER = ["I", "II", "III", "IV"];
+  const ORDER = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII"];
   return Object.entries(counts)
-    .sort(([a], [b]) => ORDER.indexOf(a) - ORDER.indexOf(b))
+    .sort(([a], [b]) => {
+      const ai = ORDER.indexOf(a);
+      const bi = ORDER.indexOf(b);
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b, "id", { numeric: true });
+    })
     .map(([name, value]) => ({ name, value }));
 }
 
@@ -176,6 +180,7 @@ export const spreadsheetService = {
         sessionStorage.removeItem(key);
       }
     });
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("sikanda:data-changed"));
   },
 
   getLastUpdated() {
@@ -409,7 +414,7 @@ export const spreadsheetService = {
         const jabatanRaw = String(item.jabatan || "").trim();
         const golonganRaw = String(item.golongan || "").trim();
         const statusSource = String(item.status || "").trim().toUpperCase();
-        const statusRaw = statusSource.startsWith("PPPK") ? "PPPK" : statusSource;
+        const statusRaw = statusSource.startsWith("PPPK") ? "PPPK" : (["PNS", "CPNS"].includes(statusSource) ? "ASN" : statusSource);
         const kategoriPppkRaw = String(item.kategori_pppk || item.pppk_category || "").trim().toLowerCase();
         const kategori_pppk = kategoriPppkRaw.includes('paruh') || kategoriPppkRaw.includes('part') || statusSource.includes('PARUH')
           ? 'paruh_waktu' as const
@@ -456,6 +461,7 @@ export const spreadsheetService = {
           assets_inventaris: [],
           match_quality: bestQ,
           is_incomplete: isIncomplete,
+          is_active: true,
         };
       }).filter(Boolean);
 

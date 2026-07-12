@@ -37,7 +37,7 @@ const SUGGESTIONS = [
   "Siapa saja yang KGB-nya jatuh tempo dalam 6 bulan ke depan?",
   "Siapa saja pegawai yang akan pensiun (BUP) tahun ini?",
   "Berapa kendaraan yang kondisinya rusak, dan siapa penggunanya?",
-  "Tampilkan daftar kendaraan yang masa STNK-nya akan habis.",
+  "Tampilkan kendaraan yang kondisinya perlu perhatian beserta penggunanya.",
   "Ringkas komposisi golongan dan tingkat pendidikan pegawai saat ini.",
   "Siapa saja pegawai yang masa kerjanya lebih dari 10 tahun?",
   "Tampilkan data pegawai yang berstatus ASN dan PPPK.",
@@ -160,12 +160,9 @@ export default function TanyaSikanda() {
     } catch (err: any) {
       const msg = err?.message || "Terjadi kendala saat menghubungi asisten.";
       const isBusy = /ramai|batas|kuota|429/i.test(msg);
-      const needsAdmin = /administrator|konfigurasi|terhubung/i.test(msg);
       const errorMessage = isBusy
         ? "Pertanyaannya bagus, tetapi saya sedang menerima cukup banyak permintaan. Tunggu sebentar ya, lalu coba kirim lagi."
-        : needsAdmin
-          ? "Maaf ya, saya belum bisa memproses jawaban naratif saat ini. Administrator SIKANDA perlu memeriksa konfigurasi asisten."
-          : "Maaf ya, jawaban itu belum berhasil saya proses. Coba kirim ulang beberapa saat lagi dengan kalimat yang sedikit lebih spesifik.";
+        : "Saya belum berhasil menuntaskan jawaban itu. Coba sebutkan bagian datanya—misalnya pegawai, KGB, pangkat, BUP, kendaraan, atau alat dan mesin—supaya saya bisa mengeceknya lebih terarah.";
 
       setMessages((prev) => [
         ...prev,
@@ -244,7 +241,7 @@ export default function TanyaSikanda() {
                 if (hour >= 15 && hour < 18) return "Sore";
                 if (hour >= 18 || hour < 3) return "Malam";
                 return "Pagi";
-              })()}, ${namaDepan || "Sobat SIKANDA"}. Apa kabar? Saya siap membantu Anda hari ini.\n\nSilakan tanyakan data kepegawaian, aset, kendaraan, atau agenda Buku Penjagaan. Untuk pertanyaan faktual, saya akan memeriksa data SIKANDA terlebih dahulu agar jawabannya lebih cepat dan tepat.`,
+              })()}, ${namaDepan || "Sobat SIKANDA"} 😊 Apa kabar?\n\nMau mengecek data apa hari ini? Saya bisa membantu menelusuri pegawai, agenda KGB/pangkat/BUP, ulang tahun, kendaraan, serta alat dan mesin berdasarkan data yang dapat Anda akses.`,
             time: nowLabel(),
           }}
         />

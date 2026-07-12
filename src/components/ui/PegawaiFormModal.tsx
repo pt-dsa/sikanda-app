@@ -6,6 +6,7 @@ import { apiService, fileToBase64 } from "@/services/apiService";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { toInputDate, parseAnyDate } from "@/lib/utils";
 import { canEditField, type AppUser } from "@/lib/rbac";
+import { useToast } from "@/components/ui/Toast";
 
 const DATE_FIELDS: (keyof Pegawai)[] = ["tgl_lahir", "tgl_mulai_golongan", "tgl_mulai_jabatan"];
 
@@ -100,6 +101,7 @@ export function PegawaiFormModal({
   user?: AppUser | null;
   bidangOptions?: string[];
 }) {
+  const toast = useToast();
   const [formData, setFormData] = useState<Partial<Pegawai>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -192,9 +194,12 @@ export function PegawaiFormModal({
       }
 
       spreadsheetService.clearCache();
+      toast.success(initialData ? "Perubahan Data Berhasil Disimpan" : "Data Pegawai Berhasil Ditambahkan", initialData ? "Perubahan profil pegawai telah disimpan dan tervalidasi." : "Data pegawai baru telah tersimpan pada database.");
       onSuccess();
     } catch (error: any) {
-      setErrorMsg(error?.message || "Terjadi kesalahan saat menyimpan data.");
+      const message = error?.message || "Terjadi kesalahan saat menyimpan data.";
+      setErrorMsg(message);
+      toast.error("Penyimpanan Data Pegawai Gagal", message);
     } finally {
       setIsSaving(false);
     }

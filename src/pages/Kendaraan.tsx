@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
-import { Vehicle } from "@/types";
+import { Pegawai, Vehicle } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -14,6 +14,9 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
 import { useLocation } from "react-router-dom";
+import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
+import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
+import { apiService, fileToBase64 } from "@/services/apiService";
 
 const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
 
@@ -34,6 +37,7 @@ export default function Kendaraan() {
   const location = useLocation();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [data, setData] = useState<Vehicle[]>([]);
+  const [employees, setEmployees] = useState<Pegawai[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterJenis, setFilterJenis] = useState("");
@@ -54,13 +58,18 @@ export default function Kendaraan() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
   const [saving, setSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   // Fungsi muat data di lingkup komponen agar bisa dipanggil ulang
   // (mis. sinkronisasi ulang saat operasi tulis gagal).
   const load = async () => {
     try {
-      const res = await spreadsheetService.getVehicles();
+      const [res, employeeRows] = await Promise.all([
+        spreadsheetService.getVehicles(),
+        spreadsheetService.getPegawai(),
+      ]);
       setData(res);
+      setEmployees(employeeRows as Pegawai[]);
     } catch (err: any) {
       toast.error("Gagal Memuat", err?.message || "Tidak dapat memuat data kendaraan.");
     } finally {
@@ -168,20 +177,41 @@ export default function Kendaraan() {
       toast.error("Data Belum Lengkap", "Nomor Polisi, Nama Aset, dan Merk/Model wajib diisi.");
       return;
     }
+    if (!isOfficialEmployeeName(payload.pengguna, employees) || !isOfficialEmployeeName(payload.penanggung_jawab, employees)) {
+      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari suggestion Database Pegawai.");
+      return;
+    }
+    const hasLatitude = payload.latitude !== undefined;
+    const hasLongitude = payload.longitude !== undefined;
+    if (hasLatitude !== hasLongitude || (hasLatitude && (Number(payload.latitude) < -90 || Number(payload.latitude) > 90 || Number(payload.longitude) < -180 || Number(payload.longitude) > 180))) {
+      toast.error("Koordinat Tidak Valid", "Latitude dan longitude harus diisi berpasangan dalam rentang koordinat yang benar.");
+      return;
+    }
 
     setSaving(true);
     try {
       const result = await spreadsheetService.saveVehicle(payload, isNew);
-      const savedItem = { ...payload, asset_id: result.asset_id } as Vehicle;
-      if (!isNew) {
-        setData(prev => prev.map(item => item.asset_id === payload.asset_id ? savedItem : item));
-        toast.success("Data Disimpan", "Perubahan data kendaraan berhasil disimpan.");
-      } else {
-        setData(prev => [savedItem, ...prev]);
-        toast.success("Data Ditambahkan", "Data kendaraan baru berhasil ditambahkan.");
+      if (photoFile) {
+        try {
+          const encoded = await fileToBase64(photoFile);
+          await apiService.uploadAssetFoto({
+            table: "assets_vehicle",
+            assetId: result.asset_id,
+            holderName: String(payload.pengguna || ""),
+            ...encoded,
+          });
+        } catch (photoError: any) {
+          setFormData({ ...payload, asset_id: result.asset_id });
+          await load();
+          toast.warning("Data Tersimpan, Foto Belum Terunggah", photoError?.message || "Silakan pilih foto dan simpan kembali.");
+          return;
+        }
       }
+      await load();
+      toast.success(isNew ? "Data Kendaraan Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data kendaraan dan media telah tersimpan." : "Perubahan data kendaraan telah tersimpan dan tervalidasi.");
       setIsEditing(false);
       setFormData({});
+      setPhotoFile(null);
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
       await load();
@@ -191,6 +221,7 @@ export default function Kendaraan() {
   };
 
   const openForm = (item?: Vehicle) => {
+    setPhotoFile(null);
     if (item) {
       setFormData({ ...item });
     } else {
@@ -665,12 +696,10 @@ export default function Kendaraan() {
                 </div>
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Penguasaan dan Lokasi</div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Pengguna</label>
-                  <input value={formData.pengguna || ""} onChange={e => setFormData({...formData, pengguna: e.target.value})} className={vehicleInputCls} placeholder="Nama pengguna kendaraan" />
+                  <EmployeeAutocomplete label="Pengguna" value={String(formData.pengguna || "")} employees={employees} onChange={(pengguna) => setFormData({ ...formData, pengguna })} placeholder="Ketik nama pengguna kendaraan..." />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Penanggung Jawab</label>
-                  <input value={formData.penanggung_jawab || ""} onChange={e => setFormData({...formData, penanggung_jawab: e.target.value})} className={vehicleInputCls} placeholder="Nama penanggung jawab" />
+                  <EmployeeAutocomplete label="Penanggung Jawab" value={String(formData.penanggung_jawab || "")} employees={employees} onChange={(penanggung_jawab) => setFormData({ ...formData, penanggung_jawab })} placeholder="Ketik nama penanggung jawab..." />
                 </div>
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <label className="text-xs font-medium text-gray-500">Lokasi / Unit Kerja</label>
@@ -704,21 +733,20 @@ export default function Kendaraan() {
                 </div>
 
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Lokasi Koordinat dan Media</div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Latitude</label>
-                  <input type="number" step="any" min="-90" max="90" value={formData.latitude ?? ""} onChange={e => setFormData({...formData, latitude: e.target.value})} className={vehicleInputCls} placeholder="Contoh: -6.300000" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Longitude</label>
-                  <input type="number" step="any" min="-180" max="180" value={formData.longitude ?? ""} onChange={e => setFormData({...formData, longitude: e.target.value})} className={vehicleInputCls} placeholder="Contoh: 106.700000" />
-                </div>
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <label className="text-xs font-medium text-gray-500">URL Foto Kendaraan</label>
-                  <input type="text" value={formData.foto || ""} onChange={e => setFormData({...formData, foto: e.target.value})} className={vehicleInputCls} placeholder="URL atau path foto kendaraan" />
-                </div>
+                <AssetMediaFields
+                  latitude={formData.latitude}
+                  longitude={formData.longitude}
+                  existingPhoto={formData.foto}
+                  selectedFile={photoFile}
+                  onCoordinatesChange={(latitude, longitude) => setFormData({ ...formData, latitude, longitude })}
+                  onFileChange={setPhotoFile}
+                  onError={(message) => toast.error("Lokasi/Media Belum Siap", message)}
+                  photoLabel="Foto Kendaraan"
+                  autoLocate={!formData.asset_id}
+                />
               </div>
               <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2">
-                <button type="button" disabled={saving} onClick={() => setIsEditing(false)} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
+                <button type="button" disabled={saving} onClick={() => { setIsEditing(false); setPhotoFile(null); }} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
                   Batal
                 </button>
                 <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">

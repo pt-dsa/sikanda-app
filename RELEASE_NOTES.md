@@ -1,23 +1,23 @@
-# SIKANDA V1.1.3 Secure - Release Notes
+# SIKANDA V1.1.4 Secure — Release Notes
 
-Baseline: SIKANDA V1.1.2 Secure.
+Baseline: SIKANDA V1.1.3 Secure.
 
-## Perubahan
+## Perubahan utama
 
-- Edit Profile aktif dan terikat pada NIP akun login; RBAC backend tetap menjadi sumber kebenaran.
-- Dashboard membedakan PPPK Penuh Waktu dan Paruh Waktu serta memakai card yang lebih proporsional.
-- PPPK lama tanpa kategori dinormalisasi sebagai Penuh Waktu.
-- Form Pegawai memakai dropdown masa kerja dan tingkat pendidikan.
-- Bidang memakai data eksisting Buku Penjagaan, menerima nilai baru, dan memiliki filter.
-- Label serta filter status Data ASN/PPPK dan Buku Penjagaan diperbarui.
-- Tambah Akun menampilkan Status Pegawai.
-- Cetak Halaman memakai kop resmi dengan logo, garis ganda, dan layout A4 landscape.
-- CRUD Alat & Mesin diperluas sesuai kolom database dan tidak membuat ID lokal semu.
-- Migrasi idempoten `003_sikanda_v1_1_3_revision.sql` ditambahkan.
+- Dashboard memiliki sinkronisasi data nyata, validasi pegawai aktif, judul tebal, istilah Terlewat, dan Komposisi SDM yang proporsional.
+- Pengguna/Penanggung Jawab kendaraan serta alat-mesin memakai autocomplete Database Pegawai dan divalidasi ulang backend.
+- GPS otomatis, kamera, galeri, preview, validasi 5 MB, dan upload Google Drive ditambahkan untuk kendaraan serta alat-mesin.
+- Popup sukses/gagal diterapkan konsisten pada CRUD aktif.
+- Tambah Akun menampilkan Jabatan Pegawai.
+- Lonceng menghitung item panel secara akurat dan menambahkan ulang tahun hari ini–7 hari.
+- Rekap Laporan menambahkan Alat & Mesin dan dropdown kategori cetak.
+- KOP dan tabel print diperbaiki untuk A4 landscape.
+- Tanya SIKANDA database-first diperluas dan persona dibuat lebih humanis.
 
-## Keamanan dan kualitas
+## Kualitas dan keamanan
 
-- Service-role Supabase dan Gemini backend tetap hanya berada di Apps Script Properties.
-- Semua mutasi profil/aset diverifikasi Apps Script dan dicatat pada audit log.
-- RLS dan pencabutan akses browser dipertahankan.
-- TypeScript, pengujian agenda/backend/laporan, production build, dan npm audit produksi lulus.
+- Tidak ada SQL baru; skema V1.1.3 digunakan kembali.
+- Foto aset hanya dapat diunggah manager melalui backend tervalidasi.
+- Nama relasi aset harus cocok dengan pegawai aktif.
+- Service-role Supabase dan Gemini backend tetap hanya di Script Properties.
+- TypeScript lint, seluruh test lama, test V1.1.4, dan production build lulus.

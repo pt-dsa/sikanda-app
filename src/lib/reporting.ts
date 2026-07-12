@@ -1,4 +1,4 @@
-import type { Pegawai, Vehicle } from "@/types";
+import type { Equipment, Pegawai, Vehicle } from "@/types";
 import type { PenjagaanEvent } from "@/lib/penjagaan";
 
 export interface PegawaiReportFilter {
@@ -19,6 +19,14 @@ export interface AgendaReportFilter {
 }
 
 export interface VehicleReportFilter {
+  search: string;
+  jenis: string;
+  kondisi: string;
+  tahun: string;
+  pengguna: string;
+}
+
+export interface EquipmentReportFilter {
   search: string;
   jenis: string;
   kondisi: string;
@@ -64,6 +72,18 @@ export function filterVehicleReport(rows: Vehicle[], filter: VehicleReportFilter
     const searchable = norm(`${row.asset_id} ${row.kode_barang} ${row.no_polisi} ${row.nama_aset} ${row.merk} ${row.pengguna}`);
     return (!query || searchable.includes(query))
       && (!filter.jenis || norm(row.jenis_kendaraan) === norm(filter.jenis))
+      && (!filter.kondisi || norm(row.kondisi) === norm(filter.kondisi))
+      && (!filter.tahun || norm(row.tahun) === norm(filter.tahun))
+      && (!filter.pengguna || norm(row.pengguna) === norm(filter.pengguna));
+  });
+}
+
+export function filterEquipmentReport(rows: Equipment[], filter: EquipmentReportFilter): Equipment[] {
+  const query = norm(filter.search);
+  return rows.filter((row) => {
+    const searchable = norm(`${row.asset_id} ${row.kode_barang} ${row.nama_aset} ${row.merk} ${row.jenis} ${row.pengguna} ${row.penanggung_jawab} ${row.lokasi}`);
+    return (!query || searchable.includes(query))
+      && (!filter.jenis || norm(row.jenis) === norm(filter.jenis))
       && (!filter.kondisi || norm(row.kondisi) === norm(filter.kondisi))
       && (!filter.tahun || norm(row.tahun) === norm(filter.tahun))
       && (!filter.pengguna || norm(row.pengguna) === norm(filter.pengguna));

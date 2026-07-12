@@ -89,4 +89,10 @@ const databaseAnswer = vm.runInContext(
 ) as string;
 assert(databaseAnswer.includes("Pegawai Uji"), "Pertanyaan KGB harus dijawab database-first tanpa Gemini");
 
+const rankAnswer = vm.runInContext(
+  "answerFromDatabase_({role:'admin',email:'admin@example.go.id'}, 'Adakah pegawai yang akan naik pangkat dalam waktu dekat?')",
+  context,
+) as string;
+assert(rankAnswer.includes("Pegawai Uji"), "Pertanyaan pangkat dengan bahasa natural harus dijawab database-first");
+
 console.log("backend-rules-tests: OK");

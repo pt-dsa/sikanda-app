@@ -34,6 +34,15 @@ export const apiService = {
   uploadFoto: (params: { nip: string; base64: string; mimeType: string; fileName: string }) =>
     callBackend<UploadFotoResult>({ action: "upload_foto", ...params }),
 
+  uploadAssetFoto: (params: {
+    table: "assets_vehicle" | "assets_equipment";
+    assetId: string;
+    holderName?: string;
+    base64: string;
+    mimeType: string;
+    fileName: string;
+  }) => callBackend<UploadFotoResult>({ action: "upload_asset_foto", ...params }),
+
   // Aset: koreksi nama pengguna (Tahap 6 — Data Cleansing fuzzy matching).
   fixAssetHolder: async (sheet: string, assetId: string, newHolderName: string) => {
     if (sheet !== "kendaraan" && sheet !== "alat_mesin") {

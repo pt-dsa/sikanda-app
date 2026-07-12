@@ -16,6 +16,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 import { motion } from "motion/react";
+import { useToast } from "@/components/ui/Toast";
 
 const containerVars = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const itemVars = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 280, damping: 22 } } };
@@ -85,7 +86,7 @@ function HorizontalBarChart({ data, labelClass = "w-16" }: { data: { name: strin
   if (!data || data.length === 0) return <p className="text-sm text-gray-400 py-6 text-center">Tidak ada data</p>;
   const maxVal = Math.max(...data.map((d) => d.value), 1);
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2.5 w-full">
       {data.map((item, idx) => (
         <div key={item.name} className="flex items-center gap-3">
           <span className={`text-xs font-medium text-gray-600 dark:text-gray-400 shrink-0 text-right truncate ${labelClass}`} title={item.name}>{item.name}</span>
@@ -120,7 +121,7 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
             Data Pegawai Belum Berhasil Dimuat
           </h3>
           <p className="text-sm text-amber-700 dark:text-amber-500 mb-4">
-            Aplikasi belum berhasil membaca data <code className="bg-amber-100 dark:bg-amber-800 px-1 py-0.5 rounded text-xs font-mono">pegawai</code> melalui backend Apps Script. Ini biasanya karena sesi Google belum valid, URL Apps Script belum /exec, atau Script Properties backend belum lengkap.
+            Aplikasi belum berhasil membaca Database Pegawai. Ini biasanya karena sesi pengguna belum valid atau konfigurasi layanan belum lengkap.
           </p>
 
           <div className="bg-white/60 dark:bg-gray-900/40 rounded-xl p-4 mb-4">
@@ -128,9 +129,9 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
             <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-none">
               {[
                 `Logout lalu masuk kembali dengan Google, bukan Mode Pengembangan`,
-                `Pastikan VITE_APPS_SCRIPT_URL memakai URL Web App /exec hasil Deploy → New deployment`,
-                `Pastikan Script Properties Apps Script sudah berisi SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, FIREBASE_API_KEY, GEMINI_API_KEY`,
-                `Pastikan email Google sudah aktif di tabel app_access, lalu klik tombol "Coba Lagi"`,
+                `Pastikan alamat layanan aplikasi menggunakan deployment terbaru`,
+                `Pastikan konfigurasi layanan aplikasi sudah dilengkapi oleh Administrator`,
+                `Pastikan email Google sudah aktif pada Kelola Akun, lalu klik tombol "Coba Lagi"`,
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <span className="shrink-0 w-5 h-5 bg-amber-100 dark:bg-amber-800 text-amber-700 dark:text-amber-400 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
@@ -166,18 +167,25 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
 // Main Dashboard
 // ---------------------------------------------------------------------------
 export default function Dashboard() {
+  const toast = useToast();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPegawaiSetupNeeded, setIsPegawaiSetupNeeded] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  const load = async () => {
+  const load = async (force = false) => {
+    if (force) {
+      setSyncing(true);
+      spreadsheetService.clearCache();
+    }
     setLoading(true);
     setErrorMsg(null);
     setIsPegawaiSetupNeeded(false);
     try {
       const data = await spreadsheetService.getDashboardMetrics();
       setMetrics(data);
+      if (force) toast.success("Sinkronisasi Berhasil", "Seluruh informasi Dashboard telah diperbarui dari data aktif dan dihitung ulang.");
     } catch (err: any) {
       const msg = err.message || "Gagal memuat data.";
       if (msg.includes("pegawai") || msg.includes("tidak ditemukan")) {
@@ -205,12 +213,18 @@ export default function Dashboard() {
       } else {
         setErrorMsg(msg);
       }
+      if (force) toast.error("Sinkronisasi Gagal", msg);
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    spreadsheetService.clearCache();
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <LoadingState />;
 
@@ -228,19 +242,25 @@ export default function Dashboard() {
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Dashboard SIKANDA</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah</p>
         </motion.div>
-        <motion.div variants={itemVars} className="flex items-center gap-2 text-sm text-gray-500 bg-white/60 dark:bg-gray-800/60 px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-700">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-          </span>
-          Terakhir sinkronisasi: {formattedDate}
+        <motion.div variants={itemVars} className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-2 text-sm text-gray-500 bg-white/60 dark:bg-gray-800/60 px-3 py-2 rounded-full border border-gray-100 dark:border-gray-700">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
+            Terakhir sinkronisasi: {formattedDate}
+          </div>
+          <button type="button" onClick={() => void load(true)} disabled={syncing} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-sm disabled:opacity-60">
+            <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Menyinkronkan..." : "Sinkronisasi Data"}
+          </button>
         </motion.div>
       </div>
 
       {/* Setup Guide — hanya muncul jika pegawai sheet belum dikonfigurasi */}
       {isPegawaiSetupNeeded && (
         <motion.div variants={itemVars}>
-          <PegawaiSetupGuide errorMsg={errorMsg || ""} onRetry={load} />
+          <PegawaiSetupGuide errorMsg={errorMsg || ""} onRetry={() => void load(true)} />
         </motion.div>
 
       )}
@@ -261,7 +281,7 @@ export default function Dashboard() {
         <>
           {/* ── SECTION 1: Metrik Kepegawaian Utama ── */}
           <section>
-            <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-widest">
+            <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-wider">
               Metrik Kepegawaian Utama
             </h2>
             <motion.div variants={itemVars} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
@@ -283,7 +303,7 @@ export default function Dashboard() {
           {/* ── SECTION 2: Buku Penjagaan ── */}
           <section>
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-800">
-              <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+              <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                 Buku Penjagaan — Rekapitulasi Agenda ≤ 12 Bulan
               </h2>
               <Link to="/buku-penjagaan" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0">
@@ -301,7 +321,7 @@ export default function Dashboard() {
                 <AlertCard title="Pensiun / BUP ≤ 12 Bulan" count={metrics.peringatanPensiun} subtitle="Mendekati batas usia pensiun" colorScheme="red" />
               </Link>
               <Link to="/buku-penjagaan?rentang=terlambat">
-                <AlertCard title="Terlambat" count={metrics.peringatanTerlambat} subtitle="Lebih dari 12 Bulan" colorScheme="red" icon={Bell} />
+                <AlertCard title="Terlewat" count={metrics.peringatanTerlambat} subtitle="Agenda telah melewati jatuh tempo" colorScheme="red" icon={Bell} />
               </Link>
             </motion.div>
           </section>
@@ -310,7 +330,7 @@ export default function Dashboard() {
           {typeof metrics.kelengkapanLengkap === "number" && (
             <section>
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-gray-800">
-                <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                   Kelengkapan Data Pegawai &amp; Relasi Aset
                 </h2>
                 <Link to="/pegawai" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 shrink-0">
@@ -369,19 +389,19 @@ export default function Dashboard() {
 
           {/* ── SECTION 3: Komposisi SDM ── */}
           <section>
-            <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-widest">
+            <h2 className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mb-3 pb-2 border-b border-gray-200 dark:border-gray-800 uppercase tracking-wider">
               Komposisi SDM
             </h2>
-            <motion.div variants={itemVars} className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+            <motion.div variants={itemVars} className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-stretch">
               {/* Golongan Donut */}
-              <Card className="h-full">
+              <Card className="h-full min-h-[310px]">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2"><Award size={16} className="text-blue-500" /><CardTitle className="text-sm">Distribusi Golongan</CardTitle></div>
                 </CardHeader>
-                <CardContent className="pb-4 min-h-[188px] flex items-center">
+                <CardContent className="pb-5 min-h-[250px] flex items-center justify-center">
                   {metrics.distribusiGolongan && metrics.distribusiGolongan.length > 0 ? (
-                    <div className="w-full flex flex-col sm:flex-row lg:flex-col 2xl:flex-row items-center justify-center gap-4">
-                      <div className="w-40 h-40 relative shrink-0">
+                    <div className="w-full grid grid-cols-1 sm:grid-cols-[170px_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[170px_minmax(0,1fr)] items-center gap-5">
+                      <div className="w-[170px] h-[170px] relative shrink-0 mx-auto">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie data={metrics.distribusiGolongan} cx="50%" cy="50%" innerRadius={42} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none">
@@ -412,14 +432,14 @@ export default function Dashboard() {
               </Card>
               
               {/* Pendidikan */}
-              <Card className="h-full">
+              <Card className="h-full min-h-[310px]">
                 <CardHeader className="pb-2"><div className="flex items-center gap-2"><GraduationCap size={16} className="text-green-500" /><CardTitle className="text-sm">Distribusi Pendidikan</CardTitle></div></CardHeader>
-                <CardContent className="pb-4 min-h-[188px] flex flex-col justify-center"><HorizontalBarChart data={metrics.distribusiPendidikan || []} /></CardContent>
+                <CardContent className="pb-5 min-h-[250px] flex flex-col justify-center"><HorizontalBarChart data={(metrics.distribusiPendidikan || []).slice(0, 9)} labelClass="w-24" /></CardContent>
               </Card>
               {/* Masa Kerja */}
-              <Card className="h-full">
+              <Card className="h-full min-h-[310px]">
                 <CardHeader className="pb-2"><div className="flex items-center gap-2"><Timer size={16} className="text-orange-500" /><CardTitle className="text-sm">Distribusi Masa Kerja</CardTitle></div></CardHeader>
-                <CardContent className="pb-4 min-h-[188px] flex flex-col justify-center"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} /></CardContent>
+                <CardContent className="pb-5 min-h-[250px] flex flex-col justify-center"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} labelClass="w-24" /></CardContent>
               </Card>
             </motion.div>
           </section>

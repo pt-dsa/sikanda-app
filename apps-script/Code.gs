@@ -108,7 +108,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.3-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.4-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -173,6 +173,9 @@ function doPost(e) {
       case 'upload_foto':
         guardOwnNip_(actor, String(body.nip || ''));
         return json_(uploadFoto_(actor, body));
+      case 'upload_asset_foto':
+        requireManager_(actor);
+        return json_(uploadAssetFoto_(actor, body));
       case 'set_config':
         requireManager_(actor);
         return json_(setConfig_(actor, String(body.key || ''), body.value));
@@ -432,7 +435,7 @@ function selectForActor_(actor, table, filters) {
 }
 
 function actorNameFromPegawai_(nip) {
-  var rows = supaGet_('pegawai?select=nama,nama_pegawai&nip=eq.' + encodeURIComponent(nip) + '&limit=1');
+  var rows = supaGet_('pegawai?select=*&nip=eq.' + encodeURIComponent(nip) + '&limit=1');
   return rows.length ? String(rows[0].nama || rows[0].nama_pegawai || '').trim() : '';
 }
 
@@ -567,6 +570,8 @@ function saveAsset_(actor, table, data, isNew) {
   var id = String(data.asset_id || '').trim();
   if (!id && !isNew) throw publicError_('Data asset_id wajib diisi.');
   if (!id) id = (table === 'assets_vehicle' ? 'VEH-' : 'EQP-') + Utilities.getUuid();
+  validateAssetEmployeeField_(data, 'pengguna', 'Pengguna');
+  validateAssetEmployeeField_(data, 'penanggung_jawab', 'Penanggung Jawab');
   var input = {};
   var allowed = ASSET_FIELDS[table];
   for (var i = 0; i < allowed.length; i++) {
@@ -587,6 +592,13 @@ function saveAsset_(actor, table, data, isNew) {
   }
   auditLog_(actor, isNew ? 'asset.create' : 'asset.update', table, id, { fields: Object.keys(payload) });
   return { ok: true, mode: isNew ? 'create' : 'update', asset_id: id, table: table };
+}
+
+function validateAssetEmployeeField_(data, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(data, key)) return;
+  var name = String(data[key] || '').trim();
+  if (!name) return;
+  if (!employeeNipByName_(name)) throw publicError_('Data ' + label + ' wajib dipilih dari Database Pegawai aktif.');
 }
 
 function deleteAsset_(actor, table, assetId) {
@@ -650,12 +662,61 @@ function securePhotoSharing_(file, nip) {
   for (var i = 0; i < accessRows.length; i++) {
     var row = accessRows[i];
     var role = normalizeRole_(row.role);
-    if (role === 'admin' || role === 'pimpinan' || String(row.nip || '') === nip) {
+    if (role === 'admin' || role === 'pimpinan' || (nip && String(row.nip || '') === nip)) {
       var email = String(row.email || '').toLowerCase().trim();
       if (email && viewers.indexOf(email) === -1) viewers.push(email);
     }
   }
   if (viewers.length) file.addViewers(viewers);
+}
+
+function uploadAssetFoto_(actor, body) {
+  var table = normalizeAssetTable_(body.table);
+  var assetId = String(body.assetId || '').trim();
+  var holderName = String(body.holderName || '').trim();
+  if (!assetId) throw publicError_('Data asset_id wajib diisi sebelum foto diunggah.');
+  var base64 = String(body.base64 || '').replace(/^data:[^;]+;base64,/, '');
+  var mimeType = String(body.mimeType || '').toLowerCase();
+  if (['image/jpeg', 'image/png', 'image/webp'].indexOf(mimeType) === -1) throw publicError_('Berkas foto harus JPEG, PNG, atau WebP.');
+  if (!base64) throw publicError_('Foto tidak berisi data.');
+  var bytes;
+  try { bytes = Utilities.base64Decode(base64); } catch (err) { throw publicError_('Berkas foto tidak valid.'); }
+  if (bytes.length > 5 * 1024 * 1024) throw publicError_('Batas ukuran foto adalah 5 MB.');
+
+  var extension = mimeType === 'image/png' ? '.png' : (mimeType === 'image/webp' ? '.webp' : '.jpg');
+  var prefix = table === 'assets_vehicle' ? 'kendaraan_' : 'alat_mesin_';
+  var safeId = assetId.replace(/[^A-Za-z0-9_-]/g, '_').substring(0, 80);
+  var root = driveFolder_(DRIVE_FOLDER_NAME);
+  var folder = childFolder_(root, table === 'assets_vehicle' ? 'Kendaraan' : 'Alat_dan_Mesin');
+  var file = folder.createFile(Utilities.newBlob(bytes, mimeType, prefix + safeId + '_' + new Date().getTime() + extension));
+  try {
+    var holderNip = employeeNipByName_(holderName);
+    securePhotoSharing_(file, holderNip);
+    var viewUrl = 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1200';
+    saveAsset_(actor, table, { asset_id: assetId, foto: viewUrl }, false);
+    auditLog_(actor, 'asset.photo.update', table, assetId, { file_id: file.getId() });
+    return { ok: true, fileId: file.getId(), url: file.getUrl(), viewUrl: viewUrl };
+  } catch (err) {
+    try { file.setTrashed(true); } catch (ignore) {}
+    throw err;
+  }
+}
+
+function childFolder_(parent, name) {
+  var iterator = parent.getFoldersByName(name);
+  return iterator.hasNext() ? iterator.next() : parent.createFolder(name);
+}
+
+function employeeNipByName_(name) {
+  var expected = normalizeName_(name);
+  if (!expected) return '';
+  var rows = supaGet_('pegawai?select=*&limit=5000');
+  for (var i = 0; i < rows.length; i++) {
+    if (isActive_(rows[i].is_active) && normalizeName_(rows[i].nama || rows[i].nama_pegawai || '') === expected) {
+      return String(rows[i].nip || '').trim();
+    }
+  }
+  return '';
 }
 
 function getConfig_() {
@@ -792,7 +853,13 @@ function aiAsk_(actor, body) {
     return { ok: true, answer: databaseAnswer, route: 'database' };
   }
 
-  if (!GEMINI_API_KEY) throw publicError_('Tanya SIKANDA belum siap menjawab pertanyaan naratif. Administrator perlu memeriksa konfigurasi asisten.');
+  if (!GEMINI_API_KEY) {
+    return {
+      ok: true,
+      route: 'database',
+      answer: 'Saya tetap siap membantu mengecek data SIKANDA. Untuk pertanyaan ini, coba sebutkan objek yang ingin dilihat—misalnya **pegawai, KGB, kenaikan pangkat, BUP, kendaraan, atau alat dan mesin**—agar saya bisa memberikan jawaban faktual langsung dari data aktif.'
+    };
+  }
   enforceAiRateLimit_(actor.email);
   var context = buildAiContext_(actor, question).substring(0, AI_MAX_CONTEXT_CHARS);
 
@@ -813,7 +880,8 @@ function aiAsk_(actor, body) {
   var systemText =
     'Anda adalah Tanya SIKANDA, rekan kerja digital untuk Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah.\n' +
     'Gunakan Bahasa Indonesia yang hangat, natural, humanis, profesional, dan tidak kaku. Mulai dari jawaban inti, lalu jelaskan seperlunya.\n' +
-    'Gunakan sapaan secara wajar, jangan mengulang permintaan pengguna, dan jangan memakai kalimat seperti robot atau layanan otomatis.\n' +
+    'Berbicaralah seperti rekan kerja yang memahami SIKANDA: gunakan transisi alami, variasikan kalimat, dan hindari nada formulir atau template.\n' +
+    'Gunakan sapaan secara wajar, jangan mengulang permintaan pengguna, jangan selalu membuka dengan kalimat yang sama, dan jangan memakai kalimat seperti robot atau layanan otomatis.\n' +
     'Gunakan penebalan seperlunya untuk angka atau kesimpulan penting. Jangan menyebut istilah teknis backend, database internal, API, prompt, atau token.\n' +
     'Hanya jawab topik SIKANDA: profil pegawai, Buku Penjagaan, kendaraan, alat dan mesin, serta cara menggunakan aplikasi.\n' +
     'Modul Pagu Anggaran, Pemeliharaan, Inventaris, dan Peminjaman masih dikembangkan untuk SIKANDA Versi 2.\n' +
@@ -825,7 +893,7 @@ function aiAsk_(actor, body) {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     payload: JSON.stringify({
       system_instruction: { parts: [{ text: systemText }] }, contents: contents,
-      generationConfig: { temperature: 0.35, maxOutputTokens: 900 }
+      generationConfig: { temperature: 0.5, maxOutputTokens: 1000 }
     })
   });
   var response = geminiResult.response;
@@ -972,26 +1040,51 @@ function compactAsset_(row, type) {
 
 function answerFromDatabase_(actor, question) {
   var q = normalizeQuestion_(question);
+  if (/^(halo|hai|hi|selamat pagi|selamat siang|selamat sore|selamat malam)\b/.test(q)) {
+    return 'Halo, **' + escapeMarkdown_(actor.nama || 'Sobat SIKANDA') + '**. Senang bisa membantu. Mau mengecek data pegawai, Buku Penjagaan, kendaraan, atau alat dan mesin hari ini?';
+  }
+  if (/apa kabar|bagaimana kabar/.test(q)) {
+    return 'Alhamdulillah saya baik. Terima kasih sudah bertanya 😊 Semoga Anda juga sehat dan aktivitasnya lancar. Ada data SIKANDA yang ingin kita cek bersama?';
+  }
+  if (/bisa bantu apa|apa yang bisa|fitur.*tanya|cara.*bertanya/.test(q)) {
+    return 'Saya bisa membantu mengecek **data pegawai, komposisi ASN/PPPK, KGB, kenaikan pangkat, BUP, ulang tahun, kendaraan, serta alat dan mesin**. Anda bisa bertanya dengan bahasa biasa, misalnya “siapa yang naik pangkat dalam 6 bulan?” atau “berapa kendaraan yang kondisinya rusak?”.';
+  }
+
   var agendaCode = '';
   var agendaLabel = '';
   if (/\bkgb\b|kenaikan gaji/.test(q)) { agendaCode = 'KGB'; agendaLabel = 'KGB'; }
   else if (/kenaikan pangkat|\bpangkat\b/.test(q)) { agendaCode = 'PANGKAT'; agendaLabel = 'kenaikan pangkat'; }
   else if (/\bbup\b|pensiun/.test(q)) { agendaCode = 'BUP'; agendaLabel = 'BUP/pensiun'; }
 
-  if (agendaCode && /(siapa|daftar|jatuh tempo|agenda|bulan ke depan|mendatang)/.test(q)) {
+  if (agendaCode && /(siapa|daftar|jatuh tempo|agenda|bulan ke depan|mendatang|adakah|ada kah|waktu dekat|terdekat|tahun ini)/.test(q)) {
     var monthMatch = q.match(/(\d{1,2})\s*bulan/);
-    var months = monthMatch ? Math.max(1, Math.min(60, parseInt(monthMatch[1], 10))) : 6;
+    var months = monthMatch ? Math.max(1, Math.min(60, parseInt(monthMatch[1], 10))) : (/tahun ini/.test(q) ? monthsUntilYearEnd_() : 6);
     return agendaAnswer_(actor, agendaCode, agendaLabel, months);
   }
+
+  if (/ulang tahun|berulang tahun|hari lahir/.test(q)) {
+    var birthdayDays = 7;
+    var dayMatch = q.match(/(\d{1,2})\s*hari/);
+    if (dayMatch) birthdayDays = Math.max(0, Math.min(60, parseInt(dayMatch[1], 10)));
+    if (/hari ini/.test(q)) birthdayDays = 0;
+    return birthdayAnswer_(actor, birthdayDays);
+  }
+
+  var mentionedEmployee = employeeMentionAnswer_(actor, q);
+  if (mentionedEmployee) return mentionedEmployee;
 
   if (/(berapa|jumlah|total)/.test(q) && /(pegawai|asn|pppk)/.test(q)) {
     var employees = selectForActor_(actor, 'pegawai', []);
     var filtered = employees;
     var label = 'pegawai aktif';
-    if (/pppk/.test(q)) {
+    if (/pppk/.test(q) && /\basn\b/.test(q)) {
+      var asnTotal = employees.filter(function (row) { return ['ASN', 'PNS'].indexOf(String(row.status || '').toUpperCase()) !== -1; }).length;
+      var pppkTotal = employees.filter(function (row) { return String(row.status || '').toUpperCase().indexOf('PPPK') !== -1; }).length;
+      return 'Saya sudah cek data aktif SIKANDA. Saat ini terdapat **' + asnTotal + ' pegawai ASN** dan **' + pppkTotal + ' pegawai PPPK**, dengan total **' + employees.length + ' pegawai aktif** dalam lingkup akses Anda.';
+    } else if (/pppk/.test(q)) {
       filtered = employees.filter(function (row) { return String(row.status || '').toUpperCase().indexOf('PPPK') !== -1; });
       if (/penuh/.test(q)) {
-        filtered = filtered.filter(function (row) { return String(row.kategori_pppk || '').toLowerCase() === 'penuh_waktu'; });
+        filtered = filtered.filter(function (row) { return pppkCategory_(row) === 'penuh_waktu'; });
         label = 'PPPK Penuh Waktu';
       } else if (/paruh/.test(q)) {
         filtered = filtered.filter(function (row) { return String(row.kategori_pppk || '').toLowerCase() === 'paruh_waktu'; });
@@ -1004,7 +1097,37 @@ function answerFromDatabase_(actor, question) {
     return 'Saya sudah cek data aktif SIKANDA. Saat ini terdapat **' + filtered.length + ' ' + label + '** dalam lingkup akses Anda.';
   }
 
-  if (/(berapa|jumlah|total)/.test(q) && /(kendaraan|mobil|motor)/.test(q)) {
+  if (/(tampilkan|daftar|siapa saja)/.test(q) && /(pegawai|asn|pppk)/.test(q)) {
+    var listedEmployees = selectForActor_(actor, 'pegawai', []);
+    var employeeLabel = 'pegawai aktif';
+    if (/pppk/.test(q) && /\basn\b/.test(q)) {
+      employeeLabel = 'pegawai ASN dan PPPK';
+    } else if (/pppk/.test(q)) {
+      listedEmployees = listedEmployees.filter(function (row) { return String(row.status || '').toUpperCase().indexOf('PPPK') !== -1; });
+      if (/paruh/.test(q)) listedEmployees = listedEmployees.filter(function (row) { return pppkCategory_(row) === 'paruh_waktu'; });
+      if (/penuh/.test(q)) listedEmployees = listedEmployees.filter(function (row) { return pppkCategory_(row) === 'penuh_waktu'; });
+      employeeLabel = /paruh/.test(q) ? 'PPPK Paruh Waktu' : (/penuh/.test(q) ? 'PPPK Penuh Waktu' : 'pegawai PPPK');
+    } else if (/\basn\b/.test(q)) {
+      listedEmployees = listedEmployees.filter(function (row) { return ['ASN', 'PNS'].indexOf(String(row.status || '').toUpperCase()) !== -1; });
+      employeeLabel = 'pegawai ASN';
+    }
+    return namedEmployeeListAnswer_(listedEmployees, employeeLabel);
+  }
+
+  if (/masa kerja/.test(q)) {
+    var yearsMatch = q.match(/(\d{1,2})\s*tahun/);
+    if (yearsMatch) {
+      var threshold = parseInt(yearsMatch[1], 10);
+      var workRows = selectForActor_(actor, 'pegawai', []).filter(function (row) { return parseInt(row.masa_kerja_tahun || 0, 10) > threshold; });
+      return namedEmployeeListAnswer_(workRows, 'pegawai dengan masa kerja lebih dari ' + threshold + ' tahun');
+    }
+  }
+
+  if (/komposisi|distribusi|ringkas.*pegawai|ringkasan.*pegawai/.test(q) && /(pegawai|golongan|pendidikan|asn|pppk)/.test(q)) {
+    return employeeCompositionAnswer_(actor);
+  }
+
+  if (/(kendaraan|mobil|motor)/.test(q) && /(berapa|jumlah|total|kondisi|rusak|baik|siapa|pengguna|daftar|tampilkan)/.test(q)) {
     var vehicles = selectForActor_(actor, 'assets_vehicle', []);
     var vehicleLabel = 'kendaraan dinas';
     if (/roda\s*2|motor/.test(q)) {
@@ -1014,10 +1137,158 @@ function answerFromDatabase_(actor, question) {
       vehicles = vehicles.filter(function (row) { return /roda\s*4|mobil/.test(normalizeQuestion_(row.asset_category || row.jenis_kendaraan || row.asset_name || row.nama_aset)); });
       vehicleLabel = 'kendaraan roda 4';
     }
+    if (/rusak/.test(q)) {
+      vehicles = vehicles.filter(function (row) { return /RUSAK/.test(String(row.condition || row.kondisi || '').toUpperCase()); });
+      vehicleLabel = 'kendaraan berkondisi rusak';
+    } else if (/\bbaik\b/.test(q)) {
+      vehicles = vehicles.filter(function (row) { return String(row.condition || row.kondisi || '').toUpperCase() === 'BAIK'; });
+      vehicleLabel = 'kendaraan berkondisi baik';
+    }
+    if (/(siapa|pengguna|daftar|tampilkan|kondisi|rusak)/.test(q)) return assetListAnswer_(vehicles, vehicleLabel, true);
     return 'Berdasarkan data aktif SIKANDA, terdapat **' + vehicles.length + ' ' + vehicleLabel + '** dalam lingkup akses Anda.';
   }
 
+  if (/(alat|mesin|peralatan)/.test(q) && /(berapa|jumlah|total|kondisi|rusak|baik|siapa|pengguna|daftar|tampilkan)/.test(q)) {
+    var equipment = selectForActor_(actor, 'assets_equipment', []);
+    var equipmentLabel = 'alat dan mesin';
+    if (/rusak/.test(q)) {
+      equipment = equipment.filter(function (row) { return /RUSAK|KURANG BAIK/.test(String(row.condition || row.kondisi || '').toUpperCase()); });
+      equipmentLabel = 'alat dan mesin yang perlu perhatian';
+    } else if (/\bbaik\b/.test(q)) {
+      equipment = equipment.filter(function (row) { return String(row.condition || row.kondisi || '').toUpperCase() === 'BAIK'; });
+      equipmentLabel = 'alat dan mesin berkondisi baik';
+    }
+    if (/(siapa|pengguna|daftar|tampilkan|kondisi|rusak)/.test(q)) return assetListAnswer_(equipment, equipmentLabel, false);
+    var unitCount = equipment.reduce(function (total, row) { return total + (parseFloat(row.quantity || row.jumlah || 1) || 0); }, 0);
+    return 'Saya sudah cek. Terdapat **' + equipment.length + ' record ' + equipmentLabel + '** dengan total **' + unitCount + ' unit** dalam lingkup akses Anda.';
+  }
+
+  if (/ringkasan|ringkas|kondisi umum|dashboard|seluruh data/.test(q)) {
+    return systemSummaryAnswer_(actor);
+  }
+
   return '';
+}
+
+function pppkCategory_(row) {
+  var category = String(row.kategori_pppk || '').toLowerCase().replace(/[\s-]+/g, '_');
+  if (!category && String(row.status || '').toUpperCase().indexOf('PPPK') !== -1) return 'penuh_waktu';
+  return category;
+}
+
+function monthsUntilYearEnd_() {
+  var now = new Date();
+  return Math.max(1, 12 - now.getMonth());
+}
+
+function escapeMarkdown_(value) {
+  return String(value || '').replace(/([*_`\[\]])/g, '\\$1');
+}
+
+function namedEmployeeListAnswer_(rows, label) {
+  rows = rows.slice().sort(function (a, b) { return String(a.nama || a.nama_pegawai || '').localeCompare(String(b.nama || b.nama_pegawai || '')); });
+  if (!rows.length) return 'Saya sudah cek, dan **belum ada ' + label + '** pada lingkup data Anda.';
+  var lines = ['Saya menemukan **' + rows.length + ' ' + label + '**:'];
+  var limit = Math.min(rows.length, 40);
+  for (var i = 0; i < limit; i++) {
+    lines.push((i + 1) + '. **' + escapeMarkdown_(rows[i].nama || rows[i].nama_pegawai || '-') + '** — ' + escapeMarkdown_(rows[i].jabatan || 'jabatan belum tersedia'));
+  }
+  if (rows.length > limit) lines.push('\nDaftar ditampilkan sampai 40 nama. Gunakan menu Data ASN/PPPK untuk melihat semuanya.');
+  return lines.join('\n');
+}
+
+function employeeCompositionAnswer_(actor) {
+  var rows = selectForActor_(actor, 'pegawai', []);
+  var asn = 0, full = 0, part = 0, grade = {}, education = {};
+  for (var i = 0; i < rows.length; i++) {
+    var status = String(rows[i].status || '').toUpperCase();
+    if (status === 'ASN' || status === 'PNS') asn++;
+    if (status.indexOf('PPPK') !== -1 && pppkCategory_(rows[i]) === 'paruh_waktu') part++;
+    if (status.indexOf('PPPK') !== -1 && pppkCategory_(rows[i]) !== 'paruh_waktu') full++;
+    var g = String(rows[i].golongan || '-').split('/')[0].trim() || '-';
+    var e = String(rows[i].tingkat || 'Belum diisi').trim() || 'Belum diisi';
+    grade[g] = (grade[g] || 0) + 1;
+    education[e] = (education[e] || 0) + 1;
+  }
+  return 'Ringkasannya, terdapat **' + rows.length + ' pegawai aktif**: **' + asn + ' ASN**, **' + full + ' PPPK Penuh Waktu**, dan **' + part + ' PPPK Paruh Waktu**.\n\n' +
+    '**Komposisi golongan:** ' + mapCountText_(grade) + '.\n\n**Pendidikan:** ' + mapCountText_(education) + '.';
+}
+
+function mapCountText_(map) {
+  return Object.keys(map).sort().map(function (key) { return escapeMarkdown_(key) + ' ' + map[key]; }).join(' · ') || 'belum tersedia';
+}
+
+function assetListAnswer_(rows, label, vehicle) {
+  if (!rows.length) return 'Saya sudah cek. **Tidak ada ' + label + '** dalam lingkup data Anda.';
+  var lines = ['Saya menemukan **' + rows.length + ' ' + label + '**:'];
+  var limit = Math.min(rows.length, 40);
+  for (var i = 0; i < limit; i++) {
+    var row = rows[i];
+    var name = row.asset_name || row.nama_aset || row.asset_category || row.jenis || '-';
+    var identity = vehicle ? (row.plate_number || row.no_polisi || '-') : (row.asset_code || row.kode_barang || '-');
+    var holder = row.holder_name || row.pengguna || 'belum ditetapkan';
+    var condition = row.condition || row.kondisi || 'belum diisi';
+    lines.push((i + 1) + '. **' + escapeMarkdown_(name) + '** (' + escapeMarkdown_(identity) + ') — ' + escapeMarkdown_(condition) + ' — pengguna: ' + escapeMarkdown_(holder));
+  }
+  if (rows.length > limit) lines.push('\nDaftar ditampilkan sampai 40 record. Buka menu terkait untuk melihat seluruh data.');
+  return lines.join('\n');
+}
+
+function employeeMentionAnswer_(actor, normalizedQuestion) {
+  if (!/(siapa|profil|data|jabatan|golongan|unit kerja|status|nip)/.test(normalizedQuestion)) return '';
+  var employees = selectForActor_(actor, 'pegawai', []);
+  var best = null;
+  for (var i = 0; i < employees.length; i++) {
+    var normalizedName = normalizeQuestion_(employees[i].nama || employees[i].nama_pegawai || '');
+    if (normalizedName && normalizedQuestion.indexOf(normalizedName) !== -1 && (!best || normalizedName.length > best.normalizedName.length)) {
+      best = { row: employees[i], normalizedName: normalizedName };
+    }
+  }
+  if (!best) return '';
+  var row = best.row;
+  return 'Berikut data yang saya temukan untuk **' + escapeMarkdown_(row.nama || row.nama_pegawai || '-') + '**:\n\n' +
+    '- NIP: **' + escapeMarkdown_(row.nip || '-') + '**\n' +
+    '- Status: **' + escapeMarkdown_(row.status || '-') + '**\n' +
+    '- Jabatan: **' + escapeMarkdown_(row.jabatan || '-') + '**\n' +
+    '- Unit kerja: **' + escapeMarkdown_(row.unit_kerja || '-') + '**\n' +
+    '- Golongan: **' + escapeMarkdown_(row.golongan || '-') + '**';
+}
+
+function birthdayAnswer_(actor, daysAhead) {
+  var employees = selectForActor_(actor, 'pegawai', []);
+  var today = startOfDay_(new Date());
+  var end = new Date(today.getTime() + daysAhead * 86400000);
+  var rows = [];
+  for (var i = 0; i < employees.length; i++) {
+    var birth = parseDate_(employees[i].tgl_lahir || employees[i].tanggal_lahir);
+    if (!birth) continue;
+    var maxDay = new Date(today.getFullYear(), birth.getMonth() + 1, 0).getDate();
+    var next = new Date(today.getFullYear(), birth.getMonth(), Math.min(birth.getDate(), maxDay));
+    next = startOfDay_(next);
+    if (next < today) {
+      maxDay = new Date(today.getFullYear() + 1, birth.getMonth() + 1, 0).getDate();
+      next = startOfDay_(new Date(today.getFullYear() + 1, birth.getMonth(), Math.min(birth.getDate(), maxDay)));
+    }
+    if (next <= end) rows.push({ row: employees[i], date: next, days: Math.round((next.getTime() - today.getTime()) / 86400000) });
+  }
+  rows.sort(function (a, b) { return a.days - b.days || String(a.row.nama || '').localeCompare(String(b.row.nama || '')); });
+  if (!rows.length) return daysAhead === 0 ? 'Hari ini **tidak ada pegawai yang berulang tahun** pada lingkup data Anda.' : 'Dalam **' + daysAhead + ' hari ke depan belum ada pegawai yang berulang tahun** pada lingkup data Anda.';
+  var lines = [daysAhead === 0 ? 'Hari ini ada **' + rows.length + ' pegawai yang berulang tahun**:' : 'Dalam ' + daysAhead + ' hari ke depan ada **' + rows.length + ' pegawai yang berulang tahun**:'];
+  for (var r = 0; r < rows.length; r++) lines.push((r + 1) + '. **' + escapeMarkdown_(rows[r].row.nama || rows[r].row.nama_pegawai || '-') + '** — ' + formatIndo_(rows[r].date) + (rows[r].days === 0 ? ' (hari ini)' : ' (' + rows[r].days + ' hari lagi)'));
+  return lines.join('\n');
+}
+
+function systemSummaryAnswer_(actor) {
+  var employees = selectForActor_(actor, 'pegawai', []);
+  var vehicles = selectForActor_(actor, 'assets_vehicle', []);
+  var equipment = selectForActor_(actor, 'assets_equipment', []);
+  var asn = employees.filter(function (row) { return ['ASN', 'PNS'].indexOf(String(row.status || '').toUpperCase()) !== -1; }).length;
+  var pppk = employees.filter(function (row) { return String(row.status || '').toUpperCase().indexOf('PPPK') !== -1; }).length;
+  return 'Berikut kondisi umum data aktif yang dapat Anda akses:\n\n' +
+    '- **' + employees.length + ' pegawai** (' + asn + ' ASN dan ' + pppk + ' PPPK)\n' +
+    '- **' + vehicles.length + ' kendaraan dinas**\n' +
+    '- **' + equipment.length + ' record alat dan mesin**\n\n' +
+    'Untuk rincian agenda KGB, kenaikan pangkat, BUP, kondisi aset, atau nama pengguna aset, sebutkan bagian yang ingin diperiksa dan saya akan menelusurinya.';
 }
 
 function agendaAnswer_(actor, code, label, months) {

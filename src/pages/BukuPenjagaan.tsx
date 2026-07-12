@@ -280,7 +280,7 @@ export default function BukuPenjagaan() {
             "KATEGORI":       KATEGORI_LABEL[e.kategori],
             "JATUH TEMPO":    formatDate(e.tanggal),
             "SISA WAKTU":     sisaWaktuLabel(e),
-            "STATUS AGENDA":  e.isOverdue ? "Terlambat" : "Akan Datang",
+            "STATUS AGENDA":  e.isOverdue ? "Terlewat" : "Akan Datang",
           }))
         : ringkasanList.map((r) => ({
             "NAMA PEGAWAI":   r.nama,
@@ -431,14 +431,14 @@ export default function BukuPenjagaan() {
           { label: "KGB ≤12 Bln",    value: summary.kgb,       icon: TrendingUp,    color: "text-blue-600 dark:text-blue-400",   click: () => { setViewMode("agenda"); setFilterKategori("KGB"); setFilterRentang("le12"); } },
           { label: "Pangkat ≤12 Bln", value: summary.pangkat,   icon: CalendarClock, color: "text-purple-600 dark:text-purple-400",click: () => { setViewMode("agenda"); setFilterKategori("PANGKAT"); setFilterRentang("le12"); } },
           { label: "Pensiun ≤12 Bln", value: summary.pensiun,   icon: Clock,         color: "text-orange-600 dark:text-orange-400",click: () => { setViewMode("agenda"); setFilterKategori("BUP"); setFilterRentang("le12"); } },
-          { label: "Terlambat",       value: summary.terlambat, icon: Mail,          color: "text-red-600 dark:text-red-400",     click: () => { setViewMode("agenda"); setFilterKategori("all"); setFilterRentang("terlambat"); } },
+          { label: "Terlewat",        value: summary.terlambat, icon: Mail,          color: "text-red-600 dark:text-red-400",     click: () => { setViewMode("agenda"); setFilterKategori("all"); setFilterRentang("terlambat"); } },
         ].map(({ label, value, icon: Icon, color, click }) => (
           <Card key={label} className="cursor-pointer hover:shadow-md transition-shadow" onClick={click}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <div className={`text-2xl font-bold ${color}`}>{value}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</div>
+                  <div className="text-xs font-bold text-gray-600 dark:text-gray-300 mt-0.5">{label}</div>
                 </div>
                 <Icon size={20} className={`${color} opacity-60 mt-1`} />
               </div>
@@ -500,7 +500,7 @@ export default function BukuPenjagaan() {
                 <option value="le3">≤ 3 bulan</option>
                 <option value="le6">≤ 6 bulan</option>
                 <option value="le12">≤ 12 bulan</option>
-                <option value="terlambat">Terlambat</option>
+                <option value="terlambat">Terlewat</option>
                 <option value="semua">Semua waktu</option>
               </select>
             </>
@@ -541,14 +541,14 @@ export default function BukuPenjagaan() {
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-100 dark:bg-gray-800 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    <th className="px-4 py-3 font-semibold">Pegawai</th>
-                    <th className="px-4 py-3 font-semibold">Gol.</th>
-                    <th className="px-4 py-3 font-semibold">Jabatan &amp; Bidang</th>
-                    <th className="px-4 py-3 font-semibold">TMT Golongan</th>
-                    <th className="px-4 py-3 font-semibold">Kategori</th>
-                    <th className="px-4 py-3 font-semibold">Jatuh Tempo</th>
-                    <th className="px-4 py-3 font-semibold">Sisa Waktu</th>
-                    <th className="px-4 py-3 font-semibold">Indikator</th>
+                    <th className="px-4 py-3 font-bold">Pegawai</th>
+                    <th className="px-4 py-3 font-bold">Gol.</th>
+                    <th className="px-4 py-3 font-bold">Jabatan &amp; Bidang</th>
+                    <th className="px-4 py-3 font-bold">TMT Golongan</th>
+                    <th className="px-4 py-3 font-bold">Kategori</th>
+                    <th className="px-4 py-3 font-bold">Jatuh Tempo</th>
+                    <th className="px-4 py-3 font-bold">Sisa Waktu</th>
+                    <th className="px-4 py-3 font-bold">Indikator</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">

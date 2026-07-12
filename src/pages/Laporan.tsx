@@ -1,19 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, Printer, RefreshCw, Search } from "lucide-react";
+import { Download, Printer, RefreshCw, Search, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import Papa from "papaparse";
 import { useToast } from "@/components/ui/Toast";
 import { buildPenjagaanEvents, type PenjagaanEvent } from "@/lib/penjagaan";
-import type { Pegawai, Vehicle } from "@/types";
+import type { Equipment, Pegawai, Vehicle } from "@/types";
 import logoKota from "@/assets/logo_kop_dcktr.png";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
 import {
   filterAgendaReport,
+  filterEquipmentReport,
   filterPegawaiReport,
   filterVehicleReport,
   uniqueSorted,
   type AgendaReportFilter,
+  type EquipmentReportFilter,
   type PegawaiReportFilter,
   type VehicleReportFilter,
 } from "@/lib/reporting";
@@ -23,6 +25,8 @@ const inputCls = "w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dar
 const initialPegawaiFilter: PegawaiReportFilter = { search: "", status: "", kategoriPppk: "", golongan: "", unitKerja: "" };
 const initialAgendaFilter: AgendaReportFilter = { search: "", kategori: "", rentang: "", unitKerja: "", tanggalMulai: "", tanggalSelesai: "" };
 const initialVehicleFilter: VehicleReportFilter = { search: "", jenis: "", kondisi: "", tahun: "", pengguna: "" };
+const initialEquipmentFilter: EquipmentReportFilter = { search: "", jenis: "", kondisi: "", tahun: "", pengguna: "" };
+type PrintScope = "pegawai" | "agenda" | "vehicle" | "equipment" | "all";
 
 function employeeRows(rows: Pegawai[]) {
   return rows.map((p) => ({
@@ -57,6 +61,61 @@ function vehicleRows(rows: Vehicle[]) {
   }));
 }
 
+function equipmentRows(rows: Equipment[]) {
+  return rows.map((item) => ({
+    asset_id: item.asset_id, kode_barang: item.kode_barang, nama_barang: item.nama_aset,
+    merk: item.merk, jenis: item.jenis, jumlah: item.jumlah, satuan: item.satuan,
+    tahun: item.tahun, pengguna: item.pengguna, penanggung_jawab: item.penanggung_jawab,
+    lokasi: item.lokasi, kondisi: item.kondisi, harga_pembelian: item.harga_pembelian,
+    latitude: item.latitude, longitude: item.longitude, foto: item.foto,
+  }));
+}
+
+function employeePrintRows(rows: Pegawai[]) {
+  return rows.map((p) => ({
+    NIP: p.nip,
+    Nama: p.nama,
+    Status: employmentStatusLabel(p),
+    "Gol.": p.golongan,
+    Jabatan: p.jabatan,
+    "Unit Kerja": p.unit_kerja,
+    "Tanggal Lahir": p.tgl_lahir,
+    "TMT Golongan": p.tgl_mulai_golongan,
+    "TMT Jabatan": p.tgl_mulai_jabatan,
+    "Masa Kerja": `${p.masa_kerja_tahun || 0} th ${p.masa_kerja_bulan || 0} bln`,
+    Pendidikan: [p.tingkat, p.pendidikan_jurusan, p.universitas].filter(Boolean).join(" · "),
+    Kontak: [p.kontak, p.email].filter(Boolean).join(" · "),
+  }));
+}
+
+function agendaPrintRows(rows: PenjagaanEvent[]) {
+  return rows.map((a) => ({
+    NIP: a.nip, Nama: a.nama, Status: a.status, "Gol.": a.golongan,
+    Jabatan: a.jabatan, "Unit Kerja": a.bidang, Agenda: a.kategoriLabel,
+    "Jatuh Tempo": a.tanggal, "Sisa Hari": a.selisihHari,
+    Indikator: a.isOverdue ? "Terlewat" : a.bucket,
+  }));
+}
+
+function vehiclePrintRows(rows: Vehicle[]) {
+  return rows.map((v) => ({
+    "Nomor Polisi": v.no_polisi, "Kode Barang": v.kode_barang, "Nama Aset": v.nama_aset,
+    "Merk/Model": [v.merk, v.tipe].filter(Boolean).join(" · "), Jenis: v.jenis_kendaraan,
+    Tahun: v.tahun, Pengguna: v.pengguna, "Penanggung Jawab": v.penanggung_jawab,
+    Lokasi: v.lokasi || v.unit_kerja, Kondisi: v.kondisi,
+    Kilometer: v.km_kendaraan, "Kapasitas Mesin": v.kapasitas_mesin,
+  }));
+}
+
+function equipmentPrintRows(rows: Equipment[]) {
+  return rows.map((item) => ({
+    "Kode Barang": item.kode_barang, "Nama Barang": item.nama_aset, Merk: item.merk,
+    Jenis: item.jenis, Jumlah: `${item.jumlah || 0} ${item.satuan || "Unit"}`,
+    Tahun: item.tahun, Pengguna: item.pengguna, "Penanggung Jawab": item.penanggung_jawab,
+    Lokasi: item.lokasi, Kondisi: item.kondisi, "Harga Pembelian": item.harga_pembelian,
+  }));
+}
+
 function localDateKey(): string {
   const now = new Date();
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -79,7 +138,7 @@ function filterSlug(filter: Record<string, string>): string {
 }
 
 function letterheadHtml(): string {
-  return `<div class="letterhead"><img src="${escapeHtml(logoKota)}" alt="Logo Kota Tangerang Selatan"><div class="letterhead-copy"><div class="gov">PEMERINTAH KOTA TANGERANG SELATAN</div><div class="agency">DINAS CIPTA KARYA DAN TATA RUANG</div><div class="office">Kawasan Perkantoran Lengkong Wetan,</div><div>Jl. Promoter No. 3 Kelurahan Lengkong Wetan, Kecamatan Serpong Kota Tangerang Selatan, Kode Pos 15322</div><div>Telp/Fax: (021) 75685907, e-mail: dcktr.tangsel@gmail.com</div></div></div><div class="letterhead-lines"><span></span><span></span></div>`;
+  return `<div class="letterhead"><img src="${escapeHtml(logoKota)}" alt="Logo Kota Tangerang Selatan"><div class="letterhead-copy"><div class="gov">PEMERINTAH KOTA TANGERANG SELATAN</div><div class="agency">DINAS CIPTA KARYA DAN TATA RUANG</div><div class="office">Kawasan Perkantoran Lengkong Wetan</div><div>Jl. Promoter No. 3, Kelurahan Lengkong Wetan, Kecamatan Serpong, Kota Tangerang Selatan 15322</div><div>Telp/Fax: (021) 75685907 · E-mail: dcktr.tangsel@gmail.com</div></div></div><div class="letterhead-lines"><span></span><span></span></div>`;
 }
 
 function reportHeadingHtml(): string {
@@ -91,7 +150,7 @@ function rowsToPrintTable(title: string, rows: Record<string, unknown>[], filter
   const keys = Object.keys(rows[0]);
   const head = keys.map((key) => `<th>${escapeHtml(key.replace(/_/g, " "))}</th>`).join("");
   const body = rows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(row[key])}</td>`).join("")}</tr>`).join("");
-  return `<section>${letterheadHtml()}${reportHeadingHtml()}<h2>${escapeHtml(title)} <small>(${rows.length} data)</small></h2><p><b>Filter:</b> ${escapeHtml(filterText)}</p><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
+  return `<section>${letterheadHtml()}${reportHeadingHtml()}<h2>${escapeHtml(title)} <small>(${rows.length} data)</small></h2><p class="filter"><b>Filter:</b> ${escapeHtml(filterText)}</p><table data-columns="${keys.length}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
 }
 
 export default function Laporan() {
@@ -101,19 +160,25 @@ export default function Laporan() {
   const [pegawai, setPegawai] = useState<Pegawai[]>([]);
   const [agenda, setAgenda] = useState<PenjagaanEvent[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [pegawaiFilter, setPegawaiFilter] = useState(initialPegawaiFilter);
   const [agendaFilter, setAgendaFilter] = useState(initialAgendaFilter);
   const [vehicleFilter, setVehicleFilter] = useState(initialVehicleFilter);
+  const [equipmentFilter, setEquipmentFilter] = useState(initialEquipmentFilter);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printScope, setPrintScope] = useState<PrintScope>("pegawai");
 
   async function load() {
     setLoading(true);
     try {
-      const [employeeData, vehicleData] = await Promise.all([
-        spreadsheetService.getPegawai(), spreadsheetService.getVehicles(),
+      spreadsheetService.clearCache();
+      const [employeeData, vehicleData, equipmentData] = await Promise.all([
+        spreadsheetService.getPegawai(), spreadsheetService.getVehicles(), spreadsheetService.getEquipment(),
       ]);
       setPegawai(employeeData as Pegawai[]);
       setAgenda(buildPenjagaanEvents(employeeData));
       setVehicles(vehicleData as Vehicle[]);
+      setEquipment(equipmentData as Equipment[]);
     } catch (error: any) {
       toast.error("Data Laporan Belum Tersedia", String(error?.message || error));
     } finally {
@@ -126,6 +191,7 @@ export default function Laporan() {
   const filteredPegawai = useMemo(() => filterPegawaiReport(pegawai, pegawaiFilter), [pegawai, pegawaiFilter]);
   const filteredAgenda = useMemo(() => filterAgendaReport(agenda, agendaFilter), [agenda, agendaFilter]);
   const filteredVehicles = useMemo(() => filterVehicleReport(vehicles, vehicleFilter), [vehicles, vehicleFilter]);
+  const filteredEquipment = useMemo(() => filterEquipmentReport(equipment, equipmentFilter), [equipment, equipmentFilter]);
 
   function exportCsv(rows: Record<string, unknown>[], name: string) {
     if (!rows.length) {
@@ -151,16 +217,16 @@ export default function Laporan() {
     }
   }
 
-  function handlePrint() {
-    const employeeData = employeeRows(filteredPegawai);
-    const agendaData = agendaRows(filteredAgenda);
-    const vehicleData = vehicleRows(filteredVehicles);
+  function handlePrint(scope: PrintScope) {
+    const sections: string[] = [];
+    if (scope === "pegawai" || scope === "all") sections.push(rowsToPrintTable("Data ASN / PPPK", employeePrintRows(filteredPegawai), filterDescription(pegawaiFilter as unknown as Record<string, string>)));
+    if (scope === "agenda" || scope === "all") sections.push(rowsToPrintTable("Buku Penjagaan", agendaPrintRows(filteredAgenda), filterDescription(agendaFilter as unknown as Record<string, string>)));
+    if (scope === "vehicle" || scope === "all") sections.push(rowsToPrintTable("Data Kendaraan", vehiclePrintRows(filteredVehicles), filterDescription(vehicleFilter as unknown as Record<string, string>)));
+    if (scope === "equipment" || scope === "all") sections.push(rowsToPrintTable("Data Alat & Mesin", equipmentPrintRows(filteredEquipment), filterDescription(equipmentFilter as unknown as Record<string, string>)));
     const content = `<!doctype html><html><head><meta charset="utf-8"><title>Rekap SIKANDA</title><style>
-      @page{size:A4 landscape;margin:9mm 8mm 10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111827;font-size:8px;margin:0}p{color:#334155;margin:5px 0 8px}section{break-before:page;page-break-before:always}section:first-of-type{break-before:auto;page-break-before:auto}h2{font-size:13px;margin:12px 0 4px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:1px solid #94a3b8;padding:3px;text-align:left;vertical-align:top;word-break:break-word}th{background:#eaf1fb;text-transform:capitalize;font-weight:700}.letterhead{display:grid;grid-template-columns:88px 1fr 88px;align-items:center;min-height:83px;padding:0 14px}.letterhead img{width:78px;height:78px;object-fit:contain}.letterhead-copy{text-align:center;line-height:1.25}.letterhead-copy .gov{font-size:18px;font-weight:800}.letterhead-copy .agency{font-size:17px;font-weight:800}.letterhead-copy .office{font-size:10px;font-weight:700;margin-top:2px}.letterhead-lines{margin:1px 8px 8px}.letterhead-lines span{display:block;border-top:2px solid #000;margin-top:2px}.letterhead-lines span+span{border-top-width:1px}.report-title{font-size:15px;font-weight:800;margin:8px 0 2px}.meta{font-size:8px;color:#475569;margin-bottom:8px}
+      @page{size:A4 landscape;margin:9mm 8mm 10mm}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:8.2px;line-height:1.25}p{color:#334155;margin:4px 0 7px}section{break-before:page;page-break-before:always;width:100%}section:first-of-type{break-before:auto;page-break-before:auto}h2{font-size:13px;margin:10px 0 3px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tfoot{display:table-footer-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:0.7px solid #64748b;padding:3.5px 4px;text-align:left;vertical-align:top;word-break:normal;overflow-wrap:anywhere;white-space:normal}th{background:#dfeaf7;text-transform:none;font-weight:800;text-align:center;vertical-align:middle}tbody tr:nth-child(even){background:#f8fafc}td:first-child{white-space:nowrap}table[data-columns="12"]{font-size:7.4px}table[data-columns="11"]{font-size:7.7px}.letterhead{display:flex;align-items:center;justify-content:center;gap:16px;min-height:78px;padding:0 10px}.letterhead img{width:72px;height:72px;object-fit:contain;flex:0 0 72px}.letterhead-copy{flex:0 1 780px;text-align:center;line-height:1.22}.letterhead-copy .gov{font-size:18px;font-weight:900;letter-spacing:.15px}.letterhead-copy .agency{font-size:17px;font-weight:900;letter-spacing:.15px}.letterhead-copy .office{font-size:10px;font-weight:800;margin-top:2px}.letterhead-lines{margin:2px 0 8px}.letterhead-lines span{display:block;border-top:2.4px solid #000;margin-top:2px}.letterhead-lines span+span{border-top-width:.8px}.report-title{font-size:15px;font-weight:900;margin:7px 0 1px}.meta{font-size:8px;color:#475569;margin-bottom:7px}.filter{padding:4px 6px;background:#f1f5f9;border-left:3px solid #2563eb}
     </style></head><body>
-      ${rowsToPrintTable("Data ASN / PPPK", employeeData, filterDescription(pegawaiFilter as unknown as Record<string, string>))}
-      ${rowsToPrintTable("Buku Penjagaan", agendaData, filterDescription(agendaFilter as unknown as Record<string, string>))}
-      ${rowsToPrintTable("Data Kendaraan", vehicleData, filterDescription(vehicleFilter as unknown as Record<string, string>))}
+      ${sections.join("")}
     </body></html>`;
     const frame = document.createElement("iframe");
     frame.title = "Cetak Rekap SIKANDA";
@@ -178,12 +244,13 @@ export default function Laporan() {
         toast.error("Cetak Gagal", "Dokumen cetak belum dapat dibuka. Silakan coba kembali.");
         return;
       }
-      target.focus();
-      target.print();
+      window.setTimeout(() => { target.focus(); target.print(); }, 250);
       window.setTimeout(() => frame.remove(), 60_000);
     };
     frame.srcdoc = content;
     document.body.appendChild(frame);
+    setPrintOpen(false);
+    toast.success("Dokumen Cetak Siap", "Pratinjau dibuka sesuai kategori dan filter yang dipilih.");
   }
 
   const options = {
@@ -195,6 +262,10 @@ export default function Laporan() {
     conditions: uniqueSorted(vehicles.map((v) => v.kondisi)),
     years: uniqueSorted(vehicles.map((v) => v.tahun)),
     users: uniqueSorted(vehicles.map((v) => v.pengguna)),
+    equipmentTypes: uniqueSorted(equipment.map((item) => item.jenis)),
+    equipmentConditions: uniqueSorted(equipment.map((item) => item.kondisi)),
+    equipmentYears: uniqueSorted(equipment.map((item) => item.tahun)),
+    equipmentUsers: uniqueSorted(equipment.map((item) => item.pengguna)),
   };
 
   const searchInput = (value: string, onChange: (value: string) => void, placeholder: string) => (
@@ -216,11 +287,11 @@ export default function Laporan() {
           <p className="text-sm text-gray-500 dark:text-gray-400">Filter data terlebih dahulu; CSV dan cetak mengikuti hasil filter aktif.</p></div>
         <div className="flex gap-2">
           <button onClick={() => void load()} disabled={loading} className="flex items-center gap-2 px-4 py-2 neuglass text-sm font-medium rounded-full disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""} />Refresh</button>
-          <button onClick={handlePrint} disabled={loading} className="flex items-center gap-2 px-4 py-2 neuglass text-sm font-medium rounded-full disabled:opacity-50"><Printer size={18} />Cetak Halaman</button>
+          <button onClick={() => setPrintOpen(true)} disabled={loading} className="flex items-center gap-2 px-4 py-2 neuglass text-sm font-bold rounded-full disabled:opacity-50"><Printer size={18} />Cetak Halaman</button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-4 gap-5 items-start">
         <Card><CardHeader><CardTitle className="text-lg">Data ASN / PPPK</CardTitle><p className="text-xs text-gray-500">{filteredPegawai.length} dari {pegawai.length} data</p></CardHeader>
           <CardContent className="space-y-2.5">
             {searchInput(pegawaiFilter.search, (search) => setPegawaiFilter({ ...pegawaiFilter, search }), "Nama, NIP, jabatan...")}
@@ -238,7 +309,7 @@ export default function Laporan() {
             {searchInput(agendaFilter.search, (search) => setAgendaFilter({ ...agendaFilter, search }), "Nama, NIP, jabatan...")}
             <div className="grid grid-cols-2 gap-2">
               {selectInput(agendaFilter.kategori, (kategori) => setAgendaFilter({ ...agendaFilter, kategori }), "Semua Agenda", ["KGB", "PANGKAT", "BUP"], { KGB: "KGB", PANGKAT: "Kenaikan Pangkat", BUP: "BUP/Pensiun" })}
-              {selectInput(agendaFilter.rentang, (rentang) => setAgendaFilter({ ...agendaFilter, rentang }), "Semua Rentang", ["terlambat", "le3", "le6", "le12"], { terlambat: "Terlambat", le3: "≤ 3 Bulan", le6: "≤ 6 Bulan", le12: "≤ 12 Bulan" })}
+              {selectInput(agendaFilter.rentang, (rentang) => setAgendaFilter({ ...agendaFilter, rentang }), "Semua Rentang", ["terlambat", "le3", "le6", "le12"], { terlambat: "Terlewat", le3: "≤ 3 Bulan", le6: "≤ 6 Bulan", le12: "≤ 12 Bulan" })}
               <div className="col-span-2">{selectInput(agendaFilter.unitKerja, (unitKerja) => setAgendaFilter({ ...agendaFilter, unitKerja }), "Semua Unit Kerja", options.agendaUnits)}</div>
               <input type="date" title="Tanggal mulai" value={agendaFilter.tanggalMulai} onChange={(e) => setAgendaFilter({ ...agendaFilter, tanggalMulai: e.target.value })} className={inputCls} />
               <input type="date" title="Tanggal selesai" value={agendaFilter.tanggalSelesai} onChange={(e) => setAgendaFilter({ ...agendaFilter, tanggalSelesai: e.target.value })} className={inputCls} />
@@ -257,7 +328,50 @@ export default function Laporan() {
             </div>
             <button onClick={() => exportCsv(vehicleRows(filteredVehicles), `Data_Kendaraan_${filterSlug(vehicleFilter as unknown as Record<string, string>)}`)} disabled={isExporting || loading} className="w-full flex justify-center items-center gap-2 px-4 py-2.5 neuglass-pressed text-blue-700 font-semibold rounded-full disabled:opacity-50"><Download size={17} />Unduh CSV Hasil Filter</button>
           </CardContent></Card>
+
+        <Card><CardHeader><CardTitle className="text-lg">Data Alat &amp; Mesin</CardTitle><p className="text-xs text-gray-500">{filteredEquipment.length} dari {equipment.length} data</p></CardHeader>
+          <CardContent className="space-y-2.5">
+            {searchInput(equipmentFilter.search, (search) => setEquipmentFilter({ ...equipmentFilter, search }), "Nama barang, merk, pengguna...")}
+            <div className="grid grid-cols-2 gap-2">
+              {selectInput(equipmentFilter.jenis, (jenis) => setEquipmentFilter({ ...equipmentFilter, jenis }), "Semua Jenis", options.equipmentTypes)}
+              {selectInput(equipmentFilter.kondisi, (kondisi) => setEquipmentFilter({ ...equipmentFilter, kondisi }), "Semua Kondisi", options.equipmentConditions)}
+              {selectInput(equipmentFilter.tahun, (tahun) => setEquipmentFilter({ ...equipmentFilter, tahun }), "Semua Tahun", options.equipmentYears)}
+              {selectInput(equipmentFilter.pengguna, (pengguna) => setEquipmentFilter({ ...equipmentFilter, pengguna }), "Semua Pengguna", options.equipmentUsers)}
+            </div>
+            <button onClick={() => exportCsv(equipmentRows(filteredEquipment), `Data_Alat_Mesin_${filterSlug(equipmentFilter as unknown as Record<string, string>)}`)} disabled={isExporting || loading} className="w-full flex justify-center items-center gap-2 px-4 py-2.5 neuglass-pressed text-blue-700 font-semibold rounded-full disabled:opacity-50"><Download size={17} />Unduh CSV Hasil Filter</button>
+          </CardContent></Card>
       </div>
+
+      {printOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm" onClick={() => setPrintOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div><h2 className="text-lg font-bold text-gray-900 dark:text-white">Pilih Data yang Akan Dicetak</h2><p className="text-xs text-gray-500 mt-0.5">Hasil cetak mengikuti filter aktif pada setiap kategori.</p></div>
+              <button onClick={() => setPrintOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"><X size={19} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Kategori Cetak</label>
+              <select value={printScope} onChange={(event) => setPrintScope(event.target.value as PrintScope)} className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold">
+                <option value="pegawai">Data ASN / PPPK</option>
+                <option value="agenda">Buku Penjagaan</option>
+                <option value="vehicle">Data Kendaraan</option>
+                <option value="equipment">Data Alat & Mesin</option>
+                <option value="all">Seluruh Data</option>
+              </select>
+              <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4 text-sm text-gray-700 dark:text-gray-200 space-y-1">
+                {(printScope === "pegawai" || printScope === "all") && <div><p><b>Data ASN/PPPK:</b> {filteredPegawai.length} record</p><p className="text-xs text-gray-500">{filterDescription(pegawaiFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "agenda" || printScope === "all") && <div><p><b>Buku Penjagaan:</b> {filteredAgenda.length} agenda</p><p className="text-xs text-gray-500">{filterDescription(agendaFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "vehicle" || printScope === "all") && <div><p><b>Data Kendaraan:</b> {filteredVehicles.length} record</p><p className="text-xs text-gray-500">{filterDescription(vehicleFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "equipment" || printScope === "all") && <div><p><b>Data Alat & Mesin:</b> {filteredEquipment.length} record</p><p className="text-xs text-gray-500">{filterDescription(equipmentFilter as unknown as Record<string, string>)}</p></div>}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2">
+              <button onClick={() => setPrintOpen(false)} className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold">Batal</button>
+              <button onClick={() => handlePrint(printScope)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"><Printer size={16} />Buka Pratinjau</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

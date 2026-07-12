@@ -12,6 +12,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
+import { useToast } from "@/components/ui/Toast";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Administrator",
@@ -40,6 +41,7 @@ interface FormState {
 const emptyForm: FormState = { email: "", role: "pegawai", nip: "", nama: "", is_active: true };
 
 export default function KelolaAkun() {
+  const toast = useToast();
   const { user } = useContext(AuthContext);
   const [users, setUsers] = useState<AccessUser[]>([]);
   const [pegawai, setPegawai] = useState<Pegawai[]>([]);
@@ -127,10 +129,13 @@ export default function KelolaAkun() {
         !isEdit
       );
       setNotice(isEdit ? `Akun ${email} diperbarui.` : `Akun ${email} ditambahkan.`);
+      toast.success(isEdit ? "Perubahan Data Berhasil Disimpan" : "Akun Berhasil Ditambahkan", isEdit ? `Perubahan akun ${email} telah tersimpan.` : `Akun ${email} telah terhubung ke Database Pegawai.`);
       setIsFormOpen(false);
       await load();
     } catch (e: any) {
-      setError(String(e?.message || e));
+      const message = String(e?.message || e);
+      setError(message);
+      toast.error("Penyimpanan Akun Gagal", message);
     } finally {
       setSaving(false);
     }
@@ -186,9 +191,12 @@ export default function KelolaAkun() {
         try {
           await apiService.userDelete(u.email);
           setNotice(`Akses ${u.email} dinonaktifkan.`);
+          toast.success("Akun Dinonaktifkan", `Akses ${u.email} berhasil dinonaktifkan.`);
           await load();
         } catch (e: any) {
-          setError(String(e?.message || e));
+          const message = String(e?.message || e);
+          setError(message);
+          toast.error("Perubahan Akun Gagal", message);
         }
       },
     });
@@ -209,9 +217,12 @@ export default function KelolaAkun() {
         try {
           const res = await apiService.userSeedFromPegawai();
           setNotice(`Selesai. ${res.added} akun pegawai ditambahkan. ${res.note || ""}`);
+          toast.success("Sinkronisasi Akun Berhasil", `${res.added} akun pegawai berhasil ditambahkan. ${res.note || ""}`);
           await load();
         } catch (e: any) {
-          setError(String(e?.message || e));
+          const message = String(e?.message || e);
+          setError(message);
+          toast.error("Sinkronisasi Akun Gagal", message);
         } finally {
           setSeeding(false);
         }
@@ -407,7 +418,7 @@ export default function KelolaAkun() {
                             className="w-full px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 border-b last:border-b-0 border-gray-100 dark:border-gray-800"
                           >
                             <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">{p.nama}</span>
-                            <span className="block text-xs text-gray-500">NIP {p.nip} · {employmentStatusLabel(p)} · {p.email || "email belum tersedia"}</span>
+                            <span className="block text-xs text-gray-500">NIP {p.nip} · {employmentStatusLabel(p)} · {p.jabatan || "jabatan belum tersedia"} · {p.email || "email belum tersedia"}</span>
                           </button>
                         )) : (
                           <div className="px-3 py-3 text-xs text-gray-500">Nama tidak ditemukan atau pegawai sudah memiliki akun.</div>
@@ -467,6 +478,11 @@ export default function KelolaAkun() {
                 <div>
                   <label className={labelCls}>Status Pegawai</label>
                   <input type="text" value={selectedEmployee ? employmentStatusLabel(selectedEmployee) : "-"} readOnly className={inputCls} />
+                </div>
+
+                <div>
+                  <label className={labelCls}>Jabatan Pegawai</label>
+                  <input type="text" value={selectedEmployee?.jabatan || "-"} readOnly placeholder="Terisi otomatis dari Database Pegawai" className={inputCls} />
                 </div>
 
                 {isEdit && <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none cursor-pointer">
