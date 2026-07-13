@@ -129,6 +129,21 @@ export function formatDate(input: string | null | undefined): string {
 
 export const formatTanggalIndo = formatDate;
 
+/**
+ * Tanggal yang dapat dibaca oleh parser adalah tanggal sah, walaupun database
+ * PostgreSQL mengembalikannya sebagai ISO. Jangan gunakan perbedaan tampilan
+ * sebagai indikator kesalahan data.
+ */
+export function isValidSikandaDate(input: unknown): boolean {
+  return !!parseAnyDate(input);
+}
+
+/** Nilai teks Indonesia untuk input manual dan audit pengguna. */
+export function toIndonesianDateText(input: unknown): string {
+  const parsed = parseAnyDate(input);
+  return parsed ? formatDate(String(input)) : "";
+}
+
 // ---------------------------------------------------------------------------
 // KEY / DATA NORMALIZATION
 // ---------------------------------------------------------------------------

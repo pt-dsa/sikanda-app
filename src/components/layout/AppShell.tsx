@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { buildPenjagaanEvents, sisaWaktuLabel, type PenjagaanEvent } from "@/lib/penjagaan";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/ui/GlobalSearch";
 import { spreadsheetService } from "@/services/spreadsheetService";
@@ -17,7 +16,17 @@ import { motion, AnimatePresence } from "motion/react";
 import { PegawaiFormModal } from "@/components/ui/PegawaiFormModal";
 import { useToast } from "@/components/ui/Toast";
 import type { Pegawai } from "@/types";
-import { birthdayTimeLabel, buildUpcomingBirthdays, type BirthdayReminder } from "@/lib/birthdays";
+import type { NotificationAgendaItem, NotificationFeed } from "@/services/apiService";
+
+function birthdayTimeLabel(item: { daysUntil: number }) {
+  return item.daysUntil === 0 ? "Hari ini" : item.daysUntil === 1 ? "Besok" : `${item.daysUntil} hari lagi`;
+}
+
+function agendaTimeLabel(item: NotificationAgendaItem) {
+  if (item.selisihHari < 0) return `Terlewat ${Math.abs(item.selisihHari)} hari`;
+  if (item.selisihHari === 0) return "Jatuh tempo hari ini";
+  return item.selisihHari < 30 ? `${item.selisihHari} hari lagi` : `${Math.floor(item.selisihHari / 30)} bulan lagi`;
+}
 
 const SESSION_KEY = "sikanda_session";
 const DEV_KEY = "sikanda_dev";
@@ -235,9 +244,9 @@ function NotifSection({
   title, items, dot, to, seeAll, close, limit = 5,
 }: {
   title: string;
-  items: PenjagaanEvent[];
+  items: NotificationAgendaItem[];
   dot: string;
-  to: (e: PenjagaanEvent) => string;
+  to: (e: NotificationAgendaItem) => string;
   seeAll: string;
   close: () => void;
   limit?: number;
@@ -263,7 +272,7 @@ function NotifSection({
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{e.kategoriLabel}</span>
             <span className={`text-[11px] font-semibold shrink-0 ${e.selisihHari < 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}>
-              {sisaWaktuLabel(e)}
+              {agendaTimeLabel(e)}
             </span>
           </div>
         </Link>
@@ -277,7 +286,7 @@ function NotifSection({
   );
 }
 
-function BirthdaySection({ items, close }: { items: BirthdayReminder[]; close: () => void }) {
+function BirthdaySection({ items, close }: { items: NotificationFeed["birthdays"]; close: () => void }) {
   if (!items.length) return null;
   return (
     <div className="py-1">
@@ -303,13 +312,12 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
   const { user, logout } = useContext(AuthContext);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [pegawaiList, setPegawaiList] = useState<any[]>([]);
+  const [feed, setFeed] = useState<NotificationFeed | null>(null);
 
   useEffect(() => {
     async function loadAlerts() {
       try {
-        const pegawai = await spreadsheetService.getPegawai();
-        setPegawaiList(pegawai);
+        setFeed(await apiService.getNotificationFeed());
       } catch (err) {
         console.error("Error loading alerts:", err);
       }
@@ -324,22 +332,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
     };
   }, []);
 
-  // Agenda untuk panel lonceng (data NYATA via modul bersama buildPenjagaanEvents).
-  // Badge mengikuti seluruh item yang benar-benar tampil pada panel.
-  const notif = useMemo(() => {
-    const events = buildPenjagaanEvents(pegawaiList);
-    const within6 = (k: PenjagaanEvent["kategori"]) =>
-      events
-        .filter((e) => e.kategori === k && e.selisihHari >= 0 && e.selisihHari <= 182)
-        .sort((a, b) => a.selisihHari - b.selisihHari);
-    return {
-      overdue: events.filter((e) => e.isOverdue).sort((a, b) => a.selisihHari - b.selisihHari),
-      kgb: within6("KGB"),
-      pangkat: within6("PANGKAT"),
-      bup: within6("BUP"),
-      birthdays: buildUpcomingBirthdays(pegawaiList, 7),
-    };
-  }, [pegawaiList]);
+  const notif = feed || { overdue: [], kgb: [], pangkat: [], bup: [], birthdays: [] };
 
   const totalNotif = notif.overdue.length + notif.kgb.length + notif.pangkat.length + notif.bup.length + notif.birthdays.length;
 
@@ -584,7 +577,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           )}
         </AnimatePresence>
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
           <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full md:h-full">
             {children}
           </div>

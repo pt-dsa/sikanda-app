@@ -40,9 +40,12 @@ function localISO(d: Date): string {
 }
 
 export function startOfToday(): Date {
-  const t = new Date();
-  t.setHours(0, 0, 0, 0);
-  return t;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const value: Record<string, number> = {};
+  parts.forEach((part) => { if (part.type !== "literal") value[part.type] = Number(part.value); });
+  return new Date(value.year, value.month - 1, value.day, 0, 0, 0, 0);
 }
 
 /** Parse "YYYY-MM-DD" (atau format lain) sebagai tanggal LOKAL tengah malam. */

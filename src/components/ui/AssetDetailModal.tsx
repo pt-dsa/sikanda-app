@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ZoomIn, ImageOff, AlertTriangle } from "lucide-react";
 import { DetailModal } from "@/components/ui/DetailModal";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { resolveAssetPhotoUrl } from "@/lib/media";
 
 // Pola props mandiri (lihat §3 handoff: @types/react tidak terpasang).
 interface AssetDetailModalProps {
@@ -55,19 +56,11 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center group relative">
                 {asset.foto ? (
                   <>
-                    <img
-                      src={
-                        String(asset.foto).includes("Kendaraan_Images")
-                          ? `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=Kendaraan&fileName=${encodeURIComponent(asset.foto)}`
-                          : asset.foto
-                      }
+                    <SafeImage
+                      src={resolveAssetPhotoUrl(asset.foto, asset.jenis ? "alat_mesin" : "kendaraan")}
                       alt="Foto"
                       className="w-full h-full object-cover cursor-pointer"
-                      onClick={(e) => setZoomedImage((e.target as HTMLImageElement).src)}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://placehold.co/600x400/e2e8f0/64748b?text=Foto+Tidak+Tersedia`;
-                        (e.target as HTMLImageElement).onerror = null;
-                      }}
+                      onClick={() => setZoomedImage(resolveAssetPhotoUrl(asset.foto, asset.jenis ? "alat_mesin" : "kendaraan"))}
                     />
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                       <ZoomIn className="text-white drop-shadow-md" size={28} />

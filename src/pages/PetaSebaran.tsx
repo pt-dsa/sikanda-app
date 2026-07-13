@@ -10,6 +10,7 @@ import { Car, Bike, Wrench, MapPin, Eye, Map as MapIcon, Layers, Radio, ZoomIn, 
 import { renderToString } from "react-dom/server";
 import { StatusBadge } from "@/components/ui/Badge";
 import { nameSimilarity, normalizeNamaForMatch } from "@/lib/cleansing";
+import { resolveAssetPhotoUrl } from "@/lib/media";
 import type { Pegawai } from "@/types";
 
 // Fix Leaflet's default icon path issues in React
@@ -71,11 +72,7 @@ function canonicalEmployeeName(raw: unknown, employees: Pegawai[]): string {
 }
 
 function assetPhotoUrl(photo: unknown, type: string): string {
-  const raw = String(photo || "").trim();
-  if (!raw) return "";
-  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) return raw;
-  const table = type === "Alat & Mesin" ? "Alat%20%26%20Mesin" : "Kendaraan";
-  return `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=${table}&fileName=${encodeURIComponent(raw)}`;
+  return resolveAssetPhotoUrl(photo, type === "Alat & Mesin" ? "alat_mesin" : "kendaraan");
 }
 
 export default function PetaSebaran() {
@@ -112,7 +109,7 @@ export default function PetaSebaran() {
         vehicles.forEach((v: any) => {
           const lat = parseCoordinate(v.latitude || v.lat);
           const lng = parseCoordinate(v.longitude || v.lng);
-          if (lat && lng) {
+          if (lat !== null && lng !== null) {
             const isMotor = String(v.jenis_kendaraan || "").toLowerCase().includes("motor") || 
                            String(v.jenis_kendaraan || "").toLowerCase().includes("roda 2") ||
                            String(v.jenis_kendaraan || "").toLowerCase().includes("roda dua");
@@ -130,7 +127,7 @@ export default function PetaSebaran() {
               qrUrl: v.qr_url,
               foto: v.foto,
               data: {
-                "Kode Barang": String(v.kode_barang || "").trim() !== String(v.no_polisi || "").trim() ? v.kode_barang : "",
+                "Kode Barang": v.kode_barang || "",
                 "No. Polisi": v.no_polisi,
                 "Merk": v.merk,
                 "Tipe": v.tipe,
@@ -138,6 +135,8 @@ export default function PetaSebaran() {
                 "Pengguna": canonicalEmployeeName(v.pengguna, employeeDirectory),
                 "Penanggung Jawab": canonicalEmployeeName(v.penanggung_jawab, employeeDirectory),
                 "Unit Kerja": v.unit_kerja,
+                "Lokasi / Unit": v.lokasi || v.unit_kerja,
+                "Koordinat": `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
                 "Kapasitas Mesin": v.kapasitas_mesin,
                 "No. BPKB": v.no_bpkb,
                 "No. Rangka": v.no_rangka,
@@ -151,7 +150,7 @@ export default function PetaSebaran() {
         equipment.forEach((e: any) => {
           const lat = parseCoordinate(e.latitude || e.lat);
           const lng = parseCoordinate(e.longitude || e.lng);
-          if (lat && lng) {
+          if (lat !== null && lng !== null) {
             mapLocations.push({
               id: e.asset_id || e.id || Math.random().toString(),
               type: "Alat & Mesin",
@@ -166,6 +165,7 @@ export default function PetaSebaran() {
               data: {
                 "Asset ID": e.asset_id,
                 "Kode Barang": e.kode_barang,
+                "QR / Asset ID": e.qr_url || e.asset_id,
                 "Nama Barang": e.nama_aset,
                 "Merk": e.merk,
                 "Jenis": e.jenis,
@@ -175,6 +175,7 @@ export default function PetaSebaran() {
                 "Pengguna": canonicalEmployeeName(e.pengguna, employeeDirectory),
                 "Penanggung Jawab": canonicalEmployeeName(e.penanggung_jawab, employeeDirectory),
                 "Lokasi / Unit": e.lokasi,
+                "Koordinat": `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
                 "Harga Pembelian": e.harga_pembelian,
               }
             });
@@ -267,7 +268,7 @@ export default function PetaSebaran() {
   const uniqueConditions = ["Semua Kondisi", ...Array.from(new Set(locations.map(l => l.condition.toUpperCase())))];
 
   return (
-    <div className="-m-4 md:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] flex flex-col relative bg-gray-50 border-t border-gray-100 overflow-hidden">
+    <div className="-m-4 md:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] min-h-[560px] flex flex-col relative bg-gray-50 border-t border-gray-100 overflow-hidden touch-pan-y">
       <div className="absolute top-3 left-3 right-3 z-[25] flex flex-col sm:flex-row gap-2 sm:gap-4 justify-between items-start pointer-events-none">
         
         {/* Title & Info Card + chip tipe klikable */}
@@ -352,7 +353,7 @@ export default function PetaSebaran() {
               <button type="button" onClick={() => setBasemapOpen((open) => !open)} aria-expanded={basemapOpen} className="w-full h-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-2 text-gray-700 dark:text-gray-300 touch-manipulation">
                 <Layers size={14} /> Basemaps
               </button>
-              {basemapOpen && <div className="absolute right-0 left-auto top-full pt-2 w-48 z-[35] pointer-events-auto">
+              {basemapOpen && <div className="absolute right-0 left-auto top-full pt-2 w-48 z-[35] pointer-events-auto max-h-[50dvh] overflow-y-auto">
                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-2">
                   {BASEMAPS.map(map => (
                     <button 

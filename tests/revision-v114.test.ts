@@ -41,11 +41,11 @@ const backend = read("apps-script/Code.gs");
 
 assert(dashboard.includes("Sinkronisasi Data") && dashboard.includes("Terlewat") && dashboard.includes("min-h-[310px]"), "Dashboard harus memiliki sinkronisasi, istilah Terlewat, dan komposisi SDM proporsional");
 for (const option of ["Data ASN / PPPK", "Buku Penjagaan", "Data Kendaraan", "Data Alat & Mesin", "Seluruh Data"]) assert(report.includes(option), `Pilihan cetak ${option} harus tersedia`);
-assert(report.includes("display:grid") && report.includes("grid-template-columns:58px") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
+assert(report.includes("display:grid") && report.includes("grid-template-columns:64px minmax(0,1fr) 64px") && report.includes("letterhead-spacer") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
 assert(vehicle.includes("EmployeeAutocomplete") && vehicle.includes("AssetMediaFields") && vehicle.includes("uploadAssetFoto"), "Kendaraan harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(machine.includes("EmployeeAutocomplete") && machine.includes("AssetMediaFields") && machine.includes("uploadAssetFoto"), "Alat & Mesin harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(account.includes("Jabatan Pegawai") && account.includes("selectedEmployee?.jabatan"), "Tambah Akun harus menampilkan Jabatan Pegawai");
-assert(shell.includes("buildUpcomingBirthdays") && shell.includes("totalNotif") && shell.includes("Ulang Tahun Hari Ini–7 Hari"), "Lonceng harus menghitung agenda dan ulang tahun yang ditampilkan");
+assert(shell.includes("getNotificationFeed") && shell.includes("totalNotif") && shell.includes("Ulang Tahun Hari Ini–7 Hari"), "Lonceng harus memakai feed agenda dan ulang tahun yang ditampilkan");
 assert(shell.includes("/pegawai?profile=") && shell.includes("100dvh"), "Notifikasi harus membuka profil tepat dan tidak terpotong di mobile");
 assert(!vehicle.includes("selectable={true}") && !machine.includes("selectable={true}"), "Checkbox seleksi kendaraan dan alat/mesin harus dihilangkan");
 assert(backend.includes("uploadAssetFoto_") && backend.includes("asset.photo.update"), "Backend harus menyimpan foto aset secara aman");

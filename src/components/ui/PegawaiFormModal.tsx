@@ -4,7 +4,7 @@ import { X, Save, AlertTriangle, RefreshCw, Camera, Upload, User } from "lucide-
 import { Pegawai } from "@/types";
 import { apiService, fileToBase64 } from "@/services/apiService";
 import { spreadsheetService } from "@/services/spreadsheetService";
-import { toInputDate, parseAnyDate } from "@/lib/utils";
+import { toIndonesianDateText, parseAnyDate } from "@/lib/utils";
 import { canEditField, type AppUser } from "@/lib/rbac";
 import { useToast } from "@/components/ui/Toast";
 
@@ -76,6 +76,23 @@ const Field = React.memo(function Field({
   );
 });
 
+const IndonesianDateField = React.memo(function IndonesianDateField({
+  label, name, value, onChange, locked,
+}: Pick<FieldProps, "label" | "name" | "value" | "onChange" | "locked">) {
+  const normalize = (event: React.FocusEvent<HTMLInputElement>) => {
+    const normalized = toIndonesianDateText(event.target.value);
+    if (normalized && normalized !== event.target.value) onChange({ target: { name, value: normalized } });
+  };
+  return (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <input type="text" name={name} value={value} onChange={onChange} onBlur={normalize}
+        readOnly={locked} placeholder="Contoh: 13 Juli 1992" className={inputCls} />
+      <p className="mt-1 text-[10px] text-gray-400">Gunakan format Indonesia, contoh: 13 Juli 1992.</p>
+    </div>
+  );
+});
+
 function SectionTitle({ children }: { children: any }) {
   return (
     <div className="md:col-span-2 mt-2 mb-1">
@@ -119,7 +136,7 @@ export function PegawaiFormModal({
       if (String(seeded.status || "").toUpperCase() === "PPPK" && !seeded.kategori_pppk) seeded.kategori_pppk = "penuh_waktu";
       DATE_FIELDS.forEach((f) => {
         const v = (initialData as any)[f];
-        if (v) (seeded as any)[f] = toInputDate(v); // ke format <input type="date">
+        if (v) (seeded as any)[f] = toIndonesianDateText(v);
       });
       setFormData(seeded);
       setPhotoPreview(initialData.foto || "");
@@ -182,6 +199,11 @@ export function PegawaiFormModal({
     setIsSaving(true);
     try {
       const payload: Partial<Pegawai> = { ...formData };
+      DATE_FIELDS.forEach((field) => {
+        const normalized = toIndonesianDateText((payload as any)[field]);
+        if ((payload as any)[field] && !normalized) throw new Error(`Format ${field.replaceAll("_", " ")} tidak valid.`);
+        if (normalized) (payload as any)[field] = normalized;
+      });
       const usia = computeUsia(formData.tgl_lahir);
       if (usia) payload.usia = usia;
 
@@ -334,13 +356,13 @@ export function PegawaiFormModal({
                 <option value="PENSIUN">PENSIUN</option>
               </select>
             </div>
-            <Field label="Tanggal Lahir" name="tgl_lahir" type="date"
+            <IndonesianDateField label="Tanggal Lahir" name="tgl_lahir"
               value={V("tgl_lahir")} onChange={handleChange} locked={L("tgl_lahir")} />
 
             <SectionTitle>Kepangkatan &amp; Jabatan</SectionTitle>
             <Field label="Golongan" name="golongan" placeholder="Contoh: III/c"
               value={V("golongan")} onChange={handleChange} locked={L("golongan")} />
-            <Field label="TMT Golongan (dasar KGB &amp; Pangkat)" name="tgl_mulai_golongan" type="date"
+            <IndonesianDateField label="TMT Golongan (dasar KGB & Pangkat)" name="tgl_mulai_golongan"
               value={V("tgl_mulai_golongan")} onChange={handleChange} locked={L("tgl_mulai_golongan")} />
             <Field label="Jabatan" name="jabatan" placeholder="Nama jabatan" colSpan
               value={V("jabatan")} onChange={handleChange} locked={L("jabatan")} />
@@ -353,7 +375,7 @@ export function PegawaiFormModal({
               </datalist>
               <p className="text-[10px] text-gray-400 mt-1">Daftar berasal dari Bidang pada Buku Penjagaan. Nilai baru dapat langsung diketik.</p>
             </div>
-            <Field label="TMT Jabatan" name="tgl_mulai_jabatan" type="date"
+            <IndonesianDateField label="TMT Jabatan" name="tgl_mulai_jabatan"
               value={V("tgl_mulai_jabatan")} onChange={handleChange} locked={L("tgl_mulai_jabatan")} />
             <div><label className={labelCls}>Masa Kerja (Tahun)</label><select name="masa_kerja_tahun" value={V("masa_kerja_tahun")} onChange={handleChange} disabled={L("masa_kerja_tahun")} className={inputCls}>
               <option value="">Pilih tahun</option>{WORK_YEAR_OPTIONS.map((value) => <option key={value} value={value}>{value} tahun</option>)}

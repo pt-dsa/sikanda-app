@@ -108,7 +108,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.5-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.6-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -137,6 +137,8 @@ function doPost(e) {
         return json_({ ok: true, data: selectForActor_(actor, String(body.table || ''), body.filters || []) });
       case 'get_config':
         return json_({ ok: true, config: isManager_(actor) ? getConfig_() : getPublicConfig_() });
+      case 'notification_feed':
+        return json_(getNotificationFeed_(actor));
       case 'user_list':
         requireManager_(actor);
         return json_(userList_());
@@ -522,6 +524,7 @@ function savePegawai_(actor, data, isNew) {
   }
 
   var allowed = isManager_(actor) ? PEGAWAI_FIELDS : EMPLOYEE_EDITABLE_FIELDS;
+  normalizePegawaiDates_(data, allowed);
   var cleanInput = {};
   for (var i = 0; i < allowed.length; i++) {
     if (Object.prototype.hasOwnProperty.call(data, allowed[i])) cleanInput[allowed[i]] = data[allowed[i]];
@@ -544,6 +547,23 @@ function savePegawai_(actor, data, isNew) {
   }
   auditLog_(actor, isNew ? 'pegawai.create' : 'pegawai.update', 'pegawai', nip, { fields: Object.keys(payload) });
   return { ok: true, mode: isNew ? 'create' : 'update', nip: nip };
+}
+
+/** Menjaga kontrak tanggal input: Indonesia/Inggris/ISO diterima, lalu
+ * disimpan dalam representasi Indonesia bila kolom target bertipe teks.
+ * Jika kolom Supabase bertipe DATE, PostgreSQL boleh mengembalikannya sebagai
+ * ISO; kedua bentuk dianggap valid oleh seluruh pembaca SIKANDA. */
+function normalizePegawaiDates_(data, allowed) {
+  var fields = ['tgl_lahir', 'tgl_mulai_golongan', 'tgl_mulai_jabatan'];
+  for (var i = 0; i < fields.length; i++) {
+    var key = fields[i];
+    if (allowed.indexOf(key) === -1 || !Object.prototype.hasOwnProperty.call(data, key)) continue;
+    var raw = String(data[key] || '').trim();
+    if (!raw) continue;
+    var parsed = parseDate_(raw);
+    if (!parsed) throw publicError_('Format ' + key.replace(/_/g, ' ') + ' tidak valid. Gunakan contoh 13 Juli 1992.');
+    data[key] = formatIndo_(parsed);
+  }
 }
 
 function deletePegawai_(actor, nip) {
@@ -1186,7 +1206,7 @@ function activeEmployees_(actor) {
 }
 
 function monthsUntilYearEnd_() {
-  var now = new Date();
+  var now = jakartaToday_();
   return Math.max(1, 12 - now.getMonth());
 }
 
@@ -1267,28 +1287,13 @@ function birthdayAnswer_(actor, daysAhead, normalizedQuestion) {
   var employees = activeEmployees_(actor);
   var named = findMentionedEmployee_(employees, normalizedQuestion || '');
   if (named) employees = [named];
-  var today = startOfDay_(new Date());
-  var end = new Date(today.getTime() + daysAhead * 86400000);
-  var rows = [];
-  for (var i = 0; i < employees.length; i++) {
-    var birth = parseDate_(employees[i].tgl_lahir || employees[i].tanggal_lahir);
-    if (!birth) continue;
-    var maxDay = new Date(today.getFullYear(), birth.getMonth() + 1, 0).getDate();
-    var next = new Date(today.getFullYear(), birth.getMonth(), Math.min(birth.getDate(), maxDay));
-    next = startOfDay_(next);
-    if (next < today) {
-      maxDay = new Date(today.getFullYear() + 1, birth.getMonth() + 1, 0).getDate();
-      next = startOfDay_(new Date(today.getFullYear() + 1, birth.getMonth(), Math.min(birth.getDate(), maxDay)));
-    }
-    if (next <= end) rows.push({ row: employees[i], date: next, days: Math.round((next.getTime() - today.getTime()) / 86400000) });
-  }
-  rows.sort(function (a, b) { return a.days - b.days || String(a.row.nama || '').localeCompare(String(b.row.nama || '')); });
+  var rows = buildBirthdayFacts_(employees, daysAhead, jakartaToday_());
   if (!rows.length) {
     if (named) return '**' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** tidak berulang tahun dalam rentang ' + (daysAhead === 0 ? 'hari ini' : daysAhead + ' hari ke depan') + '. Tanggal lahir pada Database Pegawai: **' + escapeMarkdown_(named.tgl_lahir || named.tanggal_lahir || 'belum tersedia') + '**.';
     return daysAhead === 0 ? 'Hari ini **tidak ada pegawai yang berulang tahun** pada lingkup data Anda.' : 'Dalam **' + daysAhead + ' hari ke depan belum ada pegawai yang berulang tahun** pada lingkup data Anda.';
   }
   var lines = [daysAhead === 0 ? 'Hari ini ada **' + rows.length + ' pegawai yang berulang tahun**:' : 'Dalam ' + daysAhead + ' hari ke depan ada **' + rows.length + ' pegawai yang berulang tahun**:'];
-  for (var r = 0; r < rows.length; r++) lines.push((r + 1) + '. **' + escapeMarkdown_(rows[r].row.nama || rows[r].row.nama_pegawai || '-') + '** — ' + formatIndo_(rows[r].date) + (rows[r].days === 0 ? ' (hari ini)' : ' (' + rows[r].days + ' hari lagi)'));
+  for (var r = 0; r < rows.length; r++) lines.push((r + 1) + '. **' + escapeMarkdown_(rows[r].nama || '-') + '** — ' + formatIndo_(rows[r].date) + (rows[r].days === 0 ? ' (hari ini)' : ' (' + rows[r].days + ' hari lagi)'));
   return lines.join('\n');
 }
 
@@ -1296,11 +1301,11 @@ function birthdayMonthAnswer_(actor, normalizedQuestion) {
   var employees = activeEmployees_(actor);
   var named = findMentionedEmployee_(employees, normalizedQuestion || '');
   if (named) employees = [named];
-  var today = startOfDay_(new Date());
+  var today = jakartaToday_();
   var month = today.getMonth();
   var rows = [];
   for (var i = 0; i < employees.length; i++) {
-    var birth = parseDate_(employees[i].tgl_lahir || employees[i].tanggal_lahir);
+    var birth = parseBirthdayDate_(employees[i].tgl_lahir || employees[i].tanggal_lahir, today.getFullYear());
     if (birth && birth.getMonth() === month) rows.push({ row: employees[i], day: birth.getDate() });
   }
   rows.sort(function (a, b) { return a.day - b.day || String(a.row.nama || '').localeCompare(String(b.row.nama || '')); });
@@ -1339,40 +1344,16 @@ function systemSummaryAnswer_(actor) {
 }
 
 function agendaAnswer_(actor, code, label, months) {
-  var config = getPublicConfig_();
-  var kgbCycle = intConfig_(config, 'KGB_CYCLE_YEARS', 2);
-  var rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4);
-  var bupAge = intConfig_(config, 'BUP_USIA', 58);
-  var employees = activeEmployees_(actor);
-  var today = startOfDay_(new Date());
+  var today = jakartaToday_();
   var ceiling = addCalendarMonths_(today, months);
-  var rows = [];
-
-  for (var i = 0; i < employees.length; i++) {
-    var employee = employees[i];
-    var rules = employmentRules_(employee);
-    var due = null;
-    if (code === 'KGB' && rules.kgb) due = nextCycleDate_(employee.tgl_mulai_golongan || employee.terhitung_mulai_tanggal_golongan, kgbCycle);
-    if (code === 'PANGKAT' && rules.pangkat) due = nextCycleDate_(employee.tgl_mulai_golongan || employee.terhitung_mulai_tanggal_golongan, rankCycle);
-    if (code === 'BUP' && rules.bup) due = pensionDate_(employee.tgl_lahir || employee.tanggal_lahir, bupAge);
-    if (due && due >= today && due <= ceiling) {
-      rows.push({
-        name: String(employee.nama || employee.nama_pegawai || '').trim(),
-        nip: String(employee.nip || '').trim(),
-        due: due
-      });
-    }
-  }
-  rows.sort(function (a, b) { return a.due.getTime() - b.due.getTime() || a.name.localeCompare(b.name); });
+  var rows = buildAgendaFacts_(actor, today).filter(function (item) { return item.code === code && item.date >= today && item.date <= ceiling; });
   if (!rows.length) {
     return 'Saya sudah cek. **Tidak ada agenda ' + label + '** yang jatuh tempo dalam ' + months + ' bulan ke depan pada lingkup data Anda.';
   }
 
   var limit = Math.min(rows.length, 50);
   var lines = ['Saya sudah cek. Ada **' + rows.length + ' pegawai** dengan agenda ' + label + ' dalam ' + months + ' bulan ke depan:'];
-  for (var r = 0; r < limit; r++) {
-    lines.push((r + 1) + '. **' + rows[r].name + '** — NIP ' + rows[r].nip + ' — ' + formatIndo_(rows[r].due));
-  }
+  for (var r = 0; r < limit; r++) lines.push((r + 1) + '. **' + rows[r].nama + '** — NIP ' + rows[r].nip + ' — ' + formatIndo_(rows[r].date));
   if (rows.length > limit) lines.push('\nDaftar dibatasi 50 nama. Gunakan Buku Penjagaan untuk melihat seluruh hasil.');
   return lines.join('\n');
 }
@@ -1422,7 +1403,7 @@ function runNotifications_(force, actor) {
   var rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4);
   var bupAge = intConfig_(config, 'BUP_USIA', 58);
   var employees = supaGet_('pegawai?select=*&limit=5000').filter(function (row) { return isActive_(row.is_active); });
-  var today = startOfDay_(new Date());
+  var today = jakartaToday_();
   var lastSuccess = force ? null : parseDate_(properties.getProperty('NOTIF_LAST_SUCCESS_DATE'));
   var intervalStart = lastSuccess && lastSuccess < today ? lastSuccess : new Date(today.getTime() - 86400000);
   var summaries = [];
@@ -1677,6 +1658,68 @@ function parseDate_(input) {
   return null;
 }
 
+/** Parser ulang tahun mendukung DD-MM/DD/MM tanpa tahun. Tahun kelahiran tidak
+ * memengaruhi notifikasi; kalender tahun WIB dipakai untuk perbandingan. */
+function parseBirthdayDate_(input, year) {
+  var parsed = parseDate_(input);
+  if (parsed) return parsed;
+  var text = String(input || '').trim();
+  var match = text.match(/^(\d{1,2})[-/](\d{1,2})$/);
+  return match ? validDate_(year || jakartaToday_().getFullYear(), parseInt(match[2], 10) - 1, parseInt(match[1], 10)) : null;
+}
+
+function jakartaToday_() {
+  var key = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  return parseDate_(key) || startOfDay_(new Date());
+}
+
+function buildBirthdayFacts_(employees, daysAhead, today) {
+  var end = new Date(today.getTime() + Math.max(0, daysAhead) * 86400000);
+  var rows = [];
+  for (var i = 0; i < employees.length; i++) {
+    var birth = parseBirthdayDate_(employees[i].tgl_lahir || employees[i].tanggal_lahir, today.getFullYear());
+    if (!birth) continue;
+    var day = Math.min(birth.getDate(), new Date(today.getFullYear(), birth.getMonth() + 1, 0).getDate());
+    var next = startOfDay_(new Date(today.getFullYear(), birth.getMonth(), day));
+    if (next < today) next = startOfDay_(new Date(today.getFullYear() + 1, birth.getMonth(), Math.min(birth.getDate(), new Date(today.getFullYear() + 1, birth.getMonth() + 1, 0).getDate())));
+    if (next > end) continue;
+    rows.push({ nip: String(employees[i].nip || '').trim(), nama: String(employees[i].nama || employees[i].nama_pegawai || '').trim(), jabatan: String(employees[i].jabatan || '').trim(), date: next, days: Math.round((next.getTime() - today.getTime()) / 86400000) });
+  }
+  return rows.sort(function (a, b) { return a.days - b.days || a.nama.localeCompare(b.nama); });
+}
+
+function buildAgendaFacts_(actor, today) {
+  var config = getPublicConfig_();
+  var kgbCycle = intConfig_(config, 'KGB_CYCLE_YEARS', 2), rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4), bupAge = intConfig_(config, 'BUP_USIA', 58);
+  var rows = [];
+  activeEmployees_(actor).forEach(function (employee) {
+    var rules = employmentRules_(employee), tmt = employee.tgl_mulai_golongan || employee.terhitung_mulai_tanggal_golongan, birth = employee.tgl_lahir || employee.tanggal_lahir;
+    var common = { nip: String(employee.nip || '').trim(), nama: String(employee.nama || employee.nama_pegawai || '').trim(), jabatan: String(employee.jabatan || '').trim() };
+    var append = function (code, label, date) { if (date) rows.push({ nip: common.nip, nama: common.nama, jabatan: common.jabatan, code: code, label: label, date: date, days: Math.round((date.getTime() - today.getTime()) / 86400000) }); };
+    if (rules.kgb) append('KGB', 'KGB (Kenaikan Gaji Berkala)', nextCycleDate_(tmt, kgbCycle));
+    if (rules.pangkat) append('PANGKAT', 'Kenaikan Pangkat', nextCycleDate_(tmt, rankCycle));
+    if (rules.bup) append('BUP', 'Batas Usia Pensiun (BUP)', pensionDate_(birth, bupAge));
+  });
+  return rows.sort(function (a, b) { return a.date - b.date || a.nama.localeCompare(b.nama); });
+}
+
+/** Satu feed fakta untuk lonceng dan router Tanya SIKANDA. */
+function getNotificationFeed_(actor) {
+  var today = jakartaToday_();
+  var agenda = buildAgendaFacts_(actor, today);
+  return {
+    ok: true,
+    generated_at: Utilities.formatDate(new Date(), 'Asia/Jakarta', "yyyy-MM-dd'T'HH:mm:ss"),
+    birthdays: buildBirthdayFacts_(activeEmployees_(actor), 7, today).map(function (item) { return { nip: item.nip, nama: item.nama, jabatan: item.jabatan, tanggal: formatDateKey_(item.date), daysUntil: item.days }; }),
+    overdue: agenda.filter(function (item) { return item.days < 0; }).map(notificationAgendaDto_),
+    kgb: agenda.filter(function (item) { return item.code === 'KGB' && item.days >= 0 && item.days <= 182; }).map(notificationAgendaDto_),
+    pangkat: agenda.filter(function (item) { return item.code === 'PANGKAT' && item.days >= 0 && item.days <= 182; }).map(notificationAgendaDto_),
+    bup: agenda.filter(function (item) { return item.code === 'BUP' && item.days >= 0 && item.days <= 182; }).map(notificationAgendaDto_)
+  };
+}
+
+function notificationAgendaDto_(item) { return { nip: item.nip, nama: item.nama, jabatan: item.jabatan, kategori: item.code, kategoriLabel: item.label, tanggal: formatDateKey_(item.date), selisihHari: item.days }; }
+
 function validDate_(year, month, day) {
   var date = new Date(year, month, day);
   if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
@@ -1691,7 +1734,7 @@ function startOfDay_(date) {
 function nextCycleDate_(input, cycleYears) {
   var start = parseDate_(input);
   if (!start || !cycleYears) return null;
-  var today = startOfDay_(new Date());
+  var today = jakartaToday_();
   var occurrence = 1;
   if (today > start) occurrence = Math.max(1, Math.ceil((today.getFullYear() - start.getFullYear()) / cycleYears));
   var candidate = cycleDate_(start, cycleYears * occurrence);

@@ -234,7 +234,7 @@ export default function Dashboard() {
 
 
   return (
-    <motion.div className="space-y-8" variants={containerVars} initial="hidden" animate="show">
+    <motion.div className="space-y-5" variants={containerVars} initial="hidden" animate="show">
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-3">
@@ -415,12 +415,12 @@ export default function Dashboard() {
                           <span className="text-[10px] text-gray-500">Pegawai</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 w-full max-w-[150px] min-w-0">
+                      <div className="flex flex-col gap-2 w-full max-w-[132px] min-w-0">
                         {metrics.distribusiGolongan.map((item, i) => (
-                          <div key={item.name} className="grid grid-cols-[12px_minmax(0,1fr)_26px] items-center gap-1.5">
+                          <div key={item.name} className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                              <span className="text-xs text-gray-600 dark:text-gray-400 truncate">Gol. {item.name}</span>
-                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100 text-right">{item.value}</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400 truncate">Gol. {item.name}</span>
+                            <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{item.value}</span>
                           </div>
                         ))}
                       </div>

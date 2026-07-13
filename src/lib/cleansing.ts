@@ -9,7 +9,7 @@
 // Fungsi formatDate() di utils.ts menghasilkan format ini — dipakai sebagai referensi.
 // ---------------------------------------------------------------------------
 
-import { parseAnyDate, formatDate } from "@/lib/utils";
+import { parseAnyDate } from "@/lib/utils";
 import type { Pegawai } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -266,11 +266,11 @@ export function scanPegawai(list: Pegawai[]): CleansingIssue[] {
       });
     }
 
-    // ── 6. TANGGAL TIDAK STANDAR ─────────────────────────────────────────────
-    // Standar SIKANDA: "D Month YYYY" Indonesia misal "8 September 1979".
-    // Deteksi: formatDate(raw) berbeda dari raw → belum dalam format standar.
-    // Auto-koreksi: simpan formatDate(raw) ke spreadsheet via pegawai_save.
-    // (Backend Code.gs dengan fix _applyFields akan menyimpan dalam fmtIndo_()).
+    // ── 6. TANGGAL TIDAK VALID ───────────────────────────────────────────────
+    // PostgreSQL lazim mengembalikan kolom DATE dalam ISO (YYYY-MM-DD),
+    // sedangkan input SIKANDA dapat berupa Indonesia/Inggris. Semuanya valid
+    // bila parser mengenalinya; cleansing tidak boleh membuat false positive
+    // hanya karena perbedaan representasi tampilan.
     const DATE_CHECKS: Array<{ key: keyof Pegawai; label: string }> = [
       { key: "tgl_lahir",          label: "Tanggal Lahir" },
       { key: "tgl_mulai_golongan", label: "TMT Golongan" },
@@ -280,21 +280,18 @@ export function scanPegawai(list: Pegawai[]): CleansingIssue[] {
       const raw = String((p as any)[key] ?? "").trim();
       if (!raw) continue; // kosong → sudah ditangani FIELD_WAJIB_KOSONG
 
-      // parseAnyDate bisa membaca berbagai format; jika gagal → tidak bisa auto-fix
+      // Hanya nilai yang benar-benar tidak dapat dibaca yang menjadi isu.
       const parsed = parseAnyDate(raw);
-      if (!parsed) continue; // tidak terbaca sama sekali → biarkan (informasi manual saja)
-
-      const normalized = formatDate(raw); // "D Month YYYY" Indonesia
-      if (normalized === raw) continue;  // sudah dalam format yang benar
-
-      issues.push({
-        nip, nama, kode: "TANGGAL_TIDAK_STANDAR",
-        field: key as string, fieldLabel: label,
-        nilaiLama: raw,
-        saranPerbaikan: normalized,
-        bisaAutoKoreksi: true,
-        level: "tinggi",
-      });
+      if (!parsed) {
+        issues.push({
+          nip, nama, kode: "TANGGAL_TIDAK_STANDAR",
+          field: key as string, fieldLabel: label,
+          nilaiLama: raw,
+          saranPerbaikan: "Masukkan tanggal sah, misalnya 13 Juli 1992 atau 1992-07-13",
+          bisaAutoKoreksi: false,
+          level: "tinggi",
+        });
+      }
     }
 
     // ── 7. NAMA SPASI GANDA / TRAILING ───────────────────────────────────────
@@ -312,18 +309,8 @@ export function scanPegawai(list: Pegawai[]): CleansingIssue[] {
       });
     }
 
-    // ── 8. MATCH ASET NONE (informasi) ──────────────────────────────────────
-    if (p.match_quality === "none") {
-      issues.push({
-        nip, nama, kode: "MATCH_ASET_NONE",
-        field: "nama", fieldLabel: "Match Aset",
-        nilaiLama: nama,
-        saranPerbaikan:
-          "Pegawai ini belum memiliki relasi aset. Jika ada aset terkait, pilih nama baku persis dari Database Pegawai.",
-        bisaAutoKoreksi: false,
-        level: "info",
-      });
-    }
+    // Pegawai tanpa aset bukan kesalahan cleansing. Informasi relasi aset
+    // tetap tersedia pada Data ASN/PPPK, tetapi tidak masuk daftar masalah.
   }
 
   return issues;

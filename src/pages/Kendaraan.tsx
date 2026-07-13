@@ -17,6 +17,8 @@ import { useLocation } from "react-router-dom";
 import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
+import { SafeImage } from "@/components/ui/SafeImage";
+import { resolveAssetPhotoUrl } from "@/lib/media";
 
 const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
 
@@ -521,17 +523,11 @@ export default function Kendaraan() {
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center relative group">
                 {(selectedItem as any).foto ? (
                   <>
-                    <img 
-                      src={(selectedItem as any).foto.includes("Kendaraan_Images") 
-                        ? `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=Kendaraan&fileName=${encodeURIComponent((selectedItem as any).foto)}` 
-                        : (selectedItem as any).foto} 
+                    <SafeImage
+                      src={resolveAssetPhotoUrl((selectedItem as any).foto, "kendaraan")}
                       alt="Foto" 
                       className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity bg-white"
-                      onClick={(e) => setZoomedImage(e.currentTarget.src)}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://placehold.co/600x400/e2e8f0/64748b?text=Image+Not+Found`;
-                        (e.target as HTMLImageElement).onerror = null;
-                      }}
+                      onClick={() => setZoomedImage(resolveAssetPhotoUrl((selectedItem as any).foto, "kendaraan"))}
                     />
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                       <ZoomIn className="text-white drop-shadow-md" size={32} />
@@ -749,15 +745,11 @@ export default function Kendaraan() {
           >
             <X size={24} />
           </button>
-          <img 
+          <SafeImage
             src={zoomedImage} 
             alt="Zoomed foto" 
             className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://placehold.co/800x600/e2e8f0/64748b?text=Image+Not+Found`;
-              (e.target as HTMLImageElement).onerror = null;
-            }}
           />
         </div>
       )}

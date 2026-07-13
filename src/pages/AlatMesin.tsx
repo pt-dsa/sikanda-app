@@ -17,6 +17,8 @@ import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui
 import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
+import { SafeImage } from "@/components/ui/SafeImage";
+import { resolveAssetPhotoUrl } from "@/lib/media";
 
 export default function AlatMesin() {
   const location = useLocation();
@@ -480,28 +482,15 @@ export default function AlatMesin() {
                       </div>
                     );
                   }
-                  const src = f.startsWith('http') 
-                    ? f 
-                    : `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=Alat%20%26%20Mesin&fileName=${encodeURIComponent(f)}`;
+                  const src = resolveAssetPhotoUrl(f, "alat_mesin");
                   
                   return (
                     <>
-                      <img 
+                      <SafeImage
                         src={src} 
                         alt="Foto" 
                         className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity bg-white"
-                        onClick={(e) => setZoomedImage(e.currentTarget.src)}
-                        onError={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          if (!img.dataset.retried) {
-                            img.dataset.retried = 'true';
-                            // Try the other table name variant
-                            img.src = `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=AlatMesin&fileName=${encodeURIComponent(f)}`;
-                          } else {
-                            img.src = `https://placehold.co/600x400/e2e8f0/64748b?text=Image+Not+Found`;
-                            img.onerror = null;
-                          }
-                        }}
+                        onClick={() => setZoomedImage(src)}
                       />
                       <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                         <ZoomIn className="text-white drop-shadow-md" size={32} />
@@ -706,15 +695,11 @@ export default function AlatMesin() {
           >
             <X size={24} />
           </button>
-          <img 
+          <SafeImage
             src={zoomedImage} 
             alt="Zoomed foto" 
             className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://placehold.co/800x600/e2e8f0/64748b?text=Image+Not+Found`;
-              (e.target as HTMLImageElement).onerror = null;
-            }}
           />
         </div>
       )}

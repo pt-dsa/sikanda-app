@@ -9,7 +9,8 @@
 // Tiga peran:
 //   - admin    : CRUD penuh, approval, akun, konfigurasi, dan cleansing.
 //   - pimpinan : kewenangan identik dengan admin (label dipertahankan untuk audit).
-//   - pegawai  : hanya profil sendiri dan Tanya SIKANDA dalam lingkup data sendiri.
+//   - pegawai  : dapat membuka seluruh menu operasional, tetapi tidak dapat
+//                membuka Kelola Akun/Cleansing dan hanya mengubah profil sendiri.
 // ---------------------------------------------------------------------------
 
 export type Role = "admin" | "pimpinan" | "pegawai";
@@ -52,9 +53,8 @@ export type Action =
   | "account.manage";
 
 /**
- * Field profil yang BOLEH diubah pegawai pada BARIS MILIKNYA SENDIRI (disepakati).
- * Field yang mengendalikan KGB/Pangkat/Pensiun (NIP, nama, status, golongan,
- * TMT, tgl lahir, masa kerja, jabatan) SENGAJA tidak termasuk demi integritas data.
+ * Field profil yang boleh diubah pegawai pada baris miliknya sendiri. TMT,
+ * golongan, status, dan seluruh dasar KGB/Pangkat/Pensiun tetap server-locked.
  */
 export const EDITABLE_FIELDS_OWN: readonly string[] = [
   "foto",
@@ -89,7 +89,7 @@ const MANAGER_MENUS: MenuKey[] = [...ALL_MENUS, "kelola-akun", "cleansing"];
 const MENU_BY_ROLE: Record<Role, MenuKey[]> = {
   admin: MANAGER_MENUS,
   pimpinan: MANAGER_MENUS,
-  pegawai: ["pegawai", "tanya"],
+  pegawai: ALL_MENUS,
 };
 
 const ACTIONS_BY_ROLE: Record<Role, Action[]> = {

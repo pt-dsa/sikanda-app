@@ -1,32 +1,26 @@
-# SIKANDA V1.1.5 Secure — Release Notes
+# SIKANDA V1.1.6 Secure — Release Notes
 
-Baseline: SIKANDA V1.1.4 Secure.
+## Konsistensi fakta dan tanggal
 
-## Perubahan utama
+- Apps Script menyediakan `notification_feed` berbasis database aktif dan waktu Asia/Jakarta.
+- Lonceng memakai feed backend tersebut; Tanya SIKANDA memakai builder fakta ulang tahun dan agenda yang sama sebelum Gemini dipanggil.
+- Parser ulang tahun menerima ISO, Indonesia, Inggris, numerik, dan `DD-MM`/`DD/MM` tanpa tahun.
+- Form Pegawai menerima serta menormalisasi tanggal menjadi teks Indonesia. Cleansing hanya menandai tanggal yang benar-benar tidak dapat dibaca, bukan ISO valid dari PostgreSQL.
 
-- Dashboard memiliki sinkronisasi data nyata, validasi pegawai aktif, judul tebal, istilah Terlewat, dan Komposisi SDM yang proporsional.
-- Pengguna/Penanggung Jawab kendaraan serta alat-mesin memakai autocomplete Database Pegawai dan divalidasi ulang backend.
-- GPS otomatis, kamera, galeri, preview, validasi 5 MB, dan upload Google Drive ditambahkan untuk kendaraan serta alat-mesin.
-- Popup sukses/gagal diterapkan konsisten pada CRUD aktif.
-- Tambah Akun menampilkan Jabatan Pegawai.
-- Lonceng menghitung item panel secara akurat dan menambahkan ulang tahun hari ini–7 hari.
-- Rekap Laporan menambahkan Alat & Mesin dan dropdown kategori cetak.
-- KOP dan tabel print diperbaiki untuk A4 landscape.
-- Tanya SIKANDA database-first diperluas dan persona dibuat lebih humanis.
-- Tanya SIKANDA kini memakai pegawai aktif sebagai sumber tunggal, membaca tanggal Indonesia/Inggris, membedakan ulang tahun hari ini, tujuh hari, dan bulan berjalan, serta menjawab jumlah PPPK dari query database saat itu.
-- Semua item lonceng membuka profil pegawai tepat berdasarkan NIP; panel mobile memakai viewport dinamis agar tidak terpotong.
-- Komposisi SDM dinaikkan sebelum kartu kelengkapan dan angka legenda golongan dirapatkan ke label.
-- Pratinjau foto lama kendaraan/alat-mesin menangani path legacy dan broken image tanpa crash.
-- Peta tidak lagi mengisi nomor polisi dari kode barang, menampilkan data aset lebih lengkap, dan menormalkan nama Pengguna/Penanggung Jawab ke Database Pegawai.
-- Basemap peta mobile diubah dari hover menjadi tombol tap, ukuran Leaflet disinkronkan saat viewport berubah, dan layer kontrol ditempatkan di bawah sidebar.
-- Checkbox serta bulk selection di tabel Kendaraan dan Alat & Mesin dihilangkan dari UI.
-- Halaman Data ASN/PPPK mobile menggunakan scroll halaman normal sampai data terakhir.
-- Data Cleansing hanya menyarankan nama baku dari Database Pegawai dan menolak kandidat ambigu.
+## Akses dan profil
 
-## Kualitas dan keamanan
+- Pegawai dapat membuka seluruh menu operasional kecuali Kelola Akun dan Data Cleansing.
+- Mutasi profil Pegawai tetap dibatasi pada NIP miliknya dan field pengendali TMT/KGB/Pangkat/Pensiun tetap dilindungi backend.
 
-- Tidak ada SQL baru; skema V1.1.3/V1.1.4 digunakan kembali.
-- Foto aset hanya dapat diunggah manager melalui backend tervalidasi.
-- Nama relasi aset harus cocok dengan pegawai aktif.
-- Service-role Supabase dan Gemini backend tetap hanya di Script Properties.
-- TypeScript lint, seluruh test lama, test V1.1.5, dan production build lulus.
+## Aset, peta, dashboard, dan cetak
+
+- Resolver media bersama menangani URL, path legacy, Google Drive, base64, dan blob tanpa broken preview pada Kendaraan, Alat & Mesin, serta detail aset.
+- Peta memisahkan Kode Barang dari Nomor Polisi, menampilkan lokasi/koordinat, dan memperbaiki akses kontrol Basemaps mobile.
+- Legenda Distribusi Golongan dirapatkan dan jarak section Komposisi SDM dikurangi.
+- KOP cetak memakai layout tiga kolom seimbang: logo kiri, teks di area tengah, dan spacer kanan.
+
+## Data cleansing dan validasi
+
+- Pegawai tanpa aset tidak lagi diperlakukan sebagai masalah cleansing.
+- Saran koreksi relasi aset tetap bersumber dari master Pegawai aktif dan kandidat ambigu tidak diubah otomatis.
+- Ditambahkan test regresi V1.1.6 untuk feed notifikasi, tanggal Indonesia, RBAC, cleansing, peta, media, dan KOP.

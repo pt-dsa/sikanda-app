@@ -283,7 +283,7 @@ export default function PegawaiPage() {
   }
 
   return (
-    <div className="space-y-5 min-h-full pb-20 md:pb-0 md:h-full md:flex md:flex-col md:overflow-hidden">
+    <div className="space-y-5 min-h-0 pb-28 md:pb-0 md:h-full md:flex md:flex-col md:overflow-hidden touch-pan-y">
 
       {/* Page header */}
       <div className="md:shrink-0 flex flex-col md:flex-row md:justify-between md:items-start gap-4">

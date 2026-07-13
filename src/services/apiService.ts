@@ -2,6 +2,15 @@ import { callBackend } from "@/services/backendClient";
 import type { Pegawai } from "@/types";
 
 export interface UploadFotoResult { ok: true; fileId: string; url: string; viewUrl: string; }
+export interface NotificationAgendaItem {
+  nip: string; nama: string; jabatan: string; kategori: "KGB" | "PANGKAT" | "BUP";
+  kategoriLabel: string; tanggal: string; selisihHari: number;
+}
+export interface NotificationFeed {
+  ok: true; generated_at: string;
+  birthdays: Array<{ nip: string; nama: string; jabatan: string; tanggal: string; daysUntil: number }>;
+  overdue: NotificationAgendaItem[]; kgb: NotificationAgendaItem[]; pangkat: NotificationAgendaItem[]; bup: NotificationAgendaItem[];
+}
 
 // Tipe akses tetap di-re-export dari accessService agar kontrak lama tidak berubah.
 export type { WhoamiResult, AccessUser } from "./accessService";
@@ -55,6 +64,10 @@ export const apiService = {
 
   getConfig: async (): Promise<{ ok: true; config: Record<string, any> }> =>
     callBackend({ action: "get_config" }),
+
+  // Feed fakta tunggal dari Apps Script: dipakai lonceng dan diparitas dengan
+  // router database-first Tanya SIKANDA.
+  getNotificationFeed: async (): Promise<NotificationFeed> => callBackend({ action: "notification_feed" }),
 
   setConfig: async (key: string, value: string): Promise<{ ok: true }> =>
     callBackend({ action: "set_config", key, value }),

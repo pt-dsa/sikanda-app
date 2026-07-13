@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera, Crosshair, ImagePlus, LoaderCircle, MapPin, X } from "lucide-react";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { resolveAssetPhotoUrl } from "@/lib/media";
 
 interface AssetMediaFieldsProps {
   latitude: string | number | undefined;
@@ -18,12 +19,8 @@ const inputCls = "w-full px-3 py-2 rounded-xl border border-gray-300 dark:border
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-function resolveStoredPhoto(raw: string | undefined, photoLabel: string): string {
-  const value = String(raw || "").trim();
-  if (!value) return "";
-  if (/^(https?:\/\/|data:|blob:)/i.test(value)) return value;
-  const tableName = /kendaraan/i.test(photoLabel) ? "Kendaraan" : "Alat%20%26%20Mesin";
-  return `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=${tableName}&fileName=${encodeURIComponent(value)}`;
+export function resolveStoredPhoto(raw: string | undefined, photoLabel: string): string {
+  return resolveAssetPhotoUrl(raw, /kendaraan/i.test(photoLabel) ? "kendaraan" : "alat_mesin");
 }
 
 export function AssetMediaFields({
