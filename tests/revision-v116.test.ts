@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { scanPegawai } from "../src/lib/cleansing";
 import { parseAnyDate, toIndonesianDateText } from "../src/lib/utils";
+import { normalizeIndonesianPhoneNumber, whatsappChatUrl } from "../src/lib/contact";
+import { resolveVehicleItemCode } from "../src/lib/assetIdentity";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(`Gagal: ${message}`);
@@ -9,6 +11,10 @@ const read = (path: string) => fs.readFileSync(new URL(`../${path}`, import.meta
 
 assert(!!parseAnyDate("16 Juli 2026") && !!parseAnyDate("16 July 2026") && !!parseAnyDate("16/07/2026"), "Parser frontend harus menerima format Indonesia, Inggris, dan numerik");
 assert(toIndonesianDateText("1992-07-13") === "13 Juli 1992", "Tanggal ISO harus tampil sebagai format Indonesia");
+assert(normalizeIndonesianPhoneNumber("0812-3456-7890") === "6281234567890", "Nomor 08 harus otomatis menjadi 628");
+assert(whatsappChatUrl("0812 3456 7890") === "https://wa.me/6281234567890", "Tautan WhatsApp harus memakai nomor ternormalisasi");
+assert(resolveVehicleItemCode({ plate_number: "B 6912 NQA", asset_code: "B 6912 NQA", kode_barang: "1.3.02.01" }) === "1.3.02.01", "Kode barang valid harus dipilih terpisah dari nomor polisi");
+assert(resolveVehicleItemCode({ plate_number: "B 6912 NQA", asset_code: "B 6912 NQA" }) === "", "Nomor polisi tidak boleh ditampilkan sebagai kode barang");
 
 const employee: any = {
   nip: "199207132025212027", nama: "Uji Tanggal", jabatan: "Analis", golongan: "III/a", status: "ASN",
@@ -33,7 +39,7 @@ assert(shell.includes("getNotificationFeed") && !shell.includes("buildUpcomingBi
 assert(rbac.includes("pegawai: EMPLOYEE_MENUS") && rbac.includes('menu !== "laporan"'), "Pegawai harus dapat melihat menu operasional kecuali Rekap Laporan");
 assert(form.includes("IndonesianDateField") && form.includes("Contoh: 13 Juli 1992"), "Form pegawai harus memasukkan tanggal dalam format Indonesia");
 assert(map.includes('"Kode Barang": v.kode_barang') && map.includes('"No. Polisi": v.no_polisi'), "Peta harus memisahkan kode barang dan nomor polisi");
-assert(report.includes("left:42px") && report.includes("padding:0 108px"), "KOP cetak harus memiliki posisi logo dan teks yang presisi");
+assert(report.includes("letterhead-inner") && report.includes("grid-template-columns:106px 700px") && report.includes("kopHeaderText"), "KOP cetak harus mengunci logo dan teks sebagai satu kelompok presisi");
 assert(media.includes("resolveAssetPhotoUrl") && media.includes("data:|blob:"), "Resolver foto harus aman untuk URL, data URL, dan blob");
 
 console.log("revision-v116-tests: OK");

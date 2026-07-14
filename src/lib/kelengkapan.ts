@@ -100,7 +100,7 @@ export function hitungKelengkapan(
     [String(p.foto || "").trim() !== "", "Foto"],
     [String(p.email || "").trim() !== "", "Email"],
     [String(p.kontak || "").trim() !== "", "Kontak"],
-    [relasiBersih, "Nama fuzzy dgn aset"],
+    [relasiBersih, "Relasi aset perlu diselaraskan"],
   ];
 
   const missing: string[] = [];

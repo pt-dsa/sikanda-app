@@ -41,7 +41,7 @@ const backend = read("apps-script/Code.gs");
 
 assert(dashboard.includes("Sinkronisasi Data") && dashboard.includes("Terlewat") && dashboard.includes("min-h-[310px]"), "Dashboard harus memiliki sinkronisasi, istilah Terlewat, dan komposisi SDM proporsional");
 for (const option of ["Data ASN / PPPK", "Buku Penjagaan", "Data Kendaraan", "Data Alat & Mesin", "Seluruh Data"]) assert(report.includes(option), `Pilihan cetak ${option} harus tersedia`);
-assert(report.includes("position:relative") && report.includes("left:42px") && report.includes("padding:0 108px") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
+assert(report.includes("letterhead-inner") && report.includes("grid-template-columns:106px 700px") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
 assert(vehicle.includes("EmployeeAutocomplete") && vehicle.includes("AssetMediaFields") && vehicle.includes("uploadAssetFoto"), "Kendaraan harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(machine.includes("EmployeeAutocomplete") && machine.includes("AssetMediaFields") && machine.includes("uploadAssetFoto"), "Alat & Mesin harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(account.includes("Jabatan Pegawai") && account.includes("selectedEmployee?.jabatan"), "Tambah Akun harus menampilkan Jabatan Pegawai");

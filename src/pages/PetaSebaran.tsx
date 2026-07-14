@@ -135,7 +135,7 @@ export default function PetaSebaran() {
               qrUrl: v.qr_url,
               foto: v.foto,
               data: {
-                "Kode Barang": v.kode_barang || "",
+                "Kode Barang": v.kode_barang || "Belum diisi",
                 "No. Polisi": v.no_polisi,
                 "Merk": v.merk,
                 "Tipe": v.tipe,

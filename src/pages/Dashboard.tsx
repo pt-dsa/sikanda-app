@@ -9,7 +9,7 @@ import {
   Users, UserCheck, AlertTriangle, Clock, Calendar, Bell,
   
   GraduationCap, Award, Timer, ShieldCheck, ClipboardList,
-  ExternalLink, RefreshCw,
+      ExternalLink, RefreshCw, PackageCheck, PackageX,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -29,7 +29,7 @@ function KpiCard({ title, value, icon: Icon, colorClass, subtitle }: {
   title: string; value: number | string; icon: any; colorClass: string; subtitle?: string;
 }) {
   return (
-    <Card>
+    <Card className="h-full">
       <CardContent className="p-5 flex items-center gap-4">
         <div className={`p-3 rounded-2xl shrink-0 ${colorClass}`}><Icon size={22} /></div>
         <div className="min-w-0">
@@ -337,7 +337,8 @@ export default function Dashboard() {
                   Lihat Data ASN / PPPK <ExternalLink size={12} />
                 </Link>
               </div>
-              <motion.div variants={itemVars} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
+              <motion.div variants={itemVars} className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Link to="/pegawai?kelengkapan=lengkap" className="block h-full transition-transform hover:-translate-y-0.5">
                     <KpiCard
                       title="Data Lengkap"
@@ -356,10 +357,28 @@ export default function Dashboard() {
                       subtitle={`Rata-rata kelengkapan ${metrics.kelengkapanRata ?? 0}%`}
                     />
                   </Link>
-                <Card className="md:col-span-2 xl:col-span-2 h-full">
+                  <Link to="/pegawai?aset=with" className="block h-full transition-transform hover:-translate-y-0.5">
+                    <KpiCard
+                      title="Pegawai Dengan Inventaris"
+                      value={metrics.pegawaiDenganInventaris ?? 0}
+                      icon={PackageCheck}
+                      colorClass="bg-indigo-100/70 text-indigo-600"
+                      subtitle="Pegawai yang memiliki relasi kendaraan atau alat & mesin"
+                    />
+                  </Link>
+                  <Link to="/pegawai?aset=none" className="block h-full transition-transform hover:-translate-y-0.5">
+                    <KpiCard
+                      title="Pegawai Tanpa Inventaris"
+                      value={metrics.pegawaiTanpaInventaris ?? metrics.totalPegawai}
+                      icon={PackageX}
+                      colorClass="bg-slate-200/80 text-slate-600"
+                      subtitle="Pegawai yang belum memiliki relasi aset"
+                    />
+                  </Link>
+                </div>
+                <Card className="h-full">
                   <CardHeader className="pb-2">
                     <div className="flex items-center gap-2">
-                      <ClipboardList size={16} className="text-amber-500" />
                       <ClipboardList size={16} className="text-amber-500" />
                       <CardTitle className="text-sm">Kriteria yang Paling Sering Belum Terpenuhi</CardTitle>
                     </div>
@@ -370,7 +389,7 @@ export default function Dashboard() {
                         <HorizontalBarChart data={metrics.kelengkapanFieldKosong.slice(0, 6)} labelClass="w-36" />
                         <p className="text-[11px] text-gray-400 mt-3">
                           Kriteria: NIP 18 digit, Jabatan, Golongan, TMT Golongan, Tanggal Lahir, Foto, Email, Kontak,
-                          serta relasi nama pegawai ↔ aset yang bersih (tanpa temuan fuzzy).
+                          serta relasi nama pegawai ↔ aset yang sudah selaras.
                         </p>
                       </>
                     ) : (
@@ -400,11 +419,11 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent className="pb-5 min-h-[250px] flex items-center justify-center">
                   {metrics.distribusiGolongan && metrics.distribusiGolongan.length > 0 ? (
-                    <div className="w-full grid grid-cols-1 sm:grid-cols-[170px_150px] xl:grid-cols-1 2xl:grid-cols-[170px_150px] items-center justify-center gap-4">
-                      <div className="w-[170px] h-[170px] relative shrink-0 mx-auto">
+                    <div className="w-full grid grid-cols-1 sm:grid-cols-[minmax(210px,1fr)_minmax(140px,auto)] xl:grid-cols-1 2xl:grid-cols-[minmax(210px,1fr)_minmax(140px,auto)] items-center justify-center gap-5">
+                      <div className="w-[210px] h-[210px] relative shrink-0 mx-auto">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie data={metrics.distribusiGolongan} cx="50%" cy="50%" innerRadius={42} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none">
+                            <Pie data={metrics.distribusiGolongan} cx="50%" cy="50%" innerRadius={57} outerRadius={82} paddingAngle={3} dataKey="value" stroke="none">
                               {metrics.distribusiGolongan.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                             </Pie>
                             <Tooltip formatter={(v) => [`${v} orang`, ""]} />
@@ -415,7 +434,7 @@ export default function Dashboard() {
                           <span className="text-[10px] text-gray-500">Pegawai</span>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 w-full max-w-[132px] min-w-0">
+                      <div className="grid grid-cols-1 gap-2.5 w-full min-w-0">
                         {metrics.distribusiGolongan.map((item, i) => (
                           <div key={item.name} className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />

@@ -3,6 +3,8 @@ import { canEditField, visibleMenus, type AppUser } from "../src/lib/rbac";
 import { INDONESIAN_INSTITUTIONS, INDONESIAN_STUDY_PROGRAMS, mergeSuggestionOptions } from "../src/lib/educationOptions";
 import { resolveAssetPhotoCandidates } from "../src/lib/media";
 import { scanAssetNameMismatches } from "../src/lib/cleansing";
+import { normalizeIndonesianPhoneNumber } from "../src/lib/contact";
+import { resolveVehicleItemCode } from "../src/lib/assetIdentity";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(`Gagal: ${message}`);
@@ -41,6 +43,9 @@ const report = read("src/pages/Laporan.tsx");
 const vehicle = read("src/pages/Kendaraan.tsx");
 const equipment = read("src/pages/AlatMesin.tsx");
 const safeImage = read("src/components/ui/SafeImage.tsx");
+const employeePage = read("src/pages/Pegawai.tsx");
+const dashboard = read("src/pages/Dashboard.tsx");
+const capture = read("src/components/ui/ScreenCaptureTool.tsx");
 
 assert(!backend.includes("query.push('nip=eq.' + encodeURIComponent(actor.nip))") && backend.includes("ensureActorPhotoAccess_"), "Backend pegawai harus membaca seluruh data dan memulihkan izin foto privat");
 assert(backend.includes("'nama', 'foto', 'tgl_lahir'") && backend.includes("return rows") && backend.includes("file.addViewers(viewers)"), "Backend harus mengizinkan profil personal terbatas dan berbagi foto ke akun aktif");
@@ -51,6 +56,12 @@ assert(map.includes("ResizeObserver") && map.includes("markerIcons") && map.incl
 assert(shell.includes('isMapPage ? "h-full max-w-none p-0"'), "Peta harus melewati batas max-width halaman biasa");
 assert(vehicle.includes("canWriteAssets") && equipment.includes("canWriteAssets"), "Aksi CRUD aset harus disembunyikan dari role baca-saja");
 assert(safeImage.includes("fallbackSrcs") && safeImage.includes("sourceIndex"), "Image preview harus mencoba fallback sebelum menampilkan status gagal");
-assert(report.includes("left:42px") && report.includes("padding:0 108px") && !report.includes("letterhead-spacer"), "Logo KOP harus diposisikan presisi tanpa spacer yang menggeser");
+assert(report.includes("letterhead-inner") && report.includes("column-gap:0") && report.includes("letterhead-text") && report.includes("imagesReady") && !report.includes("left:42px"), "Logo dan judul KOP harus menjadi satu kelompok yang ditunggu hingga siap sebelum print");
+assert(normalizeIndonesianPhoneNumber("081234567890") === "6281234567890", "Kontak harus dinormalisasi ke 628");
+assert(resolveVehicleItemCode({ no_polisi: "B 1 ABC", asset_code: "B 1 ABC" }) === "", "Kode kendaraan yang menduplikasi pelat harus ditolak");
+assert(employeePage.includes("Perlu Penyelarasan") && !employeePage.includes("Aset Fuzzy Match"), "Istilah fuzzy card harus diganti");
+assert(employeePage.includes("WhatsAppButton") && employeePage.includes('user?.role === "admin"') && employeePage.includes("ScreenCaptureTool"), "Admin/Pimpinan harus memiliki WhatsApp dan Administrator memiliki capture layar");
+assert(capture.includes("getDisplayMedia") && capture.includes("ClipboardItem") && capture.includes("navigator.share"), "Capture harus mendukung pilih area, salin, simpan, dan bagikan");
+assert(dashboard.includes("Pegawai Dengan Inventaris") && dashboard.includes("Pegawai Tanpa Inventaris") && dashboard.includes("outerRadius={82}"), "Dashboard harus mengisi ruang card dan memperbesar grafik golongan");
 
 console.log("revision-v116-final-tests: OK");

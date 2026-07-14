@@ -7,7 +7,7 @@ import { can, canEditPegawaiRow } from "@/lib/rbac";
 import { Pegawai } from "@/types";
 import { Card, CardContent } from "@/components/ui/Card";
 import {
-  Search, Info, Briefcase, UserCircle, Calendar, AlertTriangle,
+  Search, Info, Briefcase, UserCircle, Calendar, AlertTriangle, Camera,
   Package, ZoomIn, ImageOff, Phone, GraduationCap, Clock,
   CheckCircle2, CircleDot, Car, Wrench, Archive, ChevronDown, RefreshCw, Plus, Edit2, X, Save, Trash2,
   Download,
@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/PegawaiDetailModal";
 import { AssetDetailModal } from "@/components/ui/AssetDetailModal";
 import { employmentStatusLabel, matchesEmploymentStatus } from "@/lib/employmentStatus";
+import { whatsappChatUrl } from "@/lib/contact";
+import { ScreenCaptureTool } from "@/components/ui/ScreenCaptureTool";
 
 // ---------------------------------------------------------------------------
 // Badge Kelengkapan Data (Core Value) — 9 kriteria via @/lib/kelengkapan.
@@ -57,6 +59,37 @@ function KelengkapanBadge({ hasil, size = "sm" }: { hasil: KelengkapanResult; si
   );
 }
 
+function WhatsAppIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path fill="currentColor" d="M12 2a9.72 9.72 0 0 0-8.42 14.58L2 22l5.58-1.46A9.93 9.93 0 1 0 12 2Zm0 17.92a8.1 8.1 0 0 1-4.13-1.13l-.3-.18-3.31.87.89-3.22-.2-.32A8.02 8.02 0 1 1 12 19.92Zm4.44-6.07c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.54.12-.16.24-.62.79-.76.95-.14.16-.28.18-.52.06-.24-.12-1.02-.37-1.94-1.2-.72-.64-1.2-1.43-1.34-1.67-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.47-.4-.4-.54-.41h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.69 2.58 4.1 3.62.57.25 1.02.39 1.37.5.58.18 1.1.16 1.51.1.46-.07 1.44-.59 1.64-1.16.2-.57.2-1.06.14-1.16-.06-.1-.22-.16-.46-.28Z" />
+    </svg>
+  );
+}
+
+function WhatsAppButton({ pegawai, compact = false }: { pegawai: Pegawai; compact?: boolean }) {
+  const url = whatsappChatUrl(pegawai.kontak);
+  return (
+    <button
+      type="button"
+      disabled={!url}
+      title={url ? `Hubungi ${pegawai.nama} via WhatsApp` : "Nomor WhatsApp belum tersedia atau belum valid"}
+      aria-label={url ? `Hubungi ${pegawai.nama} via WhatsApp` : `WhatsApp ${pegawai.nama} tidak tersedia`}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+      }}
+      className={`${compact ? "p-1.5" : "p-2"} inline-flex items-center justify-center rounded-full border transition-colors ${
+        url
+          ? "border-green-200 bg-green-50 text-green-600 hover:bg-green-100 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400"
+          : "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600"
+      }`}
+    >
+      <WhatsAppIcon size={compact ? 16 : 18} />
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
@@ -72,6 +105,7 @@ export default function PegawaiPage() {
   const [filterGolongan, setFilterGolongan] = useState("all");
   const [filterBidang, setFilterBidang] = useState("all");
   const [filterMatch, setFilterMatch] = useState<"all" | "exact" | "fuzzy" | "none">("all");
+  const [filterAssetPresence, setFilterAssetPresence] = useState<"all" | "with" | "none">("all");
   const [filterIncomplete, setFilterIncomplete] = useState(false);
   // PENGUATAN KEPEGAWAIAN: filter berdasar kelengkapan 9 kriteria (core value).
   const [filterKelengkapan, setFilterKelengkapan] = useState<"all" | "lengkap" | "belum">("all");
@@ -82,6 +116,7 @@ export default function PegawaiPage() {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingPegawai, setEditingPegawai] = useState<Pegawai | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+  const [captureOpen, setCaptureOpen] = useState(false);
   // NIP yang punya temuan fuzzy Levenshtein nama ↔ holder_name aset
   // (kriteria ke-9 kelengkapan: relasi nama aset harus bersih).
   const [fuzzyNipSet, setFuzzyNipSet] = useState<Set<string>>(new Set());
@@ -161,6 +196,8 @@ export default function PegawaiPage() {
     if (["ASN", "PPPK_PENUH_WAKTU", "PPPK_PARUH_WAKTU", "PENSIUN"].includes(s)) setFilterStatus(s);
     const m = (searchParams.get("match") || "").toLowerCase();
     if (m === "exact" || m === "fuzzy" || m === "none") setFilterMatch(m as any);
+    const asset = (searchParams.get("aset") || "").toLowerCase();
+    if (asset === "with" || asset === "none") setFilterAssetPresence(asset);
     // Deep-link KPI Kelengkapan Dashboard → /pegawai?kelengkapan=lengkap|belum
     const k = (searchParams.get("kelengkapan") || "").toLowerCase();
     if (k === "lengkap" || k === "belum") setFilterKelengkapan(k as any);
@@ -200,6 +237,8 @@ export default function PegawaiPage() {
         (p.golongan || "").split("/")[0].trim() === filterGolongan;
 
       const matchMatch = filterMatch === "all" || p.match_quality === filterMatch;
+      const assetCount = p.assets?.length || 0;
+      const matchAssetPresence = filterAssetPresence === "all" || (filterAssetPresence === "with" ? assetCount > 0 : assetCount === 0);
 
       const matchIncomplete = filterIncomplete ? p.is_incomplete : true;
 
@@ -209,9 +248,9 @@ export default function PegawaiPage() {
         filterKelengkapan === "all" ||
         (filterKelengkapan === "lengkap") === hitungKelengkapan(p, fuzzyNipSet).lengkap;
 
-      return matchSearch && matchStatus && matchBidang && matchGolongan && matchMatch && matchIncomplete && matchKelengkapan;
+      return matchSearch && matchStatus && matchBidang && matchGolongan && matchMatch && matchAssetPresence && matchIncomplete && matchKelengkapan;
     }).sort((a, b) => (a.nama || "").localeCompare(b.nama || ""));
-  }, [data, searchTerm, filterStatus, filterBidang, filterGolongan, filterMatch, filterIncomplete, filterKelengkapan, fuzzyNipSet]);
+  }, [data, searchTerm, filterStatus, filterBidang, filterGolongan, filterMatch, filterAssetPresence, filterIncomplete, filterKelengkapan, fuzzyNipSet]);
 
   // Ringkasan kelengkapan (untuk kartu kecil di banner): dihitung dari SEMUA
   // data (bukan hasil filter). hitungKelengkapan murah (9 cek string per
@@ -335,6 +374,17 @@ export default function PegawaiPage() {
               className="w-full pl-9 pr-4 py-2 text-sm bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          {user?.role === "admin" && (
+            <button
+              type="button"
+              onClick={() => setCaptureOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-sky-50 text-sky-700 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors shrink-0 shadow-sm dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800"
+              title="Capture bagian layar untuk dikirim kepada pegawai"
+            >
+              <Camera size={15} />
+              Capture Layar
+            </button>
+          )}
           <button
             onClick={handleExportCSV}
             className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0 shadow-sm"
@@ -371,7 +421,7 @@ export default function PegawaiPage() {
         {[
           { key: "all" as const, label: "Total Pegawai", val: data.length, color: "text-gray-800 dark:text-gray-200", bg: "bg-gray-100 dark:bg-gray-800" },
           { key: "exact" as const, label: "Aset Terverifikasi", val: matchStats.exact, color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" },
-          { key: "fuzzy" as const, label: "Aset Fuzzy Match", val: matchStats.fuzzy, color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20" },
+          { key: "fuzzy" as const, label: "Perlu Penyelarasan", val: matchStats.fuzzy, color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20" },
           { key: "none" as const, label: "Tanpa Aset", val: matchStats.none, color: "text-gray-500", bg: "bg-gray-50 dark:bg-gray-800/30" },
         ].map((s) => {
           const active = filterMatch === s.key;
@@ -384,7 +434,7 @@ export default function PegawaiPage() {
                 active ? "border-blue-500 ring-2 ring-blue-500/40" : "border-white/40 dark:border-white/5"
               }`}
             >
-              <p className="text-xs text-gray-500 dark:text-gray-400">{s.label}</p>
+              <p className="text-xs font-bold text-gray-600 dark:text-gray-300">{s.label}</p>
               <p className={`text-xl font-bold ${s.color}`}>{s.val}</p>
             </button>
           );
@@ -405,6 +455,16 @@ export default function PegawaiPage() {
             <option value="PPPK_PARUH_WAKTU">PPPK (Paruh Waktu)</option>
             <option value="PENSIUN">PENSIUN</option>
             <option value="">Status Kosong</option>
+          </select>
+          <select
+            value={filterAssetPresence}
+            onChange={(e) => setFilterAssetPresence(e.target.value as "all" | "with" | "none")}
+            className="rounded-full neuglass-pressed text-gray-900 dark:text-gray-100 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            title="Filter kepemilikan inventaris/aset"
+          >
+            <option value="all">Inventaris: Semua</option>
+            <option value="with">Dengan Inventaris</option>
+            <option value="none">Tanpa Inventaris</option>
           </select>
           <select value={filterBidang} onChange={(e) => setFilterBidang(e.target.value)} className="rounded-full neuglass-pressed text-gray-900 dark:text-gray-100 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none max-w-[230px]">
             <option value="all">Semua Bidang</option><option value="__empty__">(Tanpa Bidang)</option>
@@ -441,9 +501,9 @@ export default function PegawaiPage() {
             <AlertTriangle size={14} />
             Data Tidak Lengkap
           </button>
-          {(filterStatus !== "all" || filterBidang !== "all" || filterGolongan !== "all" || filterMatch !== "all" || filterIncomplete || filterKelengkapan !== "all" || searchTerm) && (
+          {(filterStatus !== "all" || filterBidang !== "all" || filterGolongan !== "all" || filterMatch !== "all" || filterAssetPresence !== "all" || filterIncomplete || filterKelengkapan !== "all" || searchTerm) && (
             <button
-              onClick={() => { setFilterStatus("all"); setFilterBidang("all"); setFilterGolongan("all"); setFilterMatch("all"); setFilterIncomplete(false); setFilterKelengkapan("all"); setSearchTerm(""); }}
+              onClick={() => { setFilterStatus("all"); setFilterBidang("all"); setFilterGolongan("all"); setFilterMatch("all"); setFilterAssetPresence("all"); setFilterIncomplete(false); setFilterKelengkapan("all"); setSearchTerm(""); }}
               className="text-sm px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
             >
               Reset Filter
@@ -468,6 +528,7 @@ export default function PegawaiPage() {
                 <th className="p-4 font-bold">Status</th>
                 <th className="p-4 font-bold">KGB Berikutnya</th>
                 <th className="p-4 font-bold">Aset</th>
+                {can(user?.role, "pegawai.edit.any") && <th className="p-4 font-bold text-center">WhatsApp</th>}
                 <th className="p-4 font-bold">Kelengkapan</th>
               </tr>
             </thead>
@@ -547,6 +608,11 @@ export default function PegawaiPage() {
                       <span className="text-xs text-gray-400">-</span>
                     )}
                   </td>
+                  {can(user?.role, "pegawai.edit.any") && (
+                    <td className="p-4 text-center">
+                      <WhatsAppButton pegawai={pegawai} compact />
+                    </td>
+                  )}
                   <td className="p-4">
                     <KelengkapanBadge hasil={hitungKelengkapan(pegawai, fuzzyNipSet)} />
                   </td>
@@ -630,6 +696,11 @@ export default function PegawaiPage() {
                       <MatchBadge quality={pegawai.match_quality} />
                     </div>
                   )}
+                  {can(user?.role, "pegawai.edit.any") && (
+                    <div className="pt-1">
+                      <WhatsAppButton pegawai={pegawai} compact />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -693,6 +764,7 @@ export default function PegawaiPage() {
         )}
       </AnimatePresence>
       <ConfirmModal state={confirmState} onClose={() => setConfirmState(CONFIRM_CLOSED)} />
+      <ScreenCaptureTool open={captureOpen} onClose={() => setCaptureOpen(false)} />
     </div>
   );
 }

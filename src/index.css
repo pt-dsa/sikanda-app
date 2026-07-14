@@ -13,6 +13,10 @@
 }
 
 @layer base {
+  .sikanda-capture-active .capture-ui {
+    display: none !important;
+  }
+
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -63,4 +67,3 @@
       inset -6px -6px 10px rgba(255, 255, 255, 0.03);
   }
 }
-

@@ -6,7 +6,7 @@
  * - Every request must carry a valid Firebase ID token.
  * - Authorization is enforced here, never trusted from the frontend.
  * - Supabase service role is stored only in Script Properties.
- * - Employees can read/update only their own profile and linked assets.
+ * - Employees read all active operational data but can update only approved fields on their own profile.
  * - Admin and Pimpinan have the same management authority.
  * - Generic database mutation endpoints are intentionally disabled.
  **************************************************************************************************/
@@ -413,6 +413,9 @@ function selectForActor_(actor, table, filters) {
   var query = ['select=*', 'limit=5000'].concat(filterQuery_(table, filters));
   var rows = supaGet_(table + '?' + query.join('&'));
   rows = rows.filter(function (row) { return isActive_(row.is_active); });
+  if (table === 'pegawai') {
+    rows.forEach(function (row) { row.kontak = normalizeIndonesianPhone_(row.kontak); });
+  }
 
   // Seluruh role aktif membaca sumber data operasional yang sama. Otorisasi
   // tulis tetap berada pada endpoint mutasi di bawah dan tidak berubah.
@@ -540,6 +543,10 @@ function savePegawai_(actor, data, isNew) {
 
   var allowed = isManager_(actor) ? PEGAWAI_FIELDS : EMPLOYEE_EDITABLE_FIELDS;
   normalizePegawaiDates_(data, allowed);
+  if (Object.prototype.hasOwnProperty.call(data, 'kontak')) {
+    data.kontak = normalizeIndonesianPhone_(data.kontak);
+    if (data.kontak && !/^628\d{7,12}$/.test(data.kontak)) throw publicError_('Nomor kontak tidak valid. Gunakan nomor seluler Indonesia.');
+  }
   var cleanInput = {};
   for (var i = 0; i < allowed.length; i++) {
     if (Object.prototype.hasOwnProperty.call(data, allowed[i])) cleanInput[allowed[i]] = data[allowed[i]];
@@ -562,6 +569,28 @@ function savePegawai_(actor, data, isNew) {
   }
   auditLog_(actor, isNew ? 'pegawai.create' : 'pegawai.update', 'pegawai', nip, { fields: Object.keys(payload) });
   return { ok: true, mode: isNew ? 'create' : 'update', nip: nip };
+}
+
+function normalizeIndonesianPhone_(value) {
+  var raw = String(value == null ? '' : value).trim();
+  if (!raw) return '';
+  var digits = raw.replace(/\D/g, '');
+  if (digits.indexOf('08') === 0) return '62' + digits.substring(1);
+  if (digits.indexOf('8') === 0) return '62' + digits;
+  return digits;
+}
+
+function safeVehicleItemCode_(row) {
+  row = row || {};
+  var plate = String(row.plate_number || row.no_polisi || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  var candidates = [row.kode_barang, row.item_code, row.goods_code, row.asset_code];
+  for (var i = 0; i < candidates.length; i++) {
+    var value = String(candidates[i] || '').trim();
+    if (!value) continue;
+    if (plate && value.toUpperCase().replace(/[^A-Z0-9]/g, '') === plate) continue;
+    return value;
+  }
+  return '';
 }
 
 /** Menjaga kontrak tanggal input: Indonesia/Inggris/ISO diterima, lalu
@@ -1046,7 +1075,7 @@ function buildAiContext_(actor, question) {
       tgl_lahir: p.tgl_lahir || p.tanggal_lahir,
       tmt_golongan: p.tgl_mulai_golongan || p.terhitung_mulai_tanggal_golongan,
       tmt_jabatan: p.tgl_mulai_jabatan || p.terhitung_mulai_tanggal_jabatan,
-      pendidikan: p.tingkat, kontak: p.kontak, email: p.email
+      pendidikan: p.tingkat, kontak: normalizeIndonesianPhone_(p.kontak), email: p.email
     }));
   }
   lines.push('\nKENDARAAN:');
@@ -1060,7 +1089,7 @@ function compactAsset_(row, type) {
   return {
     id: row.asset_id || row.id,
     nama: row.asset_name || row.nama_aset || row.asset_category || row.jenis,
-    kode: row.asset_code || row.kode_barang,
+    kode: type === 'vehicle' ? safeVehicleItemCode_(row) : (row.asset_code || row.kode_barang),
     nomor_polisi: type === 'vehicle' ? (row.plate_number || row.no_polisi) : undefined,
     merk: row.brand || row.merk,
     pengguna: row.holder_name || row.pengguna,

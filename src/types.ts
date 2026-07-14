@@ -179,6 +179,8 @@ export interface DashboardMetrics {
   kelengkapanBelum?: number;                // pegawai belum lengkap
   kelengkapanRata?: number;                 // rata-rata persen kelengkapan
   kelengkapanFieldKosong?: DistribusiItem[]; // kriteria paling sering kosong
+  pegawaiDenganInventaris?: number;         // inventaris = seluruh relasi aset aktif
+  pegawaiTanpaInventaris?: number;
 
   // HR — Composition charts
   distribusiGolongan: DistribusiItem[];

@@ -13,6 +13,7 @@ import {
   mergeSuggestionOptions,
 } from "@/lib/educationOptions";
 import { useToast } from "@/components/ui/Toast";
+import { isValidWhatsAppNumber, normalizeIndonesianPhoneNumber } from "@/lib/contact";
 
 const DATE_FIELDS: (keyof Pegawai)[] = ["tgl_lahir", "tgl_mulai_golongan", "tgl_mulai_jabatan"];
 
@@ -51,6 +52,9 @@ interface FieldProps {
   colSpan?: boolean;
   value: string;
   onChange: (e: any) => void;
+  onBlur?: () => void;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  helperText?: string;
   locked: boolean;
   [key: string]: any;
 }
@@ -64,6 +68,9 @@ const Field = React.memo(function Field({
   colSpan = false,
   value,
   onChange,
+  onBlur,
+  inputMode,
+  helperText,
   locked,
 }: FieldProps) {
   return (
@@ -78,10 +85,13 @@ const Field = React.memo(function Field({
         required={required}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
+        inputMode={inputMode}
         readOnly={locked}
         placeholder={placeholder}
         className={inputCls}
       />
+      {helperText && <p className="mt-1 text-[10px] text-gray-400">{helperText}</p>}
     </div>
   );
 });
@@ -265,10 +275,16 @@ export function PegawaiFormModal({
       setErrorMsg(`Tahun Lulus harus berupa 4 digit antara 1900 dan ${new Date().getFullYear()}.`);
       return;
     }
+    const rawContact = String(formData.kontak || "").trim();
+    if (rawContact && !isValidWhatsAppNumber(rawContact)) {
+      setErrorMsg("Nomor kontak belum valid. Gunakan nomor seluler Indonesia, contoh 081234567890 atau 6281234567890.");
+      return;
+    }
 
     setIsSaving(true);
     try {
       const payload: Partial<Pegawai> = { ...formData };
+      payload.kontak = normalizeIndonesianPhoneNumber(payload.kontak);
       DATE_FIELDS.forEach((field) => {
         const normalized = toIndonesianDateText((payload as any)[field]);
         if ((payload as any)[field] && !normalized) throw new Error(`Format ${field.replaceAll("_", " ")} tidak valid.`);
@@ -478,8 +494,10 @@ export function PegawaiFormModal({
               value={V("tahun_diklat")} onChange={handleChange} locked={L("tahun_diklat")} />
 
             <SectionTitle>Kontak</SectionTitle>
-            <Field label="Kontak (No. HP)" name="kontak" placeholder="08xxxxxxxxxx"
-              value={V("kontak")} onChange={handleChange} locked={L("kontak")} />
+            <Field label="Kontak / WhatsApp" name="kontak" placeholder="08xxxxxxxxxx atau 628xxxxxxxxxx"
+              value={V("kontak")} onChange={handleChange} locked={L("kontak")} inputMode="tel"
+              onBlur={() => setFormData((prev) => ({ ...prev, kontak: normalizeIndonesianPhoneNumber(prev.kontak) }))}
+              helperText="Format 08... otomatis dikonversi dan disimpan sebagai 628...." />
             <Field label="Email (untuk notifikasi)" name="email" type="email" placeholder="nama@email.go.id"
               value={V("email")} onChange={handleChange} locked={L("email")} />
 

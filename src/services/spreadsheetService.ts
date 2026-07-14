@@ -4,6 +4,8 @@ import { buildUnifiedAssets, buildFuzzyNipSet, rekapKelengkapan } from "@/lib/ke
 import type { DashboardMetrics, DistribusiItem } from "@/types";
 import { backendSelect } from "@/services/backendClient";
 import { apiService } from "@/services/apiService";
+import { normalizeIndonesianPhoneNumber } from "@/lib/contact";
+import { resolveVehicleItemCode } from "@/lib/assetIdentity";
 
 const CACHE_EXPIRY = 30 * 1000;
 const DEFERRED_V2 = new Set(["assets_inventory", "vehicle_budget", "vehicle_maintenance", "equipment_maintenance", "maintenance", "loans"]);
@@ -309,7 +311,7 @@ export const spreadsheetService = {
         foto = "Kendaraan_Images/B 6924 NQA..jpg";
       return {
         asset_id: item.asset_id,
-        kode_barang: item.asset_code || item.kode_barang || "",
+        kode_barang: resolveVehicleItemCode(item),
         nama_aset: item.asset_name || item.nama_aset || item.asset_category || "Kendaraan Dinas",
         no_polisi,
         merk: item.brand || item.merk || "",
@@ -473,7 +475,7 @@ export const spreadsheetService = {
           riwayat_diklat: String(item.riwayat_diklat || "").trim(),
           tahun_diklat: String(item.tahun_diklat || "").trim(),
           usia: String(item.usia || "").trim(),
-          kontak: String(item.kontak || "").trim(),
+          kontak: normalizeIndonesianPhoneNumber(item.kontak),
           email: String(item.email || "").trim(),
           keterangan: String(item.keterangan || "").trim(),
           catatan_mutasi_masuk: String(item.catatan_mutasi_masuk || "").trim(),
@@ -560,6 +562,7 @@ export const spreadsheetService = {
     const unifiedAssets = buildUnifiedAssets(vehicles, equipment);
     const fuzzyNipSet = buildFuzzyNipSet(pegawai as any[], unifiedAssets);
     const kelengkapan = rekapKelengkapan(pegawai as any[], fuzzyNipSet);
+    const pegawaiDenganInventaris = pegawai.filter((p: any) => Array.isArray(p.assets) && p.assets.length > 0).length;
 
     const eventsAll = buildPenjagaanEvents(pegawai);
     const isUpcomingLe12 = (e: any) => !e.isOverdue && e.selisihHari <= 365;
@@ -584,6 +587,8 @@ export const spreadsheetService = {
       kelengkapanBelum: kelengkapan.belum,
       kelengkapanRata: kelengkapan.rataRata,
       kelengkapanFieldKosong: kelengkapan.fieldKosong,
+      pegawaiDenganInventaris,
+      pegawaiTanpaInventaris: Math.max(0, pegawai.length - pegawaiDenganInventaris),
       distribusiGolongan: buildGolonganDistribusi(pegawai),
       distribusiPendidikan: buildPendidikanDistribusi(pegawai),
       distribusiMasaKerja: buildMasaKerjaDistribusi(pegawai),

@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { buildPenjagaanEvents, type PenjagaanEvent } from "@/lib/penjagaan";
 import type { Equipment, Pegawai, Vehicle } from "@/types";
 import logoKota from "@/assets/logo_kop_dcktr.png";
+import kopHeaderText from "@/assets/kop_header_text.svg";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
 import {
   filterAgendaReport,
@@ -138,7 +139,7 @@ function filterSlug(filter: Record<string, string>): string {
 }
 
 function letterheadHtml(): string {
-  return `<div class="letterhead"><img src="${escapeHtml(logoKota)}" alt="Logo Kota Tangerang Selatan"><div class="letterhead-copy"><div class="gov">PEMERINTAH KOTA TANGERANG SELATAN</div><div class="agency">DINAS CIPTA KARYA DAN TATA RUANG</div><div class="office">Kawasan Perkantoran Lengkong Wetan</div><div>Jl. Promoter No. 3, Kelurahan Lengkong Wetan, Kecamatan Serpong, Kota Tangerang Selatan 15322</div><div>Telp/Fax: (021) 75685907 · E-mail: dcktr.tangsel@gmail.com</div></div></div><div class="letterhead-lines"><span></span><span></span></div>`;
+  return `<div class="letterhead"><div class="letterhead-inner"><img class="letterhead-logo" src="${escapeHtml(logoKota)}" alt="Logo Kota Tangerang Selatan"><img class="letterhead-text" src="${escapeHtml(kopHeaderText)}" alt="Pemerintah Kota Tangerang Selatan, Dinas Cipta Karya dan Tata Ruang"></div></div><div class="letterhead-lines"><span></span><span></span></div>`;
 }
 
 function reportHeadingHtml(): string {
@@ -224,7 +225,7 @@ export default function Laporan() {
     if (scope === "vehicle" || scope === "all") sections.push(rowsToPrintTable("Data Kendaraan", vehiclePrintRows(filteredVehicles), filterDescription(vehicleFilter as unknown as Record<string, string>)));
     if (scope === "equipment" || scope === "all") sections.push(rowsToPrintTable("Data Alat & Mesin", equipmentPrintRows(filteredEquipment), filterDescription(equipmentFilter as unknown as Record<string, string>)));
     const content = `<!doctype html><html><head><meta charset="utf-8"><title>Rekap SIKANDA</title><style>
-      @page{size:A4 landscape;margin:9mm 8mm 10mm}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:8.2px;line-height:1.25}p{color:#334155;margin:4px 0 7px}section{break-before:page;page-break-before:always;width:100%}section:first-of-type{break-before:auto;page-break-before:auto}h2{font-size:13px;margin:10px 0 3px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tfoot{display:table-footer-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:0.7px solid #64748b;padding:3.5px 4px;text-align:left;vertical-align:top;word-break:normal;overflow-wrap:anywhere;white-space:normal}th{background:#dfeaf7;text-transform:none;font-weight:800;text-align:center;vertical-align:middle}tbody tr:nth-child(even){background:#f8fafc}td:first-child{white-space:nowrap}table[data-columns="12"]{font-size:7.4px}table[data-columns="11"]{font-size:7.7px}.letterhead{position:relative;display:flex;align-items:center;justify-content:center;min-height:68px;padding:0 108px}.letterhead img{position:absolute;left:42px;top:50%;transform:translateY(-50%);width:62px;height:62px;object-fit:contain;display:block}.letterhead-copy{width:100%;text-align:center;line-height:1.16}.letterhead-copy .gov{font-size:15px;font-weight:900;letter-spacing:.1px}.letterhead-copy .agency{font-size:14px;font-weight:900;letter-spacing:.1px}.letterhead-copy .office{font-size:8.8px;font-weight:800;margin-top:2px}.letterhead-lines{margin:3px 0 8px}.letterhead-lines span{display:block;border-top:2.4px solid #000;margin-top:2px}.letterhead-lines span+span{border-top-width:.8px}.report-title{font-size:15px;font-weight:900;margin:7px 0 1px}.meta{font-size:8px;color:#475569;margin-bottom:7px}.filter{padding:4px 6px;background:#f1f5f9;border-left:3px solid #2563eb}
+      @page{size:A4 landscape;margin:9mm 8mm 10mm}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:8.2px;line-height:1.25}p{color:#334155;margin:4px 0 7px}section{break-before:page;page-break-before:always;width:100%}section:first-of-type{break-before:auto;page-break-before:auto}h2{font-size:13px;margin:10px 0 3px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tfoot{display:table-footer-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:0.7px solid #64748b;padding:3.5px 4px;text-align:left;vertical-align:top;word-break:normal;overflow-wrap:anywhere;white-space:normal}th{background:#dfeaf7;text-transform:none;font-weight:800;text-align:center;vertical-align:middle}tbody tr:nth-child(even){background:#f8fafc}td:first-child{white-space:nowrap}table[data-columns="12"]{font-size:7.4px}table[data-columns="11"]{font-size:7.7px}.letterhead{display:flex;align-items:center;justify-content:center;min-height:106px;width:100%}.letterhead-inner{display:grid;grid-template-columns:106px 700px;align-items:center;justify-content:center;column-gap:0;width:min(100%,806px);margin:0 auto}.letterhead-logo{width:106px;height:106px;object-fit:contain;display:block}.letterhead-text{width:700px;height:auto;object-fit:contain;display:block}.letterhead-lines{margin:3px 0 8px}.letterhead-lines span{display:block;border-top:2.4px solid #000;margin-top:2px}.letterhead-lines span+span{border-top-width:.8px}.report-title{font-size:15px;font-weight:900;margin:7px 0 1px}.meta{font-size:8px;color:#475569;margin-bottom:7px}.filter{padding:4px 6px;background:#f1f5f9;border-left:3px solid #2563eb}
     </style></head><body>
       ${sections.join("")}
     </body></html>`;
@@ -244,7 +245,19 @@ export default function Laporan() {
         toast.error("Cetak Gagal", "Dokumen cetak belum dapat dibuka. Silakan coba kembali.");
         return;
       }
-      window.setTimeout(() => { target.focus(); target.print(); }, 250);
+      const images = Array.from(frame.contentDocument?.images || []);
+      const imagesReady = Promise.all(images.map((image) => {
+        if (image.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          image.addEventListener("load", () => resolve(), { once: true });
+          image.addEventListener("error", () => resolve(), { once: true });
+        });
+      }));
+      const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 3_000));
+      void Promise.race([imagesReady, timeout]).then(() => {
+        target.focus();
+        target.print();
+      });
       window.setTimeout(() => frame.remove(), 60_000);
     };
     frame.srcdoc = content;

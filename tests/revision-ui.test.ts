@@ -12,6 +12,7 @@ const form = read("src/components/ui/PegawaiFormModal.tsx");
 const accounts = read("src/pages/KelolaAkun.tsx");
 const equipment = read("src/pages/AlatMesin.tsx");
 const report = read("src/pages/Laporan.tsx");
+const kopHeader = read("src/assets/kop_header_text.svg");
 const migration = read("supabase/003_sikanda_v1_1_3_revision.sql");
 
 assert(shell.includes("openOwnProfile") && shell.includes("PegawaiFormModal") && !shell.includes("Edit Profile clicked"), "Edit Profile harus membuka profil akun login");
@@ -22,7 +23,7 @@ assert(accounts.includes("Status Pegawai") && accounts.includes("employmentStatu
 for (const field of ["kode_barang", "lokasi", "latitude", "longitude", "harga_pembelian", "foto", "qr_url"]) {
   assert(equipment.includes(field), `Form Alat & Mesin harus memuat ${field}`);
 }
-assert(report.includes("PEMERINTAH KOTA TANGERANG SELATAN") && report.includes("letterhead-lines") && report.includes("logoKota"), "Cetak Halaman harus memuat kop resmi");
+assert(kopHeader.includes("PEMERINTAH KOTA TANGERANG SELATAN") && report.includes("letterhead-lines") && report.includes("logoKota") && report.includes("kopHeaderText"), "Cetak Halaman harus memuat kop resmi");
 assert(migration.includes("kategori_pppk = 'penuh_waktu'") && migration.includes("assets_equipment"), "Migrasi harus menormalkan PPPK dan melengkapi Alat & Mesin");
 
 console.log("revision-ui-tests: OK");

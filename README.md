@@ -8,7 +8,7 @@ Mulai implementasi dari:
 
 PENTING: agar perubahan tampilan muncul, upload/import/replace seluruh source frontend V1.1.6 ke Google AI Studio, klik Apply changes dan Publish, atau push seluruh source ke GitHub. Mengubah secret saja tidak mengubah kode aplikasi.
 
-Upgrade dari V1.1.5 ke V1.1.6 tidak memerlukan SQL baru. Ganti seluruh backend Apps Script, buat deployment version baru, lalu upload/replace frontend V1.1.6 dan publish/deploy ulang.
+Upgrade final dari V1.1.5 ke V1.1.6 memakai satu migrasi data idempoten: `supabase/004_sikanda_v1_1_6_contact_normalization.sql`. Migrasi ini tidak mengubah struktur tabel; hanya menormalkan kontak `08...` menjadi `628...`. Setelah itu ganti backend Apps Script, buat deployment version baru, lalu upload/replace frontend V1.1.6 dan publish/deploy ulang.
 
 Pemeriksaan lokal:
 

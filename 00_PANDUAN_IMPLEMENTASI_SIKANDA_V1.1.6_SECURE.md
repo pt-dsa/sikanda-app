@@ -4,7 +4,7 @@ Paket ini adalah upgrade dari V1.1.5 Secure. Gunakan seluruh source dari paket y
 
 ## Perubahan arsitektur V1.1.6
 
-- Tidak ada SQL/migrasi baru. Struktur database V1.1.5 tetap digunakan.
+- Tidak ada perubahan struktur database. Ada migrasi data idempoten `supabase/004_sikanda_v1_1_6_contact_normalization.sql` untuk mengubah kontak eksisting `08...` menjadi `628...`.
 - `apps-script/Code.gs` menambahkan feed fakta `notification_feed`. Feed ini menjadi sumber tunggal lonceng notifikasi dan fakta Tanya SIKANDA.
 - Browser tidak mengakses Supabase service role. Service role dan Gemini key tetap hanya berada di Script Properties Apps Script.
 - Foto aset tetap disimpan di Google Drive melalui backend.
@@ -12,12 +12,13 @@ Paket ini adalah upgrade dari V1.1.5 Secure. Gunakan seluruh source dari paket y
 ## Urutan implementasi wajib
 
 1. Backup project Google AI Studio, Apps Script, dan branch GitHub aktif.
-2. Buka `apps-script/Code.gs`, ganti seluruh isinya dengan file `apps-script/Code.gs` dari ZIP ini, lalu Save.
-3. Di Apps Script buka **Deploy → Manage deployments → Edit**, pilih **New version**, lalu Deploy. Jangan hanya menekan Save.
-4. Pastikan URL Web App tetap berakhiran `/exec`. Perbarui `VITE_APPS_SCRIPT_URL` hanya jika URL berubah.
-5. **Upload/import file ZIP `SIKANDA_v1.1.6_SECURE_AI_STUDIO_FINAL.zip` ke Google AI Studio**, atau replace seluruh source dengan isi ZIP. Ini wajib agar revisi frontend benar-benar aktif.
-6. Di AI Studio klik **Apply changes**, buka Preview, jalankan checklist, kemudian **Publish**.
-7. Push source yang sama ke GitHub. Jangan commit `node_modules`, `dist`, `.test-dist`, atau file `.env`.
+2. Jalankan `supabase/004_sikanda_v1_1_6_contact_normalization.sql` sebagai satu blok di SQL Editor, lalu pastikan tidak ada kontak valid yang masih diawali `08`.
+3. Buka `apps-script/Code.gs`, ganti seluruh isinya dengan file `apps-script/Code.gs` dari ZIP ini, lalu Save.
+4. Di Apps Script buka **Deploy → Manage deployments → Edit**, pilih **New version**, lalu Deploy. Jangan hanya menekan Save.
+5. Pastikan URL Web App tetap berakhiran `/exec`. Perbarui `VITE_APPS_SCRIPT_URL` hanya jika URL berubah.
+6. **Upload/import file ZIP `SIKANDA_v1.1.6_SECURE_AI_STUDIO_FINAL.zip` ke Google AI Studio**, atau replace seluruh source dengan isi ZIP. Ini wajib agar revisi frontend benar-benar aktif.
+7. Di AI Studio klik **Apply changes**, buka Preview, jalankan checklist, kemudian **Publish**.
+8. Push source yang sama ke GitHub. Jangan commit `node_modules`, `dist`, `.test-dist`, `tmp`, atau file `.env`.
 
 ## Script Properties yang harus tersedia
 
@@ -46,9 +47,12 @@ Tidak ada property baru yang perlu dibuat untuk V1.1.6.
 7. Uji ulang tahun dengan format `16-07`, `16/07/2026`, `16 Juli 2026`, dan `16 July 2026`. Pastikan lonceng serta Tanya SIKANDA memberi hasil sama dalam WIB.
 8. Klik item lonceng. Modal detail pegawai dengan NIP yang sama harus terbuka.
 9. Uji preview foto URL kosong, URL Drive, path legacy, dan foto kamera/galeri pada Kendaraan serta Alat & Mesin. Login Pegawai juga harus dapat membaca foto seluruh data tanpa broken-image icon. File Drive lama dapat membutuhkan beberapa detik pada pembukaan pertama untuk pemulihan izin privat.
-10. Buka Peta pada sidebar terbuka/tertutup dan resize browser. Tile harus menutup seluruh area, Radar default nonaktif, kontrol tetap responsif, dan foto popup tidak crash.
+10. Buka Peta pada sidebar terbuka/tertutup dan resize browser. Tile harus menutup seluruh area, Radar default nonaktif, kontrol tetap responsif, dan foto popup tidak crash. Untuk kendaraan yang `asset_code`-nya sama dengan nomor polisi, `Kode Barang` wajib tampil `Belum diisi`; isi kode barang asli melalui menu Data Kendaraan bila tersedia.
 11. Login Administrator/Pimpinan, buka Data Cleansing, lalu terapkan satu koreksi nama pada Kendaraan dan Alat & Mesin. Tidak boleh muncul pesan `Jenis aset tidak dikenali`.
-12. Cetak masing-masing kategori Rekap Laporan. Logo harus berada konsisten di kiri area KOP dan teks tepat di tengah; gunakan A4 landscape serta nonaktifkan browser headers/footers.
+12. Pada Data ASN/PPPK pastikan card `Perlu Penyelarasan` tampil, seluruh judul card tebal, dan ikon WhatsApp hanya tersedia untuk Administrator/Pimpinan. Uji nomor `08...`, `628...`, kosong, dan tidak valid.
+13. Login Administrator, klik **Capture Layar**, pilih tab SIKANDA, seret area, lalu uji Salin, Bagikan (bila perangkat mendukung), dan Simpan PNG. Jalankan melalui HTTPS dan izinkan screen capture ketika browser meminta.
+14. Dashboard: pastikan `Pegawai Dengan Inventaris + Pegawai Tanpa Inventaris = Total Pegawai`; inventaris berarti seluruh relasi Kendaraan dan Alat & Mesin. Pastikan donut Distribusi Golongan dan legenda memenuhi card tanpa terpotong.
+15. Cetak masing-masing kategori Rekap Laporan. Logo dan judul KOP harus tetap berdekatan sebagai satu kelompok seperti PDF acuan; gunakan A4 landscape serta nonaktifkan browser headers/footers.
 
 ## Pemeriksaan lokal
 
@@ -72,4 +76,4 @@ npm run build
 
 ## Rollback
 
-Kembalikan source AI Studio/GitHub dan New Version deployment Apps Script ke V1.1.5 bila masalah ditemukan. Tidak ada rollback SQL untuk V1.1.6.
+Kembalikan source AI Studio/GitHub dan New Version deployment Apps Script ke V1.1.5 bila masalah ditemukan. Migrasi kontak hanya mengubah representasi `08...` menjadi ekuivalen internasional `628...`; gunakan backup database bila representasi lama harus dikembalikan.
