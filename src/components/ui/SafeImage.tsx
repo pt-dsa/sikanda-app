@@ -14,6 +14,8 @@ interface SafeImageProps {
   className?: string;
   /** Kelas tambahan khusus untuk kotak fallback (opsional). */
   fallbackClassName?: string;
+  /** Sumber cadangan dicoba berurutan sebelum menampilkan fallback. */
+  fallbackSrcs?: string[];
   [key: string]: any;
 }
 
@@ -22,15 +24,18 @@ interface SafeImageProps {
  * (broken link), tampilkan ikon ImageOff alih-alih ikon "broken image" bawaan
  * browser. className diteruskan ke kedua kondisi agar tata letak konsisten.
  */
-export function SafeImage({ src, alt, className, fallbackClassName, ...props }: SafeImageProps) {
-  const [errored, setErrored] = useState(false);
+export function SafeImage({ src, alt, className, fallbackClassName, fallbackSrcs = [], ...props }: SafeImageProps) {
+  const driveMatch = String(src || "").match(/[?&]id=([A-Za-z0-9_-]+)/);
+  const implicitFallbacks = driveMatch ? [`https://drive.google.com/uc?export=view&id=${encodeURIComponent(driveMatch[1])}`] : [];
+  const sources = [src, ...fallbackSrcs, ...implicitFallbacks].filter((value, index, list): value is string => !!value && list.indexOf(value) === index);
+  const [sourceIndex, setSourceIndex] = useState(0);
 
   // Reset status error bila src berganti (mis. modal zoom dipakai ulang).
   useEffect(() => {
-    setErrored(false);
-  }, [src]);
+    setSourceIndex(0);
+  }, [src, fallbackSrcs.join("|")]);
 
-  if (errored || !src) {
+  if (!sources[sourceIndex]) {
     return (
       <div
         role="img"
@@ -49,10 +54,13 @@ export function SafeImage({ src, alt, className, fallbackClassName, ...props }: 
 
   return (
     <img
-      src={src}
+      src={sources[sourceIndex]}
       alt={alt}
       className={className}
-      onError={() => setErrored(true)}
+      loading={props.loading || "lazy"}
+      decoding={props.decoding || "async"}
+      referrerPolicy={props.referrerPolicy || "no-referrer"}
+      onError={() => setSourceIndex((index) => index + 1)}
       {...props}
     />
   );

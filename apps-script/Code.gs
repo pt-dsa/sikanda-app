@@ -34,7 +34,7 @@ var SAFE_CONFIG_KEYS = ['KGB_CYCLE_YEARS', 'PANGKAT_CYCLE_YEARS', 'BUP_USIA'];
 var MANAGED_CONFIG_KEYS = SAFE_CONFIG_KEYS.slice();
 
 var EMPLOYEE_EDITABLE_FIELDS = [
-  'foto', 'kontak', 'email', 'tingkat', 'pendidikan_jurusan', 'universitas',
+  'nama', 'foto', 'tgl_lahir', 'kontak', 'email', 'tingkat', 'pendidikan_jurusan', 'universitas',
   'tahun_lulus', 'riwayat_diklat', 'tahun_diklat', 'keterangan'
 ];
 
@@ -171,7 +171,7 @@ function doPost(e) {
         return json_(deleteAsset_(actor, String(body.table || ''), String(body.assetId || '')));
       case 'asset_fix_holder':
         requireManager_(actor);
-        return json_(fixAssetHolder_(actor, String(body.table || ''), String(body.assetId || ''), String(body.newHolderName || '')));
+        return json_(fixAssetHolder_(actor, String(body.table || body.sheet || ''), String(body.assetId || ''), String(body.newHolderName || '')));
       case 'upload_foto':
         guardOwnNip_(actor, String(body.nip || ''));
         return json_(uploadFoto_(actor, body));
@@ -411,29 +411,44 @@ function selectForActor_(actor, table, filters) {
   if (ACTIVE_DATA_TABLES.indexOf(table) === -1) throw publicError_('Tabel tidak diizinkan.');
 
   var query = ['select=*', 'limit=5000'].concat(filterQuery_(table, filters));
-  if (!isManager_(actor) && table === 'pegawai') {
-    query.push('nip=eq.' + encodeURIComponent(actor.nip));
-  }
   var rows = supaGet_(table + '?' + query.join('&'));
   rows = rows.filter(function (row) { return isActive_(row.is_active); });
 
+  // Seluruh role aktif membaca sumber data operasional yang sama. Otorisasi
+  // tulis tetap berada pada endpoint mutasi di bawah dan tidak berubah.
+  if (table === 'pegawai' || table === 'assets_vehicle' || table === 'assets_equipment') {
+    ensureActorPhotoAccess_(actor, table, rows);
+    return rows;
+  }
+  if (table === 'asset_locations') return rows;
   if (isManager_(actor)) return rows;
-  if (table === 'pegawai') return rows;
   if (table === 'system_config') {
     return rows.filter(function (row) {
       return SAFE_CONFIG_KEYS.indexOf(String(row.key || row.config_key || '').toUpperCase()) !== -1;
     });
   }
-  if (table === 'assets_vehicle' || table === 'assets_equipment') {
-    // Kepemilikan aset harus bersumber dari tabel pegawai resmi, bukan nama
-    // tampilan pada app_access yang dapat berubah secara administratif.
-    var actorName = actorNameFromPegawai_(actor.nip);
-    var expected = normalizeName_(actorName);
-    return rows.filter(function (row) {
-      return normalizeName_(row.holder_name || row.pengguna || '') === expected;
-    });
-  }
   throw publicError_('Akses ditolak: data ini tidak tersedia untuk pegawai.');
+}
+
+function driveFileIdFromUrl_(value) {
+  var text = String(value || '').trim();
+  var match = text.match(/\/file\/d\/([A-Za-z0-9_-]+)/) || text.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  return match ? match[1] : '';
+}
+
+/** Pulihkan izin file lama secara on-demand tanpa membuat foto menjadi publik. */
+function ensureActorPhotoAccess_(actor, table, rows) {
+  if (!actor || !actor.email || isManager_(actor)) return;
+  var cache = CacheService.getScriptCache();
+  var key = 'photo_access_' + Utilities.base64EncodeWebSafe(actor.email + '|' + table).substring(0, 80);
+  if (cache.get(key)) return;
+  for (var i = 0; i < rows.length; i++) {
+    var photo = rows[i].foto || rows[i].photo_legacy || rows[i].photo || '';
+    var id = driveFileIdFromUrl_(photo);
+    if (!id) continue;
+    try { DriveApp.getFileById(id).addViewer(actor.email); } catch (ignore) {}
+  }
+  cache.put(key, '1', 21600);
 }
 
 function actorNameFromPegawai_(nip) {
@@ -681,11 +696,8 @@ function securePhotoSharing_(file, nip) {
   var viewers = [];
   for (var i = 0; i < accessRows.length; i++) {
     var row = accessRows[i];
-    var role = normalizeRole_(row.role);
-    if (role === 'admin' || role === 'pimpinan' || (nip && String(row.nip || '') === nip)) {
-      var email = String(row.email || '').toLowerCase().trim();
-      if (email && viewers.indexOf(email) === -1) viewers.push(email);
-    }
+    var email = String(row.email || '').toLowerCase().trim();
+    if (email && viewers.indexOf(email) === -1) viewers.push(email);
   }
   if (viewers.length) file.addViewers(viewers);
 }

@@ -54,10 +54,13 @@ export type Action =
 
 /**
  * Field profil yang boleh diubah pegawai pada baris miliknya sendiri. TMT,
- * golongan, status, dan seluruh dasar KGB/Pangkat/Pensiun tetap server-locked.
+ * field kepegawaian struktural tetap server-locked. Di luar daftar kunci itu,
+ * pegawai dapat memperbarui profilnya sendiri.
  */
 export const EDITABLE_FIELDS_OWN: readonly string[] = [
+  "nama",
   "foto",
+  "tgl_lahir",
   "kontak",
   "email",
   "tingkat",
@@ -84,12 +87,16 @@ const ALL_MENUS: MenuKey[] = [
   "tanya", // Tanya SIKANDA — semua peran boleh bertanya (konteks SIKANDA saja)
 ];
 
+// Pegawai dapat membaca seluruh menu operasional, kecuali Rekap Laporan.
+// Kelola Akun dan Data Cleansing tetap merupakan menu tata-kelola manajer.
+const EMPLOYEE_MENUS: MenuKey[] = ALL_MENUS.filter((menu) => menu !== "laporan");
+
 const MANAGER_MENUS: MenuKey[] = [...ALL_MENUS, "kelola-akun", "cleansing"];
 
 const MENU_BY_ROLE: Record<Role, MenuKey[]> = {
   admin: MANAGER_MENUS,
   pimpinan: MANAGER_MENUS,
-  pegawai: ALL_MENUS,
+  pegawai: EMPLOYEE_MENUS,
 };
 
 const ACTIONS_BY_ROLE: Record<Role, Action[]> = {

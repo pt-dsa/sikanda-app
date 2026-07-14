@@ -30,10 +30,10 @@ const media = read("src/lib/media.ts");
 assert(backend.includes("getNotificationFeed_") && backend.includes("buildBirthdayFacts_") && backend.includes("buildAgendaFacts_"), "Backend harus menyediakan source fakta tunggal notifikasi dan Tanya SIKANDA");
 assert(backend.includes("jakartaToday_") && backend.includes("parseBirthdayDate_"), "Backend harus memakai WIB dan mendukung ulang tahun tanpa tahun");
 assert(shell.includes("getNotificationFeed") && !shell.includes("buildUpcomingBirthdays"), "Lonceng harus memakai feed backend tunggal");
-assert(rbac.includes("pegawai: ALL_MENUS"), "Pegawai harus dapat melihat seluruh menu operasional");
+assert(rbac.includes("pegawai: EMPLOYEE_MENUS") && rbac.includes('menu !== "laporan"'), "Pegawai harus dapat melihat menu operasional kecuali Rekap Laporan");
 assert(form.includes("IndonesianDateField") && form.includes("Contoh: 13 Juli 1992"), "Form pegawai harus memasukkan tanggal dalam format Indonesia");
 assert(map.includes('"Kode Barang": v.kode_barang') && map.includes('"No. Polisi": v.no_polisi'), "Peta harus memisahkan kode barang dan nomor polisi");
-assert(report.includes("letterhead-spacer") && report.includes("grid-template-columns:64px minmax(0,1fr) 64px"), "KOP cetak harus memiliki komposisi logo dan teks seimbang");
+assert(report.includes("left:42px") && report.includes("padding:0 108px"), "KOP cetak harus memiliki posisi logo dan teks yang presisi");
 assert(media.includes("resolveAssetPhotoUrl") && media.includes("data:|blob:"), "Resolver foto harus aman untuk URL, data URL, dan blob");
 
 console.log("revision-v116-tests: OK");

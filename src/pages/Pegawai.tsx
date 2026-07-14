@@ -172,6 +172,12 @@ export default function PegawaiPage() {
     return Array.from(levels).sort();
   }, [data]);
   const bidangOptions = useMemo(() => Array.from(new Set(data.map((p) => String(p.unit_kerja || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "id")), [data]);
+  const pegawaiFieldOptions = useMemo(() => ({
+    golongan: data.map((p) => p.golongan),
+    jabatan: data.map((p) => p.jabatan),
+    jurusan: data.map((p) => p.pendidikan_jurusan),
+    institusi: data.map((p) => p.universitas),
+  }), [data]);
 
   const filteredData = useMemo(() => {
     return data.filter((p) => {
@@ -677,6 +683,7 @@ export default function PegawaiPage() {
             initialData={editingPegawai}
             user={user}
             bidangOptions={bidangOptions}
+            fieldOptions={pegawaiFieldOptions}
             onClose={() => setIsFormModalOpen(false)}
             onSuccess={() => {
               setIsFormModalOpen(false);

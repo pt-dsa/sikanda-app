@@ -504,6 +504,8 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const isMapPage = location.pathname.startsWith("/peta");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const { user } = useContext(AuthContext);
@@ -577,8 +579,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           )}
         </AnimatePresence>
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
-          <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full md:h-full">
+        <main className={cn("flex-1 min-h-0 overscroll-y-contain", isMapPage ? "overflow-hidden" : "overflow-y-auto")}>
+          <div className={cn("mx-auto w-full", isMapPage ? "h-full max-w-none p-0" : "p-4 md:p-6 lg:p-8 max-w-[1600px] md:h-full")}>
             {children}
           </div>
         </main>

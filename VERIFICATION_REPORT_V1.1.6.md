@@ -12,6 +12,7 @@ Tanggal verifikasi lokal: 13 Juli 2026 (Asia/Jakarta).
 | Test laporan dan filter | Lulus |
 | Test regresi V1.1.4 dan V1.1.5 | Lulus |
 | Test regresi baru V1.1.6 | Lulus |
+| Test regresi final RBAC/form/media/peta/cleansing/KOP | Lulus |
 | Production build Vite | Lulus |
 
 ## Validasi logika yang tercakup
@@ -20,11 +21,17 @@ Tanggal verifikasi lokal: 13 Juli 2026 (Asia/Jakarta).
 - Tanggal ISO valid tidak memicu isu Data Cleansing.
 - Pegawai tanpa relasi aset tidak dihitung sebagai masalah cleansing.
 - Backend memiliki feed fakta tunggal untuk lonceng dan helper yang sama bagi Tanya SIKANDA.
-- Pegawai memperoleh seluruh menu operasional, tetapi Kelola Akun dan Data Cleansing tetap diblokir oleh route guard.
+- Pegawai membaca seluruh data pegawai/aset, melihat menu operasional selain Rekap Laporan, dan tetap diblokir dari Kelola Akun/Data Cleansing.
+- Aksi CRUD aset Pegawai disembunyikan di desktop/mobile dan tetap ditolak backend.
+- Profil sendiri dapat mengubah field personal; seluruh field struktural yang ditentukan tetap terkunci.
+- Tanggal mempunyai kalender, suggestion format, validasi langsung, serta normalisasi Indonesia.
+- Library suggestion kampus/jurusan dan opsi tambah manual tervalidasi.
 - Peta memisahkan field Kode Barang dan Nomor Polisi.
-- KOP menggunakan grid simetris dan tabel cetak tetap fixed-layout.
-- Resolver foto mendukung URL, data URL, dan blob serta fallback komponen aman.
+- KOP menggunakan posisi logo absolut yang terukur dan tabel cetak tetap fixed-layout.
+- Resolver foto mendukung Drive/AppSheet/URL/data/blob, fallback bertahap, dan pemulihan hak baca privat untuk akun aktif.
+- Cleansing mengirim identifier tabel aset yang sama dengan backend.
+- Peta memenuhi area halaman dan menghindari pembuatan ulang ikon untuk setiap marker.
 
 ## Batas validasi lokal
 
-Build lokal tidak dapat memverifikasi data hidup Supabase, autentikasi Firebase, deployment Apps Script, email aktual, GPS/kamera perangkat, izin browser, maupun raster PDF browser. Semua pemeriksaan tersebut wajib dilakukan sesuai checklist pada `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.6_SECURE.md` setelah deploy.
+Build lokal tidak dapat memverifikasi data hidup Supabase, autentikasi Firebase, deployment Apps Script, email aktual, GPS/kamera perangkat, izin Drive lama, tile basemap eksternal, maupun raster PDF browser. Semua pemeriksaan tersebut wajib dilakukan sesuai checklist pada `00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.6_SECURE.md` setelah deploy.

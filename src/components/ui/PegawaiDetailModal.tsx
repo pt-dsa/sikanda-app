@@ -7,6 +7,8 @@ import { motion } from "motion/react";
 import { formatDate } from "@/lib/utils";
 import type { Pegawai } from "@/types";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
+import { SafeImage } from "@/components/ui/SafeImage";
+import { resolveAssetPhotoCandidates } from "@/lib/media";
 
 // ---------------------------------------------------------------------------
 // Atom bersama (dipakai juga oleh halaman Data ASN/PPPK) — dipusatkan di sini
@@ -87,8 +89,6 @@ export function PegawaiAvatar({ foto, nama, size = "md" }: { foto: string; nama:
 // Kartu aset di dalam modal 360°
 // ---------------------------------------------------------------------------
 function AssetCard({ asset, type, onSelect }: { key?: React.Key; asset: any; type: "kendaraan" | "alat" | "inventaris"; onSelect: (a: any) => void }) {
-  const [imgErr, setImgErr] = useState(false);
-
   const label = type === "kendaraan"
     ? (asset.no_polisi || asset.kode_barang)
     : (asset.nama_aset || asset.kode_barang);
@@ -97,11 +97,7 @@ function AssetCard({ asset, type, onSelect }: { key?: React.Key; asset: any; typ
     ? `${asset.merk || ""} ${asset.tipe || ""}`.trim() || asset.jenis_kendaraan || ""
     : `${asset.merk || ""} ${asset.tahun || ""}`.trim();
 
-  const photoSrc = type === "kendaraan" && asset.foto
-    ? (asset.foto.includes("Kendaraan_Images")
-      ? `https://www.appsheet.com/template/gettablefileurl?appName=SIMOSDA-845158139&tableName=Kendaraan&fileName=${encodeURIComponent(asset.foto)}`
-      : asset.foto)
-    : (asset.foto || "");
+  const photoCandidates = resolveAssetPhotoCandidates(asset.foto, type === "kendaraan" ? "kendaraan" : "alat_mesin");
 
   const kondisi = String(asset.kondisi || "BAIK").toUpperCase();
   const kondisiColor =
@@ -109,18 +105,16 @@ function AssetCard({ asset, type, onSelect }: { key?: React.Key; asset: any; typ
     kondisi.includes("RINGAN") ? "bg-yellow-100 text-yellow-700" :
     "bg-red-100 text-red-700";
 
-  const TypeIcon = type === "kendaraan" ? Car : type === "alat" ? Wrench : Archive;
-
   return (
     <div
       className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all flex flex-col"
       onClick={() => onSelect(asset)}
     >
       <div className="w-full h-28 bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-        {photoSrc && !imgErr ? (
-          <img src={photoSrc} alt={label} className="w-full h-full object-cover" onError={() => setImgErr(true)} />
+        {photoCandidates.length ? (
+          <SafeImage src={photoCandidates[0]} fallbackSrcs={photoCandidates.slice(1)} alt={label} className="w-full h-full object-cover" />
         ) : (
-          <TypeIcon size={28} className="text-gray-400" />
+          type === "kendaraan" ? <Car size={28} className="text-gray-400" /> : type === "alat" ? <Wrench size={28} className="text-gray-400" /> : <Archive size={28} className="text-gray-400" />
         )}
       </div>
       <div className="p-3 flex-1 flex flex-col justify-between">

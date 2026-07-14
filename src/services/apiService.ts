@@ -53,12 +53,12 @@ export const apiService = {
   }) => callBackend<UploadFotoResult>({ action: "upload_asset_foto", ...params }),
 
   // Aset: koreksi nama pengguna (Tahap 6 — Data Cleansing fuzzy matching).
-  fixAssetHolder: async (sheet: string, assetId: string, newHolderName: string) => {
-    if (sheet !== "kendaraan" && sheet !== "alat_mesin") {
+  fixAssetHolder: async (table: string, assetId: string, newHolderName: string) => {
+    if (table !== "assets_vehicle" && table !== "assets_equipment") {
       throw new Error("Jenis aset tidak dikenali.");
     }
     return callBackend<{ ok: true; sheet: string; assetId: string; newHolderName: string }>({
-      action: "asset_fix_holder", sheet, assetId, newHolderName,
+      action: "asset_fix_holder", table, assetId, newHolderName,
     });
   },
 

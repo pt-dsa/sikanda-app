@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ZoomIn, ImageOff, AlertTriangle } from "lucide-react";
 import { DetailModal } from "@/components/ui/DetailModal";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { resolveAssetPhotoUrl } from "@/lib/media";
+import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 
 // Pola props mandiri (lihat §3 handoff: @types/react tidak terpasang).
 interface AssetDetailModalProps {
@@ -58,6 +58,7 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
                   <>
                     <SafeImage
                       src={resolveAssetPhotoUrl(asset.foto, asset.jenis ? "alat_mesin" : "kendaraan")}
+                      fallbackSrcs={resolveAssetPhotoCandidates(asset.foto, asset.jenis ? "alat_mesin" : "kendaraan").slice(1)}
                       alt="Foto"
                       className="w-full h-full object-cover cursor-pointer"
                       onClick={() => setZoomedImage(resolveAssetPhotoUrl(asset.foto, asset.jenis ? "alat_mesin" : "kendaraan"))}

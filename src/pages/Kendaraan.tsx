@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useContext, useEffect, useState, useMemo } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { Pegawai, Vehicle } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -18,7 +18,9 @@ import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/Em
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { resolveAssetPhotoUrl } from "@/lib/media";
+import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
+import { AuthContext } from "@/components/layout/AppShell";
+import { can } from "@/lib/rbac";
 
 const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
 
@@ -35,6 +37,8 @@ function displayNumber(value: unknown, suffix = ""): string {
 }
 
 export default function Kendaraan() {
+  const { user } = useContext(AuthContext);
+  const canWriteAssets = can(user?.role, "asset.write");
   const toast = useToast();
   const location = useLocation();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -323,20 +327,10 @@ export default function Kendaraan() {
           >
             <QrCode size={16} />
           </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); openForm(row); }}
-            className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors"
-            title="Edit Kendaraan"
-          >
-            <Edit2 size={16} />
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); handleDelete(row.asset_id!); }}
-            className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors"
-            title="Hapus Kendaraan"
-          >
-            <Trash2 size={16} />
-          </button>
+          {canWriteAssets && <>
+            <button onClick={(e) => { e.stopPropagation(); openForm(row); }} className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors" title="Edit Kendaraan"><Edit2 size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); handleDelete(row.asset_id!); }} className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors" title="Hapus Kendaraan"><Trash2 size={16} /></button>
+          </>}
         </div>
       ),
     },
@@ -389,20 +383,10 @@ export default function Kendaraan() {
         >
           <QrCode size={16} />
         </button>
-        <button 
-          onClick={(e) => { e.stopPropagation(); openForm(row); }}
-          className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors"
-          title="Edit Kendaraan"
-        >
-          <Edit2 size={16} />
-        </button>
-        <button 
-          onClick={(e) => { e.stopPropagation(); handleDelete(row.asset_id!); }}
-          className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors"
-          title="Hapus Kendaraan"
-        >
-          <Trash2 size={16} />
-        </button>
+        {canWriteAssets && <>
+          <button onClick={(e) => { e.stopPropagation(); openForm(row); }} className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors" title="Edit Kendaraan"><Edit2 size={16} /></button>
+          <button onClick={(e) => { e.stopPropagation(); handleDelete(row.asset_id!); }} className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors" title="Hapus Kendaraan"><Trash2 size={16} /></button>
+        </>}
       </div>
     </div>
   );
@@ -420,13 +404,13 @@ export default function Kendaraan() {
           <div className="flex px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded-full">
             Total: {filteredData.length} Kendaraan
           </div>
-          <button
+          {canWriteAssets && <button
             onClick={() => openForm()}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
           >
             <Plus size={16} />
             Tambah Data
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -525,6 +509,7 @@ export default function Kendaraan() {
                   <>
                     <SafeImage
                       src={resolveAssetPhotoUrl((selectedItem as any).foto, "kendaraan")}
+                      fallbackSrcs={resolveAssetPhotoCandidates((selectedItem as any).foto, "kendaraan").slice(1)}
                       alt="Foto" 
                       className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity bg-white"
                       onClick={() => setZoomedImage(resolveAssetPhotoUrl((selectedItem as any).foto, "kendaraan"))}

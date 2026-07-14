@@ -38,14 +38,17 @@ Tidak ada property baru yang perlu dibuat untuk V1.1.6.
 ## Pemeriksaan pascadeploy
 
 1. Buka URL Apps Script `/exec`; respons sehat memuat versi `1.1.6-secure`.
-2. Login sebagai Pegawai: seluruh menu operasional terlihat; **Kelola Akun** dan **Data Cleansing** tidak terlihat serta tidak dapat dibuka lewat URL.
-3. Pegawai hanya dapat menyimpan profil miliknya. TMT Golongan, TMT Jabatan, golongan, status, dan basis KGB/Pangkat/Pensiun tidak dapat diubah.
-4. Tambah/edit pegawai: masukkan `13 Juli 1992`, simpan, buka Data Cleansing, dan pastikan tidak muncul sebagai masalah format tanggal. Nilai ISO dari PostgreSQL juga tidak boleh menjadi false positive.
-5. Uji ulang tahun dengan format `16-07`, `16/07/2026`, `16 Juli 2026`, dan `16 July 2026`. Pastikan lonceng serta Tanya SIKANDA memberi hasil sama dalam WIB.
-6. Klik item lonceng. Modal detail pegawai dengan NIP yang sama harus terbuka.
-7. Uji preview foto URL kosong, URL Drive, path legacy, dan foto kamera/galeri pada Kendaraan serta Alat & Mesin. Tidak boleh ada broken-image icon browser.
-8. Di mobile, scroll Data ASN/PPPK sampai kartu terakhir; buka lonceng dan Basemaps peta; seluruh panel harus berada di dalam viewport.
-9. Cetak masing-masing kategori Rekap Laporan. Logo harus berada di kiri dan blok teks KOP seimbang; gunakan A4 landscape dan nonaktifkan browser headers/footers.
+2. Login sebagai Pegawai: Dashboard, Data ASN/PPPK, Buku Penjagaan, Kendaraan, Alat & Mesin, modul operasional lain, Peta, dan Tanya SIKANDA terlihat. **Rekap Laporan**, **Kelola Akun**, dan **Data Cleansing** tidak terlihat serta tidak dapat dibuka lewat URL.
+3. Pastikan akun Pegawai melihat seluruh baris Data ASN/PPPK dan seluruh aset, bukan hanya profil/aset sendiri. Tombol Tambah/Edit/Hapus aset tidak boleh tampil.
+4. Pegawai hanya dapat menyimpan profil miliknya. NIP, Status, Jabatan, Bidang, Masa Kerja bulan/tahun, Golongan, TMT Golongan/Jabatan, serta Catatan Mutasi tidak dapat diubah. Nama, Tanggal Lahir, Foto, Pendidikan, Diklat, Kontak, Email, dan Keterangan dapat diperbarui.
+5. Tambah/edit pegawai: pilih tanggal dari tombol kalender dan coba input `13 Juli 1992`, `13-07-1992`, serta tanggal tidak sah. Status validasi harus tepat dan tanggal sah tidak boleh masuk Data Cleansing.
+6. Uji Golongan, Jabatan, Jurusan, Universitas/Sekolah, dan Tahun Lulus: suggestion dapat dipilih, data eksisting tetap muncul, dan nilai baru dapat diketik.
+7. Uji ulang tahun dengan format `16-07`, `16/07/2026`, `16 Juli 2026`, dan `16 July 2026`. Pastikan lonceng serta Tanya SIKANDA memberi hasil sama dalam WIB.
+8. Klik item lonceng. Modal detail pegawai dengan NIP yang sama harus terbuka.
+9. Uji preview foto URL kosong, URL Drive, path legacy, dan foto kamera/galeri pada Kendaraan serta Alat & Mesin. Login Pegawai juga harus dapat membaca foto seluruh data tanpa broken-image icon. File Drive lama dapat membutuhkan beberapa detik pada pembukaan pertama untuk pemulihan izin privat.
+10. Buka Peta pada sidebar terbuka/tertutup dan resize browser. Tile harus menutup seluruh area, Radar default nonaktif, kontrol tetap responsif, dan foto popup tidak crash.
+11. Login Administrator/Pimpinan, buka Data Cleansing, lalu terapkan satu koreksi nama pada Kendaraan dan Alat & Mesin. Tidak boleh muncul pesan `Jenis aset tidak dikenali`.
+12. Cetak masing-masing kategori Rekap Laporan. Logo harus berada konsisten di kiri area KOP dan teks tepat di tengah; gunakan A4 landscape serta nonaktifkan browser headers/footers.
 
 ## Pemeriksaan lokal
 

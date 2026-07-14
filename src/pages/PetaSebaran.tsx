@@ -10,7 +10,7 @@ import { Car, Bike, Wrench, MapPin, Eye, Map as MapIcon, Layers, Radio, ZoomIn, 
 import { renderToString } from "react-dom/server";
 import { StatusBadge } from "@/components/ui/Badge";
 import { nameSimilarity, normalizeNamaForMatch } from "@/lib/cleansing";
-import { resolveAssetPhotoUrl } from "@/lib/media";
+import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import type { Pegawai } from "@/types";
 
 // Fix Leaflet's default icon path issues in React
@@ -46,11 +46,19 @@ const BASEMAPS = [
 function MapResizeSync() {
   const map = useMap();
   useEffect(() => {
-    const refresh = () => window.setTimeout(() => map.invalidateSize({ animate: false }), 60);
+    let frame = 0;
+    const refresh = () => {
+      window.clearTimeout(frame);
+      frame = window.setTimeout(() => map.invalidateSize({ animate: false }), 40);
+    };
     refresh();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(refresh) : null;
+    observer?.observe(map.getContainer());
     window.addEventListener("resize", refresh);
     window.addEventListener("orientationchange", refresh);
     return () => {
+      observer?.disconnect();
+      window.clearTimeout(frame);
       window.removeEventListener("resize", refresh);
       window.removeEventListener("orientationchange", refresh);
     };
@@ -83,7 +91,7 @@ export default function PetaSebaran() {
   const [filterCondition, setFilterCondition] = useState("Semua Kondisi");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeBasemap, setActiveBasemap] = useState("cartolight");
-  const [radarPulse, setRadarPulse] = useState(true);
+  const [radarPulse, setRadarPulse] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [isLegendOpen, setIsLegendOpen] = useState(true);
   const [basemapOpen, setBasemapOpen] = useState(false);
@@ -99,14 +107,14 @@ export default function PetaSebaran() {
         const employeeDirectory = employees as Pegawai[];
 
         const parseCoordinate = (val: any) => {
-          if (!val) return null;
+          if (val === null || val === undefined || String(val).trim() === "") return null;
           const parsed = Number(String(val).replace(',', '.'));
           return isNaN(parsed) ? null : parsed;
         };
 
         const mapLocations: MapLocation[] = [];
 
-        vehicles.forEach((v: any) => {
+        vehicles.forEach((v: any, index: number) => {
           const lat = parseCoordinate(v.latitude || v.lat);
           const lng = parseCoordinate(v.longitude || v.lng);
           if (lat !== null && lng !== null) {
@@ -115,7 +123,7 @@ export default function PetaSebaran() {
                            String(v.jenis_kendaraan || "").toLowerCase().includes("roda dua");
             
             mapLocations.push({
-              id: v.asset_id || v.id || Math.random().toString(),
+              id: String(v.asset_id || v.id || `vehicle-${index}`),
               type: "Kendaraan",
               lat, 
               lng,
@@ -147,12 +155,12 @@ export default function PetaSebaran() {
           }
         });
 
-        equipment.forEach((e: any) => {
+        equipment.forEach((e: any, index: number) => {
           const lat = parseCoordinate(e.latitude || e.lat);
           const lng = parseCoordinate(e.longitude || e.lng);
           if (lat !== null && lng !== null) {
             mapLocations.push({
-              id: e.asset_id || e.id || Math.random().toString(),
+              id: String(e.asset_id || e.id || `equipment-${index}`),
               type: "Alat & Mesin",
               lat, 
               lng,
@@ -212,6 +220,33 @@ export default function PetaSebaran() {
     return keys.map((k) => ({ type: k, count: counts[k] || 0 }));
   }, [locations]);
 
+  const markerIcons = useMemo(() => {
+    const build = (type: "car" | "motorcycle" | "equipment") => {
+      let color = "#0B57D0";
+      let IconComponent = <MapPin size={16} />;
+      if (type === "car" || type === "motorcycle") {
+        color = "#4F46E5";
+        IconComponent = type === "motorcycle" ? <Bike size={16} /> : <Car size={16} />;
+      } else {
+        color = "#16A34A";
+        IconComponent = <Wrench size={16} />;
+      }
+
+      const iconHtml = renderToString(IconComponent);
+      const pulseHtml = radarPulse
+        ? `<div class="absolute inset-[-8px] rounded-full border-2 animate-radar-pulse opacity-0 pointer-events-none" style="border-color: ${color}"></div>`
+        : "";
+      return L.divIcon({
+        className: "bg-transparent border-none",
+        html: `<div class="relative group w-8 h-8">${pulseHtml}<div class="w-full h-full rounded-full border-2 border-white shadow-md flex items-center justify-center text-white relative z-10" style="background-color: ${color}">${iconHtml}</div></div>`,
+        iconAnchor: [16, 16],
+        tooltipAnchor: [16, 0],
+        popupAnchor: [0, -16],
+      });
+    };
+    return { car: build("car"), motorcycle: build("motorcycle"), equipment: build("equipment") };
+  }, [radarPulse]);
+
   if (loading) {
     return <LoadingState />;
   }
@@ -220,40 +255,9 @@ export default function PetaSebaran() {
     ? [filteredLocations[0].lat, filteredLocations[0].lng]
     : [-6.2866, 106.6888]; // default to area info
 
-  const getMarkerIcon = (loc: MapLocation) => {
-    let color = "#0B57D0";
-    let IconComponent = <MapPin size={16} />;
-    
-    if (loc.type === "Kendaraan") {
-      color = "#4F46E5";
-      IconComponent = loc.isMotorcycle ? <Bike size={16} /> : <Car size={16} />;
-    } else if (loc.type === "Alat & Mesin") {
-      color = "#16A34A";
-      IconComponent = <Wrench size={16} />;
-    }
-
-    const iconHtml = renderToString(IconComponent);
-    const pulseHtml = radarPulse 
-      ? `<div class="absolute inset-[-8px] rounded-full border-2 animate-radar-pulse opacity-0 pointer-events-none" style="border-color: ${color}; animation-delay: ${Math.random()*1.5}s"></div>` 
-      : '';
-
-    const html = `
-      <div class="relative group w-8 h-8">
-        ${pulseHtml}
-        <div class="w-full h-full rounded-full border-2 border-white shadow-md flex items-center justify-center text-white relative z-10" style="background-color: ${color}">
-          ${iconHtml}
-        </div>
-      </div>
-    `;
-
-    return L.divIcon({
-      className: "bg-transparent border-none",
-      html,
-      iconAnchor: [16, 16],
-      tooltipAnchor: [16, 0],
-      popupAnchor: [0, -16],
-    });
-  };
+  const getMarkerIcon = (loc: MapLocation) => loc.type === "Alat & Mesin"
+    ? markerIcons.equipment
+    : (loc.isMotorcycle ? markerIcons.motorcycle : markerIcons.car);
 
   const getStats = () => {
     const stats: Record<string, number> = {};
@@ -268,7 +272,7 @@ export default function PetaSebaran() {
   const uniqueConditions = ["Semua Kondisi", ...Array.from(new Set(locations.map(l => l.condition.toUpperCase())))];
 
   return (
-    <div className="-m-4 md:-m-6 lg:-m-8 h-[calc(100dvh-4rem)] min-h-[560px] flex flex-col relative bg-gray-50 border-t border-gray-100 overflow-hidden touch-pan-y">
+    <div className="h-full min-h-0 w-full max-w-none flex flex-col relative bg-gray-50 border-t border-gray-100 overflow-hidden touch-pan-y">
       <div className="absolute top-3 left-3 right-3 z-[25] flex flex-col sm:flex-row gap-2 sm:gap-4 justify-between items-start pointer-events-none">
         
         {/* Title & Info Card + chip tipe klikable */}
@@ -372,16 +376,19 @@ export default function PetaSebaran() {
       </div>
 
       <div className="absolute inset-0 z-10 bg-gray-100">
-        <MapContainer center={center} zoom={16} style={{ height: "100%", width: "100%", zIndex: 10 }} maxZoom={20}>
+        <MapContainer center={center} zoom={16} style={{ height: "100%", width: "100%", zIndex: 10 }} maxZoom={20} zoomAnimation={false} fadeAnimation={false} markerZoomAnimation={false}>
           <MapResizeSync />
           <TileLayer
             key={activeBasemap}
             attribution={selectedBasemap.attribution}
             url={selectedBasemap.url}
             maxZoom={20}
+            updateWhenIdle
+            updateWhenZooming={false}
+            keepBuffer={1}
           />
           {filteredLocations.map((item, idx) => (
-            <Marker key={item.id} position={[item.lat, item.lng]} icon={getMarkerIcon(item)}>
+            <Marker key={`${item.type}-${item.id}-${idx}`} position={[item.lat, item.lng]} icon={getMarkerIcon(item)}>
               <Popup className="rounded-xl overflow-hidden min-w-[300px]">
                 <div className="p-0 -m-3">
                   {item.foto && (
@@ -391,6 +398,7 @@ export default function PetaSebaran() {
                     >
                       <SafeImage 
                         src={assetPhotoUrl(item.foto, item.type)} 
+                        fallbackSrcs={resolveAssetPhotoCandidates(item.foto, item.type === "Alat & Mesin" ? "alat_mesin" : "kendaraan").slice(1)}
                         alt={item.title} 
                         className="w-full h-full object-contain bg-gray-900 group-hover:scale-105 transition-transform duration-300"
                       />

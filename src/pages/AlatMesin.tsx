@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useContext, useEffect, useState, useMemo } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { Equipment, Pegawai } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -18,9 +18,13 @@ import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/Em
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { resolveAssetPhotoUrl } from "@/lib/media";
+import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
+import { AuthContext } from "@/components/layout/AppShell";
+import { can } from "@/lib/rbac";
 
 export default function AlatMesin() {
+  const { user } = useContext(AuthContext);
+  const canWriteAssets = can(user?.role, "asset.write");
   const location = useLocation();
   const toast = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -286,20 +290,10 @@ export default function AlatMesin() {
           >
             <QrCode size={16} />
           </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); openForm(row); }}
-            className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors"
-            title="Edit"
-          >
-            <Edit2 size={16} />
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); handleDelete((row as any).asset_id || (row as any).id || ""); }}
-            className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors"
-            title="Hapus"
-          >
-            <Trash2 size={16} />
-          </button>
+          {canWriteAssets && <>
+            <button onClick={(e) => { e.stopPropagation(); openForm(row); }} className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors" title="Edit"><Edit2 size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); handleDelete((row as any).asset_id || (row as any).id || ""); }} className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors" title="Hapus"><Trash2 size={16} /></button>
+          </>}
         </div>
       ),
     },
@@ -346,20 +340,10 @@ export default function AlatMesin() {
         >
           <QrCode size={16} />
         </button>
-        <button 
-          onClick={(e) => { e.stopPropagation(); openForm(row); }}
-          className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors"
-          title="Edit"
-        >
-          <Edit2 size={16} />
-        </button>
-        <button 
-          onClick={(e) => { e.stopPropagation(); handleDelete((row as any).asset_id || (row as any).id || ""); }}
-          className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors"
-          title="Hapus"
-        >
-          <Trash2 size={16} />
-        </button>
+        {canWriteAssets && <>
+          <button onClick={(e) => { e.stopPropagation(); openForm(row); }} className="p-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full text-amber-600 dark:text-amber-400 transition-colors" title="Edit"><Edit2 size={16} /></button>
+          <button onClick={(e) => { e.stopPropagation(); handleDelete((row as any).asset_id || (row as any).id || ""); }} className="p-2 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 rounded-full text-red-600 dark:text-red-400 transition-colors" title="Hapus"><Trash2 size={16} /></button>
+        </>}
       </div>
     </div>
   );
@@ -377,13 +361,13 @@ export default function AlatMesin() {
           <div className="flex px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded-full">
             Total: {filteredData.length} Aset
           </div>
-          <button 
+          {canWriteAssets && <button 
             onClick={() => openForm()}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all shadow-sm hover:shadow-md"
           >
             <Plus size={16} />
             Tambah Data
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -483,11 +467,13 @@ export default function AlatMesin() {
                     );
                   }
                   const src = resolveAssetPhotoUrl(f, "alat_mesin");
+                  const candidates = resolveAssetPhotoCandidates(f, "alat_mesin");
                   
                   return (
                     <>
                       <SafeImage
                         src={src} 
+                        fallbackSrcs={candidates.slice(1)}
                         alt="Foto" 
                         className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity bg-white"
                         onClick={() => setZoomedImage(src)}

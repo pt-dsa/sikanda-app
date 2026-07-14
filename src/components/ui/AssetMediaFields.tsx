@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera, Crosshair, ImagePlus, LoaderCircle, MapPin, X } from "lucide-react";
 import { SafeImage } from "@/components/ui/SafeImage";
-import { resolveAssetPhotoUrl } from "@/lib/media";
+import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 
 interface AssetMediaFieldsProps {
   latitude: string | number | undefined;
@@ -37,6 +37,7 @@ export function AssetMediaFields({
   const [locating, setLocating] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [preview, setPreview] = useState(resolveStoredPhoto(existingPhoto, photoLabel));
+  const storedPhotoCandidates = resolveAssetPhotoCandidates(existingPhoto, /kendaraan/i.test(photoLabel) ? "kendaraan" : "alat_mesin");
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const autoLocateAttempted = useRef(false);
@@ -139,6 +140,7 @@ export function AssetMediaFields({
           <div className="relative w-full max-w-sm aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
             <SafeImage
               src={preview}
+              fallbackSrcs={selectedFile ? [] : storedPhotoCandidates.slice(1)}
               alt={`Pratinjau ${photoLabel}`}
               className="w-full h-full object-cover"
               fallbackClassName="min-h-full"

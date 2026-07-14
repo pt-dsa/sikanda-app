@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "motion/react";
-import { X, Save, AlertTriangle, RefreshCw, Camera, Upload, User } from "lucide-react";
+import { X, Save, AlertTriangle, RefreshCw, Camera, Upload, User, CalendarDays, CheckCircle2 } from "lucide-react";
 import { Pegawai } from "@/types";
 import { apiService, fileToBase64 } from "@/services/apiService";
 import { spreadsheetService } from "@/services/spreadsheetService";
-import { toIndonesianDateText, parseAnyDate } from "@/lib/utils";
+import { toIndonesianDateText, toInputDate, parseAnyDate } from "@/lib/utils";
 import { canEditField, type AppUser } from "@/lib/rbac";
+import {
+  GOLONGAN_OPTIONS,
+  INDONESIAN_INSTITUTIONS,
+  INDONESIAN_STUDY_PROGRAMS,
+  mergeSuggestionOptions,
+} from "@/lib/educationOptions";
 import { useToast } from "@/components/ui/Toast";
 
 const DATE_FIELDS: (keyof Pegawai)[] = ["tgl_lahir", "tgl_mulai_golongan", "tgl_mulai_jabatan"];
@@ -16,6 +22,10 @@ const labelCls = "block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1"
 const WORK_YEAR_OPTIONS = Array.from({ length: 51 }, (_, value) => value);
 const WORK_MONTH_OPTIONS = Array.from({ length: 12 }, (_, value) => value);
 const EDUCATION_OPTIONS = ["SD", "SMP", "SMA/SMK/SLTA", "D-I", "D-II", "D-III", "D-IV", "S-1/STRATA I", "S-2/STRATA II", "S-3/STRATA III"];
+const GRADUATION_YEAR_OPTIONS = Array.from(
+  { length: new Date().getFullYear() - 1949 },
+  (_, index) => String(new Date().getFullYear() - index),
+);
 
 function computeUsia(tglLahir?: string): string {
   const d = parseAnyDate(tglLahir);
@@ -76,6 +86,29 @@ const Field = React.memo(function Field({
   );
 });
 
+const SuggestionField = React.memo(function SuggestionField({
+  label, name, value, onChange, locked, placeholder = "Pilih suggestion atau ketik nilai baru", colSpan = false, options = [],
+}: Pick<FieldProps, "label" | "name" | "value" | "onChange" | "locked" | "placeholder" | "colSpan"> & { options: string[] }) {
+  const listId = `pegawai-${name}-options`;
+  return (
+    <div className={colSpan ? "md:col-span-2" : ""}>
+      <label className={labelCls}>{label}</label>
+      <input
+        list={listId}
+        name={name}
+        value={value}
+        onChange={onChange}
+        readOnly={locked}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={inputCls}
+      />
+      <datalist id={listId}>{options.map((option) => <option key={option} value={option} />)}</datalist>
+      {!locked && <p className="mt-1 text-[10px] text-gray-400">Pilih dari suggestion atau ketik nilai baru bila belum tersedia.</p>}
+    </div>
+  );
+});
+
 const IndonesianDateField = React.memo(function IndonesianDateField({
   label, name, value, onChange, locked,
 }: Pick<FieldProps, "label" | "name" | "value" | "onChange" | "locked">) {
@@ -83,12 +116,37 @@ const IndonesianDateField = React.memo(function IndonesianDateField({
     const normalized = toIndonesianDateText(event.target.value);
     if (normalized && normalized !== event.target.value) onChange({ target: { name, value: normalized } });
   };
+  const parsed = value ? parseAnyDate(value) : null;
+  const calendarValue = toInputDate(value);
   return (
     <div>
       <label className={labelCls}>{label}</label>
-      <input type="text" name={name} value={value} onChange={onChange} onBlur={normalize}
-        readOnly={locked} placeholder="Contoh: 13 Juli 1992" className={inputCls} />
-      <p className="mt-1 text-[10px] text-gray-400">Gunakan format Indonesia, contoh: 13 Juli 1992.</p>
+      <div className="flex gap-2">
+        <input type="text" name={name} value={value} onChange={onChange} onBlur={normalize}
+          readOnly={locked} inputMode="numeric" placeholder="Contoh: 13 Juli 1992" className={inputCls} />
+        {!locked && (
+          <label className="relative w-11 shrink-0 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer flex items-center justify-center" title={`Pilih ${label} dari kalender`}>
+            <CalendarDays size={17} />
+            <input
+              type="date"
+              value={calendarValue}
+              aria-label={`Pilih ${label} dari kalender`}
+              onChange={(event) => {
+                const selected = toIndonesianDateText(event.target.value);
+                if (selected) onChange({ target: { name, value: selected } });
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </label>
+        )}
+      </div>
+      {!value ? (
+        <p className="mt-1 text-[10px] text-gray-400">Disarankan memakai tombol kalender. Input manual menerima 13 Juli 1992, 13-07-1992, atau 13/07/1992.</p>
+      ) : parsed ? (
+        <p className="mt-1 text-[10px] text-emerald-600 flex items-center gap-1"><CheckCircle2 size={11} /> Valid · akan disimpan sebagai {toIndonesianDateText(value)}</p>
+      ) : (
+        <p className="mt-1 text-[10px] text-red-600 flex items-center gap-1"><AlertTriangle size={11} /> Tanggal belum valid. Pilih kalender atau gunakan contoh 13 Juli 1992.</p>
+      )}
     </div>
   );
 });
@@ -110,6 +168,7 @@ export function PegawaiFormModal({
   onSuccess,
   user,
   bidangOptions = [],
+  fieldOptions = {},
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -117,6 +176,12 @@ export function PegawaiFormModal({
   onSuccess: () => void;
   user?: AppUser | null;
   bidangOptions?: string[];
+  fieldOptions?: {
+    golongan?: string[];
+    jabatan?: string[];
+    jurusan?: string[];
+    institusi?: string[];
+  };
 }) {
   const toast = useToast();
   const [formData, setFormData] = useState<Partial<Pegawai>>({});
@@ -195,6 +260,11 @@ export function PegawaiFormModal({
       setErrorMsg("Pilih PPPK (Penuh Waktu) atau PPPK (Paruh Waktu).");
       return;
     }
+    const graduationYear = String(formData.tahun_lulus || "").trim();
+    if (graduationYear && (!/^\d{4}$/.test(graduationYear) || Number(graduationYear) < 1900 || Number(graduationYear) > new Date().getFullYear())) {
+      setErrorMsg(`Tahun Lulus harus berupa 4 digit antara 1900 dan ${new Date().getFullYear()}.`);
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -243,6 +313,10 @@ export function PegawaiFormModal({
     if (V("kategori_pppk") === "paruh_waktu") return "PPPK_PARUH_WAKTU";
     return "PPPK_PENUH_WAKTU";
   })();
+  const golonganSuggestions = mergeSuggestionOptions(GOLONGAN_OPTIONS, fieldOptions.golongan || []);
+  const jabatanSuggestions = mergeSuggestionOptions(fieldOptions.jabatan || []);
+  const jurusanSuggestions = mergeSuggestionOptions(INDONESIAN_STUDY_PROGRAMS, fieldOptions.jurusan || []);
+  const institutionSuggestions = mergeSuggestionOptions(INDONESIAN_INSTITUTIONS, fieldOptions.institusi || []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -360,12 +434,12 @@ export function PegawaiFormModal({
               value={V("tgl_lahir")} onChange={handleChange} locked={L("tgl_lahir")} />
 
             <SectionTitle>Kepangkatan &amp; Jabatan</SectionTitle>
-            <Field label="Golongan" name="golongan" placeholder="Contoh: III/c"
-              value={V("golongan")} onChange={handleChange} locked={L("golongan")} />
+            <SuggestionField label="Golongan" name="golongan" placeholder="Pilih golongan atau ketik nilai baru"
+              value={V("golongan")} onChange={handleChange} locked={L("golongan")} options={golonganSuggestions} />
             <IndonesianDateField label="TMT Golongan (dasar KGB & Pangkat)" name="tgl_mulai_golongan"
               value={V("tgl_mulai_golongan")} onChange={handleChange} locked={L("tgl_mulai_golongan")} />
-            <Field label="Jabatan" name="jabatan" placeholder="Nama jabatan" colSpan
-              value={V("jabatan")} onChange={handleChange} locked={L("jabatan")} />
+            <SuggestionField label="Jabatan" name="jabatan" placeholder="Pilih jabatan atau ketik nilai baru" colSpan
+              value={V("jabatan")} onChange={handleChange} locked={L("jabatan")} options={jabatanSuggestions} />
             <div className="md:col-span-2">
               <label className={labelCls}>Bidang</label>
               <input list="pegawai-bidang-options" name="unit_kerja" value={V("unit_kerja")} onChange={handleChange}
@@ -390,12 +464,12 @@ export function PegawaiFormModal({
               {V("tingkat") && !EDUCATION_OPTIONS.includes(V("tingkat")) && <option value={V("tingkat")}>{V("tingkat")} (data lama)</option>}
               {EDUCATION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
             </select></div>
-            <Field label="Pendidikan (Jurusan)" name="pendidikan_jurusan" placeholder="Contoh: S-1 Sistem Informasi"
-              value={V("pendidikan_jurusan")} onChange={handleChange} locked={L("pendidikan_jurusan")} />
-            <Field label="Universitas / Sekolah" name="universitas"
-              value={V("universitas")} onChange={handleChange} locked={L("universitas")} />
-            <Field label="Tahun Lulus" name="tahun_lulus" placeholder="Contoh: 2010"
-              value={V("tahun_lulus")} onChange={handleChange} locked={L("tahun_lulus")} />
+            <SuggestionField label="Pendidikan (Jurusan)" name="pendidikan_jurusan" placeholder="Pilih jurusan atau ketik nilai baru"
+              value={V("pendidikan_jurusan")} onChange={handleChange} locked={L("pendidikan_jurusan")} options={jurusanSuggestions} />
+            <SuggestionField label="Universitas / Sekolah" name="universitas" placeholder="Pilih institusi atau ketik nilai baru"
+              value={V("universitas")} onChange={handleChange} locked={L("universitas")} options={institutionSuggestions} />
+            <SuggestionField label="Tahun Lulus" name="tahun_lulus" placeholder="Pilih tahun atau ketik 4 digit"
+              value={V("tahun_lulus")} onChange={handleChange} locked={L("tahun_lulus")} options={GRADUATION_YEAR_OPTIONS} />
 
             <SectionTitle>Diklat</SectionTitle>
             <Field label="Riwayat Diklat" name="riwayat_diklat"
