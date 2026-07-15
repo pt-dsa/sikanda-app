@@ -268,6 +268,10 @@ export default function BukuPenjagaan() {
   }
 
   function exportCSV() {
+    if (!can(user?.role, "data.export")) {
+      toast.error("Akses Ditolak", "Role Pegawai tidak memiliki izin mengunduh CSV.");
+      return;
+    }
     const rows =
       viewMode === "agenda"
         ? filteredEvents.map((e) => ({
@@ -316,7 +320,7 @@ export default function BukuPenjagaan() {
       const res = await apiService.runNotifikasi() as any;
       toast.success(
         "Proses Notifikasi Selesai",
-        `${res.agenda ?? 0} agenda masuk ambang 6 bulan; ${res.email_pegawai_terkirim ?? 0} email pegawai dan ${res.email_rekap_terkirim ?? 0} rekap Administrator dikirim.`
+        `${res.agenda ?? 0} agenda berada dalam 1 bulan sebelum tenggat; ${res.email_pegawai_terkirim ?? 0} email pegawai dan ${res.email_rekap_terkirim ?? 0} rekap Administrator dikirim minggu ini.`
       );
     } catch (err: any) {
       toast.error("Gagal Mengirim", err?.message || "Terjadi kesalahan saat mengirim notifikasi.");
@@ -390,7 +394,7 @@ export default function BukuPenjagaan() {
                   open: true,
                   title: "Kirim Notifikasi Sekarang",
                   message:
-                    "Periksa agenda yang tepat memasuki enam bulan kalender hari ini dan kirim email satu kali kepada pegawai terkait. Rekap otomatis juga dikirim ke akun Administrator/Pimpinan aktif.\n\nNotifikasi yang sudah tercatat tidak akan dikirim ulang.",
+                    "Kirim pengingat untuk agenda yang sudah memasuki satu bulan sebelum jatuh tempo. Pengingat dijadwalkan setiap minggu dan tidak akan dikirim lebih dari satu kali pada minggu yang sama. Rekap otomatis juga dikirim ke akun Administrator/Pimpinan aktif.",
                   confirmLabel: "Kirim Notifikasi",
                   confirmClass: "bg-emerald-600 hover:bg-emerald-700",
                   onConfirm: doKirimNotifikasi,
@@ -403,12 +407,14 @@ export default function BukuPenjagaan() {
               Kirim Notifikasi
             </button>
           )}
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Download size={15} /> Ekspor CSV
-          </button>
+          {can(user?.role, "data.export") && (
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Download size={15} /> Ekspor CSV
+            </button>
+          )}
           <button
             onClick={() => load(true)}
             disabled={isRefreshing}
@@ -767,7 +773,7 @@ export default function BukuPenjagaan() {
               ))}
             </div>
             <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
-              Default resmi: KGB 2 tahun, pangkat 4 tahun, dan BUP 58 tahun. Email pegawai dikirim satu kali saat memasuki enam bulan kalender; rekap dikirim otomatis ke akun Administrator/Pimpinan aktif. Perubahan konfigurasi tercatat dalam audit.
+              Default resmi: KGB 2 tahun, pangkat 4 tahun, dan BUP 58 tahun. Email pegawai mulai dikirim saat tenggat masuk 1 bulan ke depan dan diulang paling banyak satu kali setiap minggu; rekap dikirim ke akun Administrator/Pimpinan aktif. Perubahan konfigurasi tercatat dalam audit.
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" disabled={savingSettings} onClick={() => setSettingsOpen(false)} className="px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700">Batal</button>

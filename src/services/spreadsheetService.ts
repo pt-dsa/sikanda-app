@@ -11,6 +11,30 @@ const CACHE_EXPIRY = 30 * 1000;
 const DEFERRED_V2 = new Set(["assets_inventory", "vehicle_budget", "vehicle_maintenance", "equipment_maintenance", "maintenance", "loans"]);
 const inFlight = new Map<string, Promise<any[]>>();
 
+function cacheTableRows(table: string, rows: any[], timestamp = Date.now()) {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.setItem(`supabase_v2_backend_${table}`, JSON.stringify({ timestamp, data: rows || [] }));
+  sessionStorage.setItem("sheet_last_updated", new Date(timestamp).toISOString());
+}
+
+async function primeDashboardSnapshot() {
+  if (typeof sessionStorage !== "undefined") {
+    const cached = sessionStorage.getItem("supabase_v2_backend_pegawai");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Date.now() - parsed.timestamp < CACHE_EXPIRY) return;
+      } catch { /* fetch fresh snapshot */ }
+    }
+  }
+  const snapshot = await apiService.getDashboardSnapshot();
+  const timestamp = Date.now();
+  cacheTableRows("pegawai", snapshot.data.pegawai || [], timestamp);
+  cacheTableRows("assets_vehicle", snapshot.data.assets_vehicle || [], timestamp);
+  cacheTableRows("assets_equipment", snapshot.data.assets_equipment || [], timestamp);
+  cacheTableRows("system_config", snapshot.data.system_config || [], timestamp);
+}
+
 // ---------------------------------------------------------------------------
 // Core fetch — FIXED: detect GViz API error response (not just HTML pages)
 // ---------------------------------------------------------------------------
@@ -87,7 +111,7 @@ function matchAssets(nama: string, byExact: Map<string, any[]>, byFuzzy: Map<str
 }
 
 // ---------------------------------------------------------------------------
-// Photo URL — Google Drive share → direct URL
+// Photo URL — signed Supabase URL dipertahankan; Google Drive hanya fallback legacy
 // ---------------------------------------------------------------------------
 function convertGDriveUrl(rawUrl: string): string {
   const url = String(rawUrl || "").trim();
@@ -203,7 +227,7 @@ export const spreadsheetService = {
   },
 
   async savePegawai(data: Partial<any>, isNew: boolean) {
-    const allowed = ['nip', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'status', 'kategori_pppk', 'tgl_lahir', 'tgl_mulai_golongan', 'tgl_mulai_jabatan', 'masa_kerja_tahun', 'masa_kerja_bulan', 'tingkat', 'pendidikan_jurusan', 'universitas', 'tahun_lulus', 'riwayat_diklat', 'tahun_diklat', 'usia', 'kontak', 'email', 'keterangan', 'catatan_mutasi_masuk', 'catatan_mutasi_keluar', 'foto', 'is_active'];
+    const allowed = ['nip', 'nama', 'jabatan', 'unit_kerja', 'golongan', 'status', 'kategori_pppk', 'tgl_lahir', 'tgl_mulai_golongan', 'tgl_mulai_jabatan', 'masa_kerja_tahun', 'masa_kerja_bulan', 'tingkat', 'pendidikan_jurusan', 'universitas', 'tahun_lulus', 'riwayat_diklat', 'tahun_diklat', 'usia', 'kontak', 'email', 'keterangan', 'catatan_mutasi_masuk', 'catatan_mutasi_keluar', 'is_active'];
     const sanitized = this._sanitizeData(data, allowed);
     await apiService.savePegawai(sanitized, isNew);
     this.clearCache();
@@ -481,6 +505,10 @@ export const spreadsheetService = {
           catatan_mutasi_masuk: String(item.catatan_mutasi_masuk || "").trim(),
           catatan_mutasi_keluar: String(item.catatan_mutasi_keluar || "").trim(),
           foto,
+          foto_storage_path: String(item.foto_storage_path || "").trim(),
+          foto_provider: String(item.foto_provider || (item.foto_storage_path ? "supabase" : (item.foto ? "drive" : ""))).trim(),
+          foto_migration_status: String(item.foto_migration_status || "").trim(),
+          foto_migrated_at: String(item.foto_migrated_at || "").trim(),
           assets: allAssets,
           assets_kendaraan: vMatch.items,
           assets_alat_mesin: eMatch.items,
@@ -502,6 +530,7 @@ export const spreadsheetService = {
   // getDashboardMetrics — robust: isolasi error pegawai dari error aset
   // ---------------------------------------------------------------------------
   async getDashboardMetrics(): Promise<DashboardMetrics> {
+    await primeDashboardSnapshot();
     // Jalankan semua fetch paralel; isolasi error per grup
     const [
       pegawaiResult,

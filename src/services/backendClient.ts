@@ -47,42 +47,50 @@ export async function callBackend<T = any>(
   }
 
   const auth = await buildAuth(explicitAuth);
+  const action = String(payload.action || "");
+  const retryable = new Set(["ping", "whoami", "supa_select", "get_config", "notification_feed", "dashboard_snapshot", "employee_photo_url"]);
+  const attempts = retryable.has(action) ? 2 : 1;
+  const requestId = globalThis.crypto?.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  let lastError: Error | null = null;
 
-  let res: Response;
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
-  try {
-    res = await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ ...payload, ...auth }),
-      redirect: "follow",
-      signal: controller.signal,
-    });
-  } catch (e: any) {
-    if (e?.name === "AbortError") {
-      throw new Error("Server SIKANDA tidak merespons dalam 30 detik. Silakan coba lagi.");
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const timeoutMs = retryable.has(action) ? (attempt === 0 ? 25_000 : 40_000) : 45_000;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ ...payload, ...auth, requestId }),
+        redirect: "follow",
+        signal: controller.signal,
+      });
+      let json: any;
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error("Respons server tidak valid. Pastikan Web App Apps Script sudah di-deploy sebagai Web App.");
+      }
+      if (!json || json.ok !== true) {
+        const suffix = json?.request_id ? ` (ID: ${json.request_id})` : ` (ID: ${requestId})`;
+        throw new Error(((json && json.error) || "Operasi gagal di server SIKANDA.") + suffix);
+      }
+      return json as T;
+    } catch (e: any) {
+      const aborted = e?.name === "AbortError";
+      lastError = aborted
+        ? new Error(`Server SIKANDA belum merespons dalam ${Math.round(timeoutMs / 1000)} detik (ID: ${requestId}).`)
+        : new Error(e?.message || `Tidak dapat menghubungi server SIKANDA (ID: ${requestId}).`);
+      if (attempt + 1 < attempts && (aborted || /fetch|network|menghubungi/i.test(String(e?.message || "")))) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500 * (attempt + 1)));
+        continue;
+      }
+      throw lastError;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
-    throw new Error(
-      "Tidak dapat menghubungi server SIKANDA. Periksa koneksi internet dan URL Apps Script. (" +
-        (e?.message || e) +
-        ")"
-    );
-  } finally {
-    window.clearTimeout(timeoutId);
   }
-
-  let json: any;
-  try {
-    json = await res.json();
-  } catch {
-    throw new Error("Respons server tidak valid. Pastikan Web App Apps Script sudah di-deploy sebagai Web App.");
-  }
-
-  if (!json || json.ok !== true) {
-    throw new Error((json && json.error) || "Operasi gagal di server SIKANDA.");
-  }
-  return json as T;
+  throw lastError || new Error(`Operasi gagal di server SIKANDA (ID: ${requestId}).`);
   } finally {
     releaseConcurrencySlot();
   }

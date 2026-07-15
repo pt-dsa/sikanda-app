@@ -47,8 +47,8 @@ const employeePage = read("src/pages/Pegawai.tsx");
 const dashboard = read("src/pages/Dashboard.tsx");
 const capture = read("src/components/ui/ScreenCaptureTool.tsx");
 
-assert(!backend.includes("query.push('nip=eq.' + encodeURIComponent(actor.nip))") && backend.includes("ensureActorPhotoAccess_"), "Backend pegawai harus membaca seluruh data dan memulihkan izin foto privat");
-assert(backend.includes("'nama', 'foto', 'tgl_lahir'") && backend.includes("return rows") && backend.includes("file.addViewers(viewers)"), "Backend harus mengizinkan profil personal terbatas dan berbagi foto ke akun aktif");
+assert(!backend.includes("query.push('nip=eq.' + encodeURIComponent(actor.nip))") && !backend.includes("ensureActorPhotoAccess_"), "Backend pegawai harus membaca seluruh data tanpa operasi izin Drive pada jalur baca");
+assert(backend.includes("'nama', 'tgl_lahir', 'kontak'") && backend.includes("signedEmployeePhotoUrls_") && backend.includes("foto_storage_path"), "Backend harus membatasi profil personal dan melayani foto private melalui signed URL");
 assert(form.includes('type="date"') && form.includes("Tanggal belum valid") && form.includes("SuggestionField"), "Form harus memiliki kalender, validasi langsung, dan suggestion yang dapat diketik");
 assert(form.includes("INDONESIAN_INSTITUTIONS") && form.includes("INDONESIAN_STUDY_PROGRAMS") && form.includes("GRADUATION_YEAR_OPTIONS"), "Form harus memakai library pendidikan dan suggestion tahun lulus");
 assert(api.includes('table !== "assets_vehicle"') && api.includes('action: "asset_fix_holder", table'), "Cleansing harus mengirim nama tabel yang dikenali backend");

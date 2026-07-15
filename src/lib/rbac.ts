@@ -48,6 +48,7 @@ export type Action =
   | "pegawai.edit.own"
   | "pegawai.delete"
   | "asset.write"
+  | "data.export"
   | "config.write"
   | "cleansing.run"
   | "account.manage";
@@ -105,6 +106,7 @@ const ACTIONS_BY_ROLE: Record<Role, Action[]> = {
     "pegawai.edit.any",
     "pegawai.delete",
     "asset.write",
+    "data.export",
     "config.write",
     "cleansing.run",
     "account.manage",
@@ -114,6 +116,7 @@ const ACTIONS_BY_ROLE: Record<Role, Action[]> = {
     "pegawai.edit.any",
     "pegawai.delete",
     "asset.write",
+    "data.export",
     "config.write",
     "cleansing.run",
     "account.manage",

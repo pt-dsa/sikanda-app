@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Info, UserCircle, AlertTriangle, Package, GraduationCap,
   CheckCircle2, CircleDot, Car, Wrench, Archive, ChevronDown, Edit2, Trash2,
@@ -9,6 +9,7 @@ import type { Pegawai } from "@/types";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { resolveAssetPhotoCandidates } from "@/lib/media";
+import { apiService } from "@/services/apiService";
 
 // ---------------------------------------------------------------------------
 // Atom bersama (dipakai juga oleh halaman Data ASN/PPPK) — dipusatkan di sini
@@ -62,13 +63,35 @@ export function PensiunStatus({ tglPensiun }: { tglPensiun: string }) {
   );
 }
 
-export function PegawaiAvatar({ foto, nama, size = "md" }: { foto: string; nama: string; size?: "sm" | "md" | "lg" }) {
+export function PegawaiAvatar({ foto, nama, nip, size = "md" }: { foto: string; nama: string; nip?: string; size?: "sm" | "md" | "lg" }) {
   const [imgError, setImgError] = useState(false);
+  const [source, setSource] = useState(foto || "");
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
   const cls = { sm: "w-9 h-9", md: "w-11 h-11", lg: "w-28 h-28 text-4xl" }[size];
   const textCls = { sm: "text-sm", md: "text-base", lg: "text-3xl" }[size];
   const initial = nama ? nama.charAt(0).toUpperCase() : "?";
 
-  if (!foto || imgError) {
+  useEffect(() => {
+    setSource(foto || "");
+    setImgError(false);
+    setRefreshAttempted(false);
+  }, [foto, nip]);
+
+  const handleImageError = async () => {
+    if (!refreshAttempted && nip) {
+      setRefreshAttempted(true);
+      try {
+        const refreshed = await apiService.getEmployeePhotoUrl(nip);
+        if (refreshed.url && refreshed.url !== source) {
+          setSource(refreshed.url);
+          return;
+        }
+      } catch { /* fallback to initials below */ }
+    }
+    setImgError(true);
+  };
+
+  if (!source || imgError) {
     return (
       <div className={`${cls} rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold ${textCls} shrink-0`}>
         {initial}
@@ -77,10 +100,13 @@ export function PegawaiAvatar({ foto, nama, size = "md" }: { foto: string; nama:
   }
   return (
     <img
-      src={foto}
+      src={source}
       alt={nama}
       className={`${cls} rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 shrink-0`}
-      onError={() => setImgError(true)}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => void handleImageError()}
     />
   );
 }
@@ -217,7 +243,7 @@ export function PegawaiDetailModal({
 
             {/* Sidebar */}
             <div className="w-full md:w-56 shrink-0 flex flex-col items-center text-center mb-6 md:mb-0">
-              <PegawaiAvatar foto={pegawai.foto} nama={pegawai.nama} size="lg" />
+              <PegawaiAvatar foto={pegawai.foto} nama={pegawai.nama} nip={pegawai.nip} size="lg" />
               <div className="flex items-center gap-1 mt-3 justify-center">
                 <h3 className="text-lg font-bold leading-tight">{pegawai.nama}</h3>
               </div>

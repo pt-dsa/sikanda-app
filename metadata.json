@@ -1,6 +1,6 @@
 {
   "name": "SIKANDA",
-  "description": "SIKANDA V1.1.6 Secure - Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah",
+  "description": "SIKANDA V1.1.7 Secure - Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah",
   "requestFramePermissions": ["camera", "geolocation"],
   "majorCapabilities": []
 }

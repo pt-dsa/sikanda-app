@@ -1,14 +1,17 @@
-# SIKANDA V1.1.6 Secure
+# SIKANDA V1.1.7 Secure
 
-SIKANDA adalah Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah dengan React/Vite, Firebase Authentication, backend Google Apps Script, Supabase PostgreSQL, Google Drive, dan Tanya SIKANDA.
+SIKANDA adalah Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah berbasis React/Vite, Firebase Authentication, Google Apps Script, Supabase PostgreSQL/Storage, dan Tanya SIKANDA database-first.
 
-Mulai implementasi dari:
+Mulai deployment dari **`00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.7_SECURE.md`**.
 
-**`00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.6_SECURE.md`**
+Urutan upgrade wajib:
 
-PENTING: agar perubahan tampilan muncul, upload/import/replace seluruh source frontend V1.1.6 ke Google AI Studio, klik Apply changes dan Publish, atau push seluruh source ke GitHub. Mengubah secret saja tidak mengubah kode aplikasi.
-
-Upgrade final dari V1.1.5 ke V1.1.6 memakai satu migrasi data idempoten: `supabase/004_sikanda_v1_1_6_contact_normalization.sql`. Migrasi ini tidak mengubah struktur tabel; hanya menormalkan kontak `08...` menjadi `628...`. Setelah itu ganti backend Apps Script, buat deployment version baru, lalu upload/replace frontend V1.1.6 dan publish/deploy ulang.
+1. Backup Supabase, Apps Script, dan folder foto Google Drive.
+2. Jalankan migrasi V1.1.6 bila belum, lalu `supabase/005_sikanda_v1_1_7_storage_and_notifications.sql`.
+3. Deploy `apps-script/Code.gs` sebagai **New version**.
+4. Jalankan `pasangTriggerSikandaV117()` satu kali.
+5. Jalankan `migrasiSemuaFotoPegawaiKeSupabase()` satu kali; proses berlanjut per batch.
+6. Deploy frontend V1.1.7.
 
 Pemeriksaan lokal:
 
@@ -18,4 +21,4 @@ npm run verify
 npm audit --omit=dev --audit-level=high
 ```
 
-Secret backend tidak boleh berada di source, AI Studio frontend, atau GitHub.
+Secret Firebase, Supabase service-role, dan Gemini tidak boleh masuk source/frontend/GitHub.

@@ -282,8 +282,16 @@ export function PegawaiFormModal({
     }
 
     setIsSaving(true);
+    let saveStage: "data" | "photo" = "data";
     try {
       const payload: Partial<Pegawai> = { ...formData };
+      // Metadata foto dikelola eksklusif oleh endpoint Storage agar signed URL
+      // tidak pernah tersimpan kembali sebagai URL permanen di database.
+      delete (payload as any).foto;
+      delete (payload as any).foto_storage_path;
+      delete (payload as any).foto_provider;
+      delete (payload as any).foto_migration_status;
+      delete (payload as any).foto_migrated_at;
       payload.kontak = normalizeIndonesianPhoneNumber(payload.kontak);
       DATE_FIELDS.forEach((field) => {
         const normalized = toIndonesianDateText((payload as any)[field]);
@@ -296,18 +304,26 @@ export function PegawaiFormModal({
       await apiService.savePegawai(payload, !initialData);
 
       if (photoFile) {
+        saveStage = "photo";
         const { base64, mimeType, fileName } = await fileToBase64(photoFile);
         const uploadRes = await apiService.uploadFoto({ nip: String(formData.nip), base64, mimeType, fileName });
-        await apiService.savePegawai({ nip: String(formData.nip), foto: uploadRes.viewUrl }, false);
+        setPhotoPreview(uploadRes.viewUrl);
       }
 
       spreadsheetService.clearCache();
       toast.success(initialData ? "Perubahan Data Berhasil Disimpan" : "Data Pegawai Berhasil Ditambahkan", initialData ? "Perubahan profil pegawai telah disimpan dan tervalidasi." : "Data pegawai baru telah tersimpan pada database.");
       onSuccess();
     } catch (error: any) {
-      const message = error?.message || "Terjadi kesalahan saat menyimpan data.";
+      const detail = error?.message || "Terjadi kesalahan saat menyimpan data.";
+      const message = saveStage === "photo"
+        ? `Data profil sudah tersimpan, tetapi foto belum berhasil diunggah. Silakan coba unggah foto kembali. ${detail}`
+        : detail;
       setErrorMsg(message);
-      toast.error("Penyimpanan Data Pegawai Gagal", message);
+      toast.error(saveStage === "photo" ? "Unggah Foto Belum Berhasil" : "Penyimpanan Data Pegawai Gagal", message);
+      if (saveStage === "photo") {
+        spreadsheetService.clearCache();
+        onSuccess();
+      }
     } finally {
       setIsSaving(false);
     }
@@ -375,9 +391,7 @@ export function PegawaiFormModal({
                     src={photoPreview}
                     alt="Foto"
                     className="w-full h-full object-cover"
-                    onError={(e) =>
-                      ((e.target as HTMLImageElement).style.display = "none")
-                    }
+                    onError={() => setPhotoPreview("")}
                   />
                 ) : (
                   <User size={32} className="text-gray-400" />
@@ -419,7 +433,7 @@ export function PegawaiFormModal({
                   className="hidden"
                 />
                 <p className="text-[10px] text-gray-400">
-                  JPG/PNG, maks 5 MB. Disimpan ke Google Drive.
+                  JPG/PNG/WebP, maks 5 MB. Dioptimalkan dan disimpan private di Supabase Storage.
                 </p>
               </div>
             </div>

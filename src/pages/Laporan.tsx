@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Download, Printer, RefreshCw, Search, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { spreadsheetService } from "@/services/spreadsheetService";
@@ -9,6 +9,8 @@ import type { Equipment, Pegawai, Vehicle } from "@/types";
 import logoKota from "@/assets/logo_kop_dcktr.png";
 import kopHeaderText from "@/assets/kop_header_text.svg";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
+import { AuthContext } from "@/components/layout/AppShell";
+import { can } from "@/lib/rbac";
 import {
   filterAgendaReport,
   filterEquipmentReport,
@@ -156,6 +158,7 @@ function rowsToPrintTable(title: string, rows: Record<string, unknown>[], filter
 
 export default function Laporan() {
   const toast = useToast();
+  const { user } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [pegawai, setPegawai] = useState<Pegawai[]>([]);
@@ -195,6 +198,10 @@ export default function Laporan() {
   const filteredEquipment = useMemo(() => filterEquipmentReport(equipment, equipmentFilter), [equipment, equipmentFilter]);
 
   function exportCsv(rows: Record<string, unknown>[], name: string) {
+    if (!can(user?.role, "data.export")) {
+      toast.error("Akses Ditolak", "Role Pegawai tidak memiliki izin mengunduh CSV.");
+      return;
+    }
     if (!rows.length) {
       toast.warning("Ekspor Kosong", "Tidak ada data yang sesuai dengan filter aktif.");
       return;

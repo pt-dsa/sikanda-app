@@ -1,7 +1,7 @@
 import { callBackend } from "@/services/backendClient";
 import type { Pegawai } from "@/types";
 
-export interface UploadFotoResult { ok: true; fileId: string; url: string; viewUrl: string; }
+export interface UploadFotoResult { ok: true; fileId: string; url: string; viewUrl: string; storagePath?: string; provider?: "supabase"; }
 export interface NotificationAgendaItem {
   nip: string; nama: string; jabatan: string; kategori: "KGB" | "PANGKAT" | "BUP";
   kategoriLabel: string; tanggal: string; selisihHari: number;
@@ -69,6 +69,15 @@ export const apiService = {
   // router database-first Tanya SIKANDA.
   getNotificationFeed: async (): Promise<NotificationFeed> => callBackend({ action: "notification_feed" }),
 
+  getDashboardSnapshot: async (): Promise<{ ok: true; generated_at: string; data: Record<string, any[]> }> =>
+    callBackend({ action: "dashboard_snapshot" }),
+
+  getEmployeePhotoUrl: async (nip: string): Promise<{ ok: true; nip: string; url: string; provider: "supabase" | "drive" | "none" }> =>
+    callBackend({ action: "employee_photo_url", nip }),
+
+  migrateDrivePhotos: async (limit = 10) =>
+    callBackend<{ ok: true; scanned: number; migrated: number; skipped: number; failed: Array<{ nip: string; nama: string; error: string }> }>({ action: "photo_migrate_drive", limit }),
+
   setConfig: async (key: string, value: string): Promise<{ ok: true }> =>
     callBackend({ action: "set_config", key, value }),
 
@@ -80,7 +89,7 @@ export const apiService = {
     question: string,
     history: Array<{ role: "user" | "assistant"; content: string }>,
     dataContext: string
-  ): Promise<{ ok: true; answer: string; model?: string; route?: "database" | "gemini" }> => {
+  ): Promise<{ ok: true; answer: string; model?: string; route?: "database" | "gemini"; snapshot_at?: string }> => {
     return callBackend({ action: "ai_ask", question, history, dataContext });
   },
 
@@ -99,14 +108,43 @@ export const apiService = {
 
 // Helper: ubah File -> base64 (tanpa prefix data URL) untuk dikirim ke backend.
 export function fileToBase64(file: File): Promise<{ base64: string; mimeType: string; fileName: string }> {
-  return new Promise((resolve, reject) => {
+  return optimizeEmployeePhoto(file).then((optimized) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = String(reader.result || "");
       const base64 = result.includes(",") ? result.split(",")[1] : result;
-      resolve({ base64, mimeType: file.type || "image/jpeg", fileName: file.name || "foto.jpg" });
+      resolve({ base64, mimeType: optimized.type || "image/webp", fileName: optimized.name || "foto.webp" });
     };
     reader.onerror = () => reject(new Error("Gagal membaca berkas foto."));
-    reader.readAsDataURL(file);
-  });
+    reader.readAsDataURL(optimized);
+  }));
+}
+
+/** Batasi dimensi dan ukuran transfer. Foto profil tidak memerlukan resolusi kamera penuh. */
+async function optimizeEmployeePhoto(file: File): Promise<File> {
+  if (typeof document === "undefined" || typeof URL === "undefined") return file;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Foto tidak dapat dibaca oleh browser."));
+      img.src = objectUrl;
+    });
+    const maxSide = 960;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || 1, image.naturalHeight || 1));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+    context.drawImage(image, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "foto"}.webp`, { type: "image/webp" });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

@@ -18,7 +18,7 @@ export function formatNumber(num: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// DATE HANDLING (SIKANDA standard: simpan "DD-MM-YYYY", tampil "13 Juni 1968")
+// DATE HANDLING (SIKANDA standard: simpan ISO "YYYY-MM-DD", tampil "13 Juni 1968")
 // ---------------------------------------------------------------------------
 const MONTHS_MAP: Record<string, number> = {
   JANUARI: 0, JANUARY: 0, JAN: 0,
@@ -101,14 +101,14 @@ export function parseIndonesianDate(dateStr: string): Date | null {
   return parseAnyDate(dateStr);
 }
 
-/** Kanonik penyimpanan: "DD-MM-YYYY" (atau "" jika tidak terbaca). */
+/** Kanonik penyimpanan database: "YYYY-MM-DD" (atau "" jika tidak terbaca). */
 export function toStorageDate(input: unknown): string {
   const d = parseAnyDate(input);
   if (!d) return "";
-  const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
   const yyyy = d.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Untuk <input type="date"> butuh "YYYY-MM-DD". */

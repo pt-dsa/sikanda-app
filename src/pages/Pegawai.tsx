@@ -268,6 +268,10 @@ export default function PegawaiPage() {
   // - Nama berkas standar: SIKANDA_Pegawai_YYYYMMDD.csv (komponen tanggal LOKAL).
   // ---------------------------------------------------------------------------
   const handleExportCSV = () => {
+    if (!can(user?.role, "data.export")) {
+      toast.error("Akses Ditolak", "Role Pegawai tidak memiliki izin mengunduh CSV.");
+      return;
+    }
     if (filteredData.length === 0) {
       toast.warning("Ekspor Kosong", "Tidak ada data pegawai pada filter saat ini.");
       return;
@@ -385,14 +389,16 @@ export default function PegawaiPage() {
               Capture Layar
             </button>
           )}
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0 shadow-sm"
-            title="Ekspor data pegawai (sesuai filter) beserta kolom kelengkapan"
-          >
-            <Download size={14} />
-            Ekspor CSV
-          </button>
+          {can(user?.role, "data.export") && (
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shrink-0 shadow-sm"
+              title="Ekspor data pegawai (sesuai filter) beserta kolom kelengkapan"
+            >
+              <Download size={14} />
+              Ekspor CSV
+            </button>
+          )}
           <button
             onClick={() => load(true)}
             disabled={isRefreshing}
@@ -546,7 +552,7 @@ export default function PegawaiPage() {
                 >
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <PegawaiAvatar foto={pegawai.foto} nama={pegawai.nama} size="sm" />
+                      <PegawaiAvatar foto={pegawai.foto} nama={pegawai.nama} nip={pegawai.nip} size="sm" />
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight max-w-[180px] truncate">
                           {pegawai.nama}
@@ -644,7 +650,7 @@ export default function PegawaiPage() {
             <Card className="overflow-hidden hover:shadow-md transition-all">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <PegawaiAvatar foto={pegawai.foto} nama={pegawai.nama} size="md" />
+                  <PegawaiAvatar foto={pegawai.foto} nama={pegawai.nama} nip={pegawai.nip} size="md" />
                   <div className="flex-1 overflow-hidden">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h3 className="font-bold text-gray-900 dark:text-white leading-tight text-sm truncate">

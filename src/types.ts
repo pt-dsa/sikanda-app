@@ -139,8 +139,12 @@ export interface Pegawai {
   catatan_mutasi_masuk: string;
   catatan_mutasi_keluar: string;
 
-  // Photo (Google Drive direct URL)
+  // Photo (signed URL dari Supabase; Drive hanya fallback migrasi)
   foto: string;
+  foto_storage_path?: string;
+  foto_provider?: string;
+  foto_migration_status?: string;
+  foto_migrated_at?: string;
 
   // Linked assets (populated after matching)
   assets: any[];
