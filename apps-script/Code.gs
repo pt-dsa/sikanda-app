@@ -34,6 +34,7 @@ var ACTIVE_DATA_TABLES = ['pegawai', 'assets_vehicle', 'assets_equipment', 'asse
 var DEFERRED_V2_TABLES = ['assets_inventory', 'vehicle_budget', 'maintenance', 'loans'];
 var SAFE_CONFIG_KEYS = ['KGB_CYCLE_YEARS', 'PANGKAT_CYCLE_YEARS', 'BUP_USIA'];
 var MANAGED_CONFIG_KEYS = SAFE_CONFIG_KEYS.slice();
+var VALID_ASSET_CONDITIONS = ['BAIK', 'RUSAK RINGAN', 'KURANG BAIK', 'RUSAK BERAT'];
 
 var EMPLOYEE_EDITABLE_FIELDS = [
   'nama', 'tgl_lahir', 'kontak', 'email', 'tingkat', 'pendidikan_jurusan', 'universitas',
@@ -117,7 +118,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.9-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.10-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -775,6 +776,24 @@ function requireAssetText_(data, key, label, isNew) {
   data[key] = String(data[key]).trim();
 }
 
+function normalizeAssetCondition_(data, isNew) {
+  var hasCondition = Object.prototype.hasOwnProperty.call(data, 'kondisi');
+  if (!hasCondition) {
+    if (isNew) throw publicError_('Data kondisi wajib dipilih berdasarkan pemeriksaan fisik aset.');
+    return;
+  }
+  var condition = String(data.kondisi || '').trim().toUpperCase();
+  if (!condition) {
+    delete data.kondisi;
+    if (isNew) throw publicError_('Data kondisi wajib dipilih berdasarkan pemeriksaan fisik aset.');
+    return;
+  }
+  if (VALID_ASSET_CONDITIONS.indexOf(condition) === -1) {
+    throw publicError_('Kondisi aset tidak valid. Pilih BAIK, RUSAK RINGAN, KURANG BAIK, atau RUSAK BERAT.');
+  }
+  data.kondisi = condition;
+}
+
 function syncAssetCoordinates_(actor, table, assetId, data) {
   if (!Object.prototype.hasOwnProperty.call(data, 'latitude') || !Object.prototype.hasOwnProperty.call(data, 'longitude')) return;
   var assetLatitudeColumn = firstExistingColumn_(table, 'latitude');
@@ -943,6 +962,7 @@ function saveAsset_(actor, table, data, isNew) {
     requireAssetText_(data, 'nama_aset', 'Nama Barang', isNew);
     requireAssetText_(data, 'merk', 'Merk', isNew);
   }
+  normalizeAssetCondition_(data, isNew);
   validateAssetEmployeeField_(data, 'pengguna', 'Pengguna');
   validateAssetEmployeeField_(data, 'penanggung_jawab', 'Penanggung Jawab');
   var input = {};

@@ -1,10 +1,10 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ScanSearch, RefreshCw, CheckCircle2, AlertTriangle,
   ShieldAlert, Info, ChevronDown, ChevronUp, Zap, Check,
-  UserCheck2, ArrowRight,
+  UserCheck2, ArrowRight, ExternalLink, Wrench,
 } from "lucide-react";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { apiService } from "@/services/apiService";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/cleansing";
 import { buildUnifiedAssets } from "@/lib/kelengkapan";
 import type { Pegawai } from "@/types";
+import { scanMissingAssetConditions, type MissingAssetConditionIssue } from "@/lib/assetCondition";
 
 // ---------------------------------------------------------------------------
 // Halaman Cleansing (Tahap 6)
@@ -66,6 +67,7 @@ export default function Cleansing() {
   const [assetApplied, setAssetApplied]     = useState<Set<string>>(new Set());
   const [applyingAssetKey, setApplyingAssetKey] = useState<string | null>(null);
   const [assetScanLoading, setAssetScanLoading] = useState(true);
+  const [conditionIssues, setConditionIssues] = useState<MissingAssetConditionIssue[]>([]);
 
   // Peta NIP → Pegawai (untuk buildCorrectionPayload)
   const pegawaiByNip = useMemo(() => {
@@ -98,6 +100,7 @@ export default function Cleansing() {
       const unifiedAssets = buildUnifiedAssets(vehicles, equipment);
 
       setAssetIssues(scanAssetNameMismatches(result as Pegawai[], unifiedAssets));
+      setConditionIssues(scanMissingAssetConditions(vehicles, equipment));
     } catch (err: any) {
       setErrorMsg(err?.message || "Gagal memuat data pegawai.");
     } finally {
@@ -236,6 +239,7 @@ export default function Cleansing() {
   }
 
   const canEdit = can(user?.role, "pegawai.edit.any");
+  const canEditAssets = can(user?.role, "asset.write");
 
   if (loading) return <LoadingState />;
 
@@ -252,7 +256,7 @@ export default function Cleansing() {
             <ScanSearch size={24} className="text-blue-600" /> Data Cleansing
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Deteksi dan perbaikan inkonsistensi data pegawai
+            Deteksi dan perbaikan inkonsistensi data pegawai serta aset
           </p>
         </div>
         <div className="flex gap-2">
@@ -295,7 +299,7 @@ export default function Cleansing() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="border-l-4 border-l-red-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
@@ -320,7 +324,61 @@ export default function Cleansing() {
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Informasi Saja</div>
           </CardContent>
         </Card>
+        <Card className="border-l-4 border-l-orange-500 col-span-2 md:col-span-1">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{conditionIssues.length}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Kondisi Aset Belum Diisi</div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Data legacy wajib diverifikasi; tidak pernah dikoreksi massal menjadi BAIK. */}
+      <section id="asset-condition-section" className="scroll-mt-5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Wrench size={18} className="text-orange-600" /> Kondisi Aset Belum Diisi
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 max-w-3xl">
+              Nilai kosong tidak dianggap BAIK. Periksa kondisi fisik setiap aset lalu simpan melalui tombol Perbaiki. Demi integritas data, tidak tersedia pengisian otomatis atau massal.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 rounded-full self-start sm:self-auto">
+            {conditionIssues.length} perlu verifikasi
+          </span>
+        </div>
+
+        {conditionIssues.length === 0 ? (
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-900 dark:bg-green-950/20">
+            <CheckCircle2 size={28} className="mx-auto mb-2 text-green-500" />
+            <p className="text-sm font-medium text-green-700 dark:text-green-300">Seluruh aset telah memiliki data kondisi.</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-orange-200 bg-white dark:border-orange-900/60 dark:bg-gray-800 overflow-hidden">
+            <div className="max-h-[28rem] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/60">
+              {conditionIssues.map((issue) => (
+                <div key={issue.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-orange-50/50 dark:hover:bg-orange-950/10">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-orange-700 bg-orange-100 dark:bg-orange-900/40 dark:text-orange-300 px-2 py-0.5 rounded-full">{issue.kindLabel}</span>
+                      <span className="text-xs font-mono text-gray-400">{issue.assetId}</span>
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white break-words">{issue.assetLabel}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Pengguna: {issue.holderName || "Belum diisi"}</p>
+                  </div>
+                  {canEditAssets ? (
+                    <Link to={issue.editPath} className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-orange-600 px-4 py-2 text-xs font-bold text-white hover:bg-orange-700">
+                      <ExternalLink size={13} /> Perbaiki
+                    </Link>
+                  ) : (
+                    <span className="text-xs italic text-gray-400">Perlu admin/pimpinan</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Tabs */}
       <div className="overflow-x-auto">

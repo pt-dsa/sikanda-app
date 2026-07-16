@@ -38,9 +38,9 @@ export function SummaryCards({
     ...items,
   ];
 
-  // Kolom adaptif: 2 di mobile, sampai 5 di desktop (atau sejumlah kartu).
-  const cols = Math.min(cards.length, 5);
-  const lgCols = ["lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3", "lg:grid-cols-4", "lg:grid-cols-5"][cols - 1] || "lg:grid-cols-5";
+  // Kolom adaptif: 2 di mobile, sampai 6 di desktop (Total + 4 kondisi + kosong).
+  const cols = Math.min(cards.length, 6);
+  const lgCols = ["lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3", "lg:grid-cols-4", "lg:grid-cols-5", "lg:grid-cols-6"][cols - 1] || "lg:grid-cols-6";
 
   return (
     <div className={`grid grid-cols-2 ${lgCols} gap-3 ${className}`}>

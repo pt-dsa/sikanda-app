@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/utils";
 import type { Pegawai } from "@/types";
 import { employmentStatusLabel } from "@/lib/employmentStatus";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { assetConditionLabel } from "@/lib/assetCondition";
 import { resolveAssetPhotoCandidates } from "@/lib/media";
 import { apiService } from "@/services/apiService";
 
@@ -143,11 +144,12 @@ function AssetCard({ asset, type, onSelect }: { key?: React.Key; asset: any; typ
 
   const photoCandidates = resolveAssetPhotoCandidates(asset.foto, type === "kendaraan" ? "kendaraan" : "alat_mesin");
 
-  const kondisi = String(asset.kondisi || "BAIK").toUpperCase();
+  const kondisi = assetConditionLabel(asset.kondisi);
   const kondisiColor =
     kondisi === "BAIK" ? "bg-green-100 text-green-700" :
-    kondisi.includes("RINGAN") ? "bg-yellow-100 text-yellow-700" :
-    "bg-red-100 text-red-700";
+    kondisi.includes("RINGAN") || kondisi.includes("KURANG") ? "bg-yellow-100 text-yellow-700" :
+    kondisi.includes("BERAT") || kondisi.includes("RUSAK") ? "bg-red-100 text-red-700" :
+    "bg-gray-100 text-gray-700";
 
   return (
     <div

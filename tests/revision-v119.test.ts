@@ -60,6 +60,6 @@ assert(map.includes("calc(100vw-3rem)"), "popup peta tidak boleh lebih lebar dar
 assert(service.includes("apiService.saveAsset('assets_vehicle'") && service.includes("apiService.saveAsset('assets_equipment'"), "create aset harus melewati API backend");
 assert(api.includes('action: "asset_save"'), "frontend harus memanggil endpoint asset_save");
 assert(backend.includes("supaRequest_('post', table, payload, 'return=representation')"), "backend create aset harus POST langsung ke tabel Supabase");
-assert(backend.includes("version: '1.1.9-secure'"), "backend harus melaporkan versi 1.1.9-secure");
+assert(backend.includes("version: '1.1.10-secure'"), "backend terbaru harus mempertahankan endpoint versi aman");
 
 console.log("revision-v119-tests: OK");

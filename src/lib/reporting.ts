@@ -1,5 +1,6 @@
 import type { Equipment, Pegawai, Vehicle } from "@/types";
 import type { PenjagaanEvent } from "@/lib/penjagaan";
+import { assetConditionLabel } from "@/lib/assetCondition";
 
 export interface PegawaiReportFilter {
   search: string;
@@ -72,7 +73,7 @@ export function filterVehicleReport(rows: Vehicle[], filter: VehicleReportFilter
     const searchable = norm(`${row.asset_id} ${row.kode_barang} ${row.no_polisi} ${row.nama_aset} ${row.merk} ${row.pengguna}`);
     return (!query || searchable.includes(query))
       && (!filter.jenis || norm(row.jenis_kendaraan) === norm(filter.jenis))
-      && (!filter.kondisi || norm(row.kondisi) === norm(filter.kondisi))
+      && (!filter.kondisi || norm(assetConditionLabel(row.kondisi)) === norm(filter.kondisi))
       && (!filter.tahun || norm(row.tahun) === norm(filter.tahun))
       && (!filter.pengguna || norm(row.pengguna) === norm(filter.pengguna));
   });
@@ -84,7 +85,7 @@ export function filterEquipmentReport(rows: Equipment[], filter: EquipmentReport
     const searchable = norm(`${row.asset_id} ${row.kode_barang} ${row.nama_aset} ${row.merk} ${row.jenis} ${row.pengguna} ${row.penanggung_jawab} ${row.lokasi}`);
     return (!query || searchable.includes(query))
       && (!filter.jenis || norm(row.jenis) === norm(filter.jenis))
-      && (!filter.kondisi || norm(row.kondisi) === norm(filter.kondisi))
+      && (!filter.kondisi || norm(assetConditionLabel(row.kondisi)) === norm(filter.kondisi))
       && (!filter.tahun || norm(row.tahun) === norm(filter.tahun))
       && (!filter.pengguna || norm(row.pengguna) === norm(filter.pengguna));
   });

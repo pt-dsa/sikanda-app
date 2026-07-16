@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useMemo } from "react";
+import React, { useContext, useEffect, useState, useMemo, useRef } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { Pegawai, Vehicle } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -23,6 +23,7 @@ import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
 import { optionalCoordinatePayload } from "@/lib/coordinates";
 import { normalizeAssetText, optionalAssetNumber, validOptionalAssetNumber } from "@/lib/assetFields";
+import { ASSET_CONDITIONS, assetConditionLabel, isValidAssetCondition, normalizeAssetCondition } from "@/lib/assetCondition";
 
 const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
 
@@ -66,6 +67,7 @@ export default function Kendaraan() {
   const [formData, setFormData] = useState<Partial<Vehicle>>({});
   const [saving, setSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const handledEditIdRef = useRef("");
 
   // Fungsi muat data di lingkup komponen agar bisa dipanggil ulang
   // (mis. sinkronisasi ulang saat operasi tulis gagal).
@@ -174,6 +176,11 @@ export default function Kendaraan() {
     e.preventDefault();
     if (saving) return;
     const isNew = !formData.asset_id;
+    const normalizedCondition = normalizeAssetCondition(formData.kondisi);
+    if (isNew && !isValidAssetCondition(normalizedCondition)) {
+      toast.error("Kondisi Wajib Dipilih", "Pilih kondisi kendaraan berdasarkan hasil pemeriksaan fisik. Data baru tidak boleh dianggap BAIK secara otomatis.");
+      return;
+    }
     const coordinateResult = optionalCoordinatePayload(formData.latitude, formData.longitude);
     if (!coordinateResult.pair.valid) {
       toast.error("Koordinat Tidak Valid", coordinateResult.pair.error);
@@ -203,7 +210,6 @@ export default function Kendaraan() {
       tipe: normalizeAssetText(formData.tipe),
       jenis_kendaraan: normalizeAssetText(formData.jenis_kendaraan),
       tahun: optionalAssetNumber(formData.tahun),
-      kondisi: String(formData.kondisi || "BAIK").trim().toUpperCase(),
       pengguna: normalizeAssetText(formData.pengguna),
       penanggung_jawab: normalizeAssetText(formData.penanggung_jawab),
       lokasi: normalizeAssetText(formData.lokasi || formData.unit_kerja),
@@ -218,6 +224,9 @@ export default function Kendaraan() {
       qr_url: formData.qr_url,
       ...coordinateResult.payload,
     };
+    // Saat mengedit data legacy yang kondisinya kosong/tidak baku, jangan
+    // mengirim kondisi agar perubahan field lain tidak mengubahnya diam-diam.
+    if (isValidAssetCondition(normalizedCondition)) payload.kondisi = normalizedCondition;
     if (coordinateResult.pair.empty) {
       delete payload.latitude;
       delete payload.longitude;
@@ -263,28 +272,38 @@ export default function Kendaraan() {
     }
   };
 
-  const openForm = (item?: Vehicle) => {
+  function openForm(item?: Vehicle) {
     setPhotoFile(null);
     if (item) {
       setFormData({ ...item });
     } else {
-      setFormData({ nama_aset: "Kendaraan Dinas", kondisi: "BAIK" });
+      setFormData({ nama_aset: "Kendaraan Dinas", kondisi: "" });
     }
     setIsEditing(true);
-  };
+  }
+
+  useEffect(() => {
+    const editId = new URLSearchParams(location.search).get("edit") || "";
+    if (!editId || loading || !canWriteAssets || handledEditIdRef.current === editId) return;
+    const item = data.find((row) => String(row.asset_id) === editId);
+    if (item) {
+      handledEditIdRef.current = editId;
+      openForm(item);
+    }
+  }, [location.search, data, loading, canWriteAssets]);
 
   const filteredData = useMemo(() => {
     return data.filter(item => {
       const matchJenis = filterJenis ? String(item.jenis_kendaraan || "").toLowerCase() === String(filterJenis || "").toLowerCase() : true;
       // canonKey (trim+UPPERCASE) di kedua sisi → angka kartu == jumlah baris terfilter.
-      const matchKondisi = filterKondisi ? canonKey(item.kondisi) === canonKey(filterKondisi) : true;
+      const matchKondisi = filterKondisi ? canonKey(assetConditionLabel(item.kondisi)) === canonKey(filterKondisi) : true;
       return matchJenis && matchKondisi;
     });
   }, [data, filterJenis, filterKondisi]);
 
   // Ringkasan kondisi dari data NYATA (dikelompokkan kanonik). Klik kartu = filter.
   const kondisiSummary = useMemo(
-    () => summarizeBy(data, (d: Vehicle) => d.kondisi).map((b) => ({ ...b, tone: toneForKondisi(b.key) })),
+    () => summarizeBy(data, (d: Vehicle) => assetConditionLabel(d.kondisi)).map((b) => ({ ...b, tone: toneForKondisi(b.key) })),
     [data]
   );
 
@@ -297,7 +316,7 @@ export default function Kendaraan() {
   };
 
   const uniqueJenis = Array.from(new Set(data.map(d => d.jenis_kendaraan).filter(Boolean)));
-  const uniqueKondisi = Array.from(new Set(data.map(d => d.kondisi).filter(Boolean)));
+  const uniqueKondisi = Array.from(new Set(data.map(d => assetConditionLabel(d.kondisi))));
 
   const columns: ColumnDef<Vehicle>[] = [
     {
@@ -333,7 +352,7 @@ export default function Kendaraan() {
       sortable: true,
       cell: (row) => (
         <div className="flex flex-col gap-1 items-start">
-          <StatusBadge status={row.kondisi || ""} />
+          <StatusBadge status={assetConditionLabel(row.kondisi)} />
           {isMaintenanceDue(row.km_kendaraan) && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
               <AlertCircle size={10} />
@@ -381,7 +400,7 @@ export default function Kendaraan() {
           <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{row.merk} {row.tipe} {row.tahun ? `(${row.tahun})` : ""}</div>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <StatusBadge status={row.kondisi || ""} />
+          <StatusBadge status={assetConditionLabel(row.kondisi)} />
           {isMaintenanceDue(row.km_kendaraan) && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
               <AlertCircle size={10} />
@@ -505,6 +524,7 @@ export default function Kendaraan() {
             <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">Ubah Status:</span>
             <button onClick={() => handleBulkUpdateStatus("BAIK")} className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 rounded-full text-xs font-semibold transition-colors">BAIK</button>
             <button onClick={() => handleBulkUpdateStatus("RUSAK RINGAN")} className="px-3 py-1.5 bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 rounded-full text-xs font-semibold transition-colors">RUSAK RINGAN</button>
+            <button onClick={() => handleBulkUpdateStatus("KURANG BAIK")} className="px-3 py-1.5 bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 rounded-full text-xs font-semibold transition-colors">KURANG BAIK</button>
             <button onClick={() => handleBulkUpdateStatus("RUSAK BERAT")} className="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 rounded-full text-xs font-semibold transition-colors">RUSAK BERAT</button>
             <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-1"></div>
             <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full text-xs font-semibold transition-colors shadow-sm">
@@ -533,7 +553,7 @@ export default function Kendaraan() {
           "Nomor Polisi": selectedItem.no_polisi,
           "Merk": selectedItem.merk,
           "Tipe": selectedItem.tipe,
-          "Kondisi": selectedItem.kondisi,
+          "Kondisi": assetConditionLabel(selectedItem.kondisi),
           "Jenis Kendaraan": selectedItem.jenis_kendaraan,
           "Tahun Pembelian": selectedItem.tahun,
           "Pengguna": selectedItem.pengguna,
@@ -693,12 +713,12 @@ export default function Kendaraan() {
                   <input type="number" min="1900" max="2100" value={formData.tahun || ""} onChange={e => setFormData({...formData, tahun: e.target.value})} className={vehicleInputCls} placeholder="Contoh: 2018" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Kondisi</label>
-                  <select value={formData.kondisi || "BAIK"} onChange={e => setFormData({...formData, kondisi: e.target.value})} className={vehicleInputCls}>
-                    <option value="BAIK">BAIK</option>
-                    <option value="RUSAK RINGAN">RUSAK RINGAN</option>
-                    <option value="RUSAK BERAT">RUSAK BERAT</option>
+                  <label className="text-xs font-medium text-gray-500">Kondisi {!formData.asset_id && <span className="text-red-500">*</span>}</label>
+                  <select required={!formData.asset_id} value={isValidAssetCondition(formData.kondisi) ? normalizeAssetCondition(formData.kondisi) : ""} onChange={e => setFormData({...formData, kondisi: e.target.value})} className={vehicleInputCls}>
+                    <option value="">-- Pilih kondisi berdasarkan pemeriksaan --</option>
+                    {ASSET_CONDITIONS.map((condition) => <option key={condition} value={condition}>{condition}</option>)}
                   </select>
+                  {!isValidAssetCondition(formData.kondisi) && formData.asset_id && <p className="text-[11px] text-amber-600">Data lama belum memiliki kondisi atau nilainya tidak baku. Pilih kondisi setelah diverifikasi; field lain tetap dapat disimpan tanpa mengubah kondisi.</p>}
                 </div>
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Penguasaan dan Lokasi</div>
                 <div className="flex flex-col gap-1">

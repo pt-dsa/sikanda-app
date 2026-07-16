@@ -31,9 +31,9 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
 export function getStatusBadgeVariant(status: string): BadgeProps["variant"] {
   if (!status) return "default";
   const s = String(status || "").toLowerCase();
-  if (s.includes("baik") || s.includes("selesai") || s.includes("aman") || s.includes("disetujui") || s.includes("dikembalikan")) return "success";
-  if (s.includes("rusak ringan") || s.includes("monitoring") || s.includes("pengajuan") || s.includes("dipinjam")) return "warning";
   if (s.includes("rusak berat") || s.includes("kritis") || s.includes("ditolak")) return "danger";
+  if (s.includes("rusak ringan") || s.includes("kurang baik") || s.includes("monitoring") || s.includes("pengajuan") || s.includes("dipinjam")) return "warning";
+  if (s === "baik" || s.includes("selesai") || s.includes("aman") || s.includes("disetujui") || s.includes("dikembalikan")) return "success";
   return "default";
 }
 

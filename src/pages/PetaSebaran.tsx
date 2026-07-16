@@ -13,6 +13,7 @@ import { nameSimilarity, normalizeNamaForMatch } from "@/lib/cleansing";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import type { Pegawai } from "@/types";
 import { coordinatePairFromRow } from "@/lib/coordinates";
+import { assetConditionLabel } from "@/lib/assetCondition";
 
 // Fix Leaflet's default icon path issues in React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -125,7 +126,7 @@ export default function PetaSebaran() {
               lng,
               title: v.no_polisi || v.nama_aset || "Kendaraan",
               subtitle: `${v.merk || ""} - ${v.jenis_kendaraan || ""}`,
-              condition: v.kondisi || "BAIK",
+              condition: assetConditionLabel(v.kondisi),
               isMotorcycle: isMotor,
               pengguna: canonicalEmployeeName(v.pengguna, employeeDirectory),
               qrUrl: v.qr_url,
@@ -163,7 +164,7 @@ export default function PetaSebaran() {
               lng,
               title: e.nama_aset || "Alat & Mesin",
               subtitle: e.merk || "-",
-              condition: e.kondisi || "BAIK",
+              condition: assetConditionLabel(e.kondisi),
               pengguna: canonicalEmployeeName(e.pengguna, employeeDirectory),
               qrUrl: e.qr_url,
               foto: e.foto,
@@ -175,7 +176,7 @@ export default function PetaSebaran() {
                 "Merk": e.merk,
                 "Jenis": e.jenis,
                 "Jumlah": e.jumlah ? `${e.jumlah} ${e.satuan || ''}` : '',
-                "Kondisi": e.kondisi,
+                "Kondisi": assetConditionLabel(e.kondisi),
                 "Tahun": e.tahun,
                 "Pengguna": canonicalEmployeeName(e.pengguna, employeeDirectory),
                 "Penanggung Jawab": canonicalEmployeeName(e.penanggung_jawab, employeeDirectory),
@@ -498,6 +499,7 @@ export default function PetaSebaran() {
                   <StatusBadge status="RUSAK RINGAN" className="justify-center !text-[10px]" />
                   <StatusBadge status="KURANG BAIK" className="justify-center !text-[10px]" />
                   <StatusBadge status="RUSAK BERAT" className="justify-center !text-[10px]" />
+                  <StatusBadge status="BELUM DIISI" className="justify-center !text-[10px] col-span-2" />
                 </div>
               </div>
             </div>

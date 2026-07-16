@@ -1,38 +1,36 @@
-# SIKANDA V1.1.9 Secure — Release Notes
+# SIKANDA V1.1.10 Secure — Release Notes
 
 Tanggal rilis: 16 Juli 2026 (Asia/Jakarta).
 
-## Perbaikan update Pengguna Alat & Mesin
+## Integritas kondisi aset
 
-- Placeholder legacy seperti `-`, `NULL`, dan nilai kosong tidak lagi dikirim sebagai isi kolom database.
-- Tahun, jumlah, harga, kilometer, dan kapasitas mesin dinormalisasi menjadi number sebelum mutasi.
-- Payload Alat & Mesin dibangun dari field yang diizinkan, bukan menyebarkan seluruh object hasil baca.
-- Backend mengulang validasi angka untuk mencegah manipulasi dari browser.
-- Koordinat yang tidak berubah tidak ditulis ulang ke `asset_locations`.
-- Update koordinat lama hanya mengubah latitude/longitude, bukan `asset_id` atau `type`, sehingga constraint metadata lokasi legacy tidak menghalangi update Pengguna.
-- Error PostgreSQL umum diterjemahkan menjadi pesan aman dan dapat ditindaklanjuti tanpa membuka detail database.
+- Menghapus fallback frontend yang sebelumnya mengubah kondisi kosong menjadi `BAIK` saat data dibaca.
+- Menghapus fallback payload yang sebelumnya dapat menulis `BAIK` saat pengguna hanya memperbaiki field lain.
+- Menampilkan nilai kosong sebagai `BELUM DIISI` pada Kendaraan, Alat & Mesin, relasi aset pegawai, detail, Peta Sebaran, laporan print, dan CSV.
+- Card ringkasan serta filter memakai kunci kondisi yang sama, sehingga angka pada card identik dengan baris yang tampil.
+- Badge `KURANG BAIK` diperbaiki agar berwarna peringatan, bukan hijau.
 
-## Sinkronisasi
+## CRUD dan validasi
 
-- Ditambahkan tombol Sinkronisasi pada Kelola Akun, Data Kendaraan, dan Alat & Mesin.
-- Sinkronisasi membersihkan cache sesi dan memuat ulang data aktif dari Supabase melalui Apps Script.
-- Tombol memiliki status proses dan mencegah klik ganda.
-- **Tarik dari Database Pegawai** tetap terpisah karena fungsinya membuat akun baru, bukan sekadar refresh.
+- Data baru wajib memilih satu dari empat kondisi resmi.
+- Update data lama tanpa kondisi tetap dapat dilakukan; payload tidak menyertakan kondisi sampai pengguna benar-benar memilihnya.
+- Backend memvalidasi kondisi secara independen untuk menolak manipulasi request dari browser.
+- Alur create/update tetap menulis ke Supabase melalui Apps Script dengan token Firebase, RBAC, field allowlist, dan verifikasi baris hasil mutasi.
 
-## Antarmuka dan mobile-first
+## Data Cleansing
 
-- Format jam menjadi `Hari,tanggal bulan tahun | Pukul HH:mm:ss WIB`.
-- Distribusi Masa Kerja memakai tinggi card secara lebih proporsional dengan bar yang lebih jelas.
-- Topbar menempatkan pencarian pada baris penuh di mobile agar ikon navigasi tidak berdesakan.
-- Kelola Akun memakai card pada mobile dan tabel pada desktop.
-- Modal Kendaraan, Alat & Mesin, Akun, Pegawai, detail umum, konfirmasi, dan laporan mengikuti viewport dinamis, memiliki scroll internal, footer aman, serta tombol sentuh lebih besar.
-- Popup Peta Sebaran dibatasi terhadap lebar viewport mobile.
-- Overflow horizontal global dicegah dan safe area perangkat berponi/home indicator didukung.
+- Audit baca-saja mendeteksi seluruh Kendaraan dan Alat & Mesin tanpa kondisi.
+- Setiap temuan memiliki tautan langsung ke modal edit record yang tepat.
+- Tidak ada auto-fix atau bulk-fix kondisi. Status harus ditentukan melalui pemeriksaan fisik.
 
-## Database dan keamanan
+## Capture Supabase
 
-- Tambah Kendaraan melakukan `POST` ke `assets_vehicle`.
-- Tambah Alat & Mesin melakukan `POST` ke `assets_equipment`.
-- Seluruh mutasi melewati Apps Script, Firebase ID token, resolusi role `app_access`, dan pemeriksaan baris `return=representation`.
-- Supabase service-role dan Gemini key tetap hanya berada di Apps Script Properties.
-- Tidak ada migrasi SQL atau secret frontend baru.
+- Pesan “SQL snippet ... no longer exists” adalah status tab/query Supabase yang sudah tidak tersedia, bukan kerusakan database. Membuka query baru adalah tindakan yang benar.
+- Hasil aktual menunjukkan 133 dari 139 Kendaraan dan 39 dari 40 Alat & Mesin belum memiliki kondisi. V1.1.10 mempertahankan fakta tersebut sampai diverifikasi manual.
+- Nama kolom aktif adalah nama Indonesia seperti `no_polisi`, `nama_aset`, dan `pengguna`.
+
+## Keamanan dan kompatibilitas
+
+- RLS, model service-role-only, private storage, Firebase Authentication, backend RBAC, audit log, dan error sanitization dipertahankan.
+- Tidak ada secret, dependency, SQL, property, trigger, atau migrasi baru.
+- TypeScript, 12 suite regresi, build produksi, sintaks Apps Script, audit dependency, dan pemindaian secret lulus.

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ZoomIn, ImageOff, AlertTriangle } from "lucide-react";
 import { DetailModal } from "@/components/ui/DetailModal";
+import { assetConditionLabel } from "@/lib/assetCondition";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 
@@ -37,7 +38,7 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
                 Merk: asset.merk,
                 Tipe: asset.tipe,
                 Tahun: asset.tahun,
-                Kondisi: asset.kondisi,
+                Kondisi: assetConditionLabel(asset.kondisi),
                 Pengguna: asset.pengguna,
                 "No. BPKB": asset.no_bpkb,
                 "No. Rangka": asset.no_rangka,

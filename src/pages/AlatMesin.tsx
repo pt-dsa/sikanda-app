@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useMemo } from "react";
+import React, { useContext, useEffect, useState, useMemo, useRef } from "react";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { Equipment, Pegawai } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -23,6 +23,7 @@ import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
 import { optionalCoordinatePayload } from "@/lib/coordinates";
 import { normalizeAssetText, optionalAssetNumber, validOptionalAssetNumber } from "@/lib/assetFields";
+import { ASSET_CONDITIONS, assetConditionLabel, isValidAssetCondition, normalizeAssetCondition } from "@/lib/assetCondition";
 
 export default function AlatMesin() {
   const { user } = useContext(AuthContext);
@@ -48,6 +49,7 @@ export default function AlatMesin() {
   const [formData, setFormData] = useState<Partial<Equipment>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const handledEditIdRef = useRef("");
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -188,6 +190,11 @@ export default function AlatMesin() {
       return;
     }
     const isNew = !formData.asset_id;
+    const normalizedCondition = normalizeAssetCondition(formData.kondisi);
+    if (isNew && !isValidAssetCondition(normalizedCondition)) {
+      toast.error("Kondisi Wajib Dipilih", "Pilih kondisi alat/mesin berdasarkan hasil pemeriksaan fisik. Data baru tidak boleh dianggap BAIK secara otomatis.");
+      return;
+    }
     const payload: Partial<Equipment> = {
       asset_id: formData.asset_id,
       kode_barang: String(formData.kode_barang || "").trim(),
@@ -198,7 +205,6 @@ export default function AlatMesin() {
       pengguna: normalizeAssetText(formData.pengguna),
       penanggung_jawab: normalizeAssetText(formData.penanggung_jawab),
       lokasi: normalizeAssetText(formData.lokasi),
-      kondisi: String(formData.kondisi || "BAIK").trim().toUpperCase(),
       jumlah: optionalAssetNumber(formData.jumlah) || 1,
       satuan: normalizeAssetText(formData.satuan) || "Unit",
       harga_pembelian: optionalAssetNumber(formData.harga_pembelian),
@@ -206,6 +212,7 @@ export default function AlatMesin() {
       qr_url: formData.qr_url,
       ...coordinateResult.payload,
     };
+    if (isValidAssetCondition(normalizedCondition)) payload.kondisi = normalizedCondition;
     if (coordinateResult.pair.empty) {
       delete payload.latitude;
       delete payload.longitude;
@@ -243,15 +250,25 @@ export default function AlatMesin() {
     }
   };
 
-  const openForm = (item?: Equipment) => {
+  function openForm(item?: Equipment) {
     setPhotoFile(null);
     if (item) {
       setFormData(item);
     } else {
-      setFormData({ kondisi: "BAIK", jumlah: 1, satuan: "Unit" });
+      setFormData({ kondisi: "", jumlah: 1, satuan: "Unit" });
     }
     setIsEditing(true);
-  };
+  }
+
+  useEffect(() => {
+    const editId = new URLSearchParams(location.search).get("edit") || "";
+    if (!editId || loading || !canWriteAssets || handledEditIdRef.current === editId) return;
+    const item = data.find((row) => String(row.asset_id) === editId);
+    if (item) {
+      handledEditIdRef.current = editId;
+      openForm(item);
+    }
+  }, [location.search, data, loading, canWriteAssets]);
 
 
   const filteredData = useMemo(() => {
@@ -264,18 +281,18 @@ export default function AlatMesin() {
         item.penanggung_jawab?.toLowerCase().includes(search.toLowerCase())
       ) : true;
       const matchJenis = filterJenis ? String(item.jenis || "").toLowerCase() === String(filterJenis || "").toLowerCase() : true;
-      const matchKondisi = filterKondisi ? canonKey(item.kondisi) === canonKey(filterKondisi) : true;
+      const matchKondisi = filterKondisi ? canonKey(assetConditionLabel(item.kondisi)) === canonKey(filterKondisi) : true;
       return matchSearch && matchJenis && matchKondisi;
     });
   }, [data, search, filterJenis, filterKondisi]);
 
   const kondisiSummary = useMemo(
-    () => summarizeBy(data, (d: Equipment) => d.kondisi).map((b) => ({ ...b, tone: toneForKondisi(b.key) })),
+    () => summarizeBy(data, (d: Equipment) => assetConditionLabel(d.kondisi)).map((b) => ({ ...b, tone: toneForKondisi(b.key) })),
     [data]
   );
 
   const uniqueJenis = Array.from(new Set(data.map(d => d.jenis).filter(Boolean)));
-  const uniqueKondisi = Array.from(new Set(data.map(d => d.kondisi).filter(Boolean)));
+  const uniqueKondisi = Array.from(new Set(data.map(d => assetConditionLabel(d.kondisi))));
 
   const columns: ColumnDef<Equipment>[] = [
     {
@@ -316,7 +333,7 @@ export default function AlatMesin() {
       accessorKey: "kondisi",
       sortable: true,
       cell: (row) => (
-        <StatusBadge status={row.kondisi || ""} />
+        <StatusBadge status={assetConditionLabel(row.kondisi)} />
       ),
     },
     {
@@ -357,7 +374,7 @@ export default function AlatMesin() {
           <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{row.merk} {row.tahun ? `(${row.tahun})` : ""}</div>
         </div>
         <div className="flex-shrink-0">
-          <StatusBadge status={row.kondisi || ""} />
+          <StatusBadge status={assetConditionLabel(row.kondisi)} />
         </div>
       </div>
       
@@ -473,6 +490,7 @@ export default function AlatMesin() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">Ubah Status:</span>
             <button onClick={() => handleBulkUpdateStatus("BAIK")} className="px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 rounded-full text-xs font-semibold transition-colors">BAIK</button>
+            <button onClick={() => handleBulkUpdateStatus("RUSAK RINGAN")} className="px-3 py-1.5 bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 rounded-full text-xs font-semibold transition-colors">RUSAK RINGAN</button>
             <button onClick={() => handleBulkUpdateStatus("KURANG BAIK")} className="px-3 py-1.5 bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 rounded-full text-xs font-semibold transition-colors">KURANG BAIK</button>
             <button onClick={() => handleBulkUpdateStatus("RUSAK BERAT")} className="px-3 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 rounded-full text-xs font-semibold transition-colors">RUSAK BERAT</button>
             <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-1"></div>
@@ -503,7 +521,7 @@ export default function AlatMesin() {
           "Merk": selectedItem.merk,
           "Jenis": selectedItem.jenis,
           "Jumlah": selectedItem.jumlah ? `${selectedItem.jumlah} ${selectedItem.satuan || ''}` : '',
-          "Kondisi": selectedItem.kondisi,
+          "Kondisi": assetConditionLabel(selectedItem.kondisi),
           "Tahun": selectedItem.tahun,
           "Pengguna": selectedItem.pengguna,
           "Penanggung Jawab": selectedItem.penanggung_jawab,
@@ -683,12 +701,12 @@ export default function AlatMesin() {
                   <EmployeeAutocomplete label="Penanggung Jawab" value={String(formData.penanggung_jawab || "")} employees={employees} onChange={(penanggung_jawab) => setFormData({ ...formData, penanggung_jawab })} placeholder="Ketik nama penanggung jawab..." />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Kondisi</label>
-                  <select value={formData.kondisi || "BAIK"} onChange={e => setFormData({...formData, kondisi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm text-gray-900 dark:text-gray-100">
-                    <option value="BAIK" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">BAIK</option>
-                    <option value="KURANG BAIK" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">KURANG BAIK</option>
-                    <option value="RUSAK BERAT" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">RUSAK BERAT</option>
+                  <label className="text-xs font-medium text-gray-500">Kondisi {!formData.asset_id && <span className="text-red-500">*</span>}</label>
+                  <select required={!formData.asset_id} value={isValidAssetCondition(formData.kondisi) ? normalizeAssetCondition(formData.kondisi) : ""} onChange={e => setFormData({...formData, kondisi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm text-gray-900 dark:text-gray-100">
+                    <option value="" className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">-- Pilih kondisi berdasarkan pemeriksaan --</option>
+                    {ASSET_CONDITIONS.map((condition) => <option key={condition} value={condition} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">{condition}</option>)}
                   </select>
+                  {!isValidAssetCondition(formData.kondisi) && formData.asset_id && <p className="text-[11px] text-amber-600">Data lama belum memiliki kondisi atau nilainya tidak baku. Pilih kondisi setelah diverifikasi; field lain tetap dapat disimpan tanpa mengubah kondisi.</p>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Harga Pembelian</label>

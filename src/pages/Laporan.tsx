@@ -22,6 +22,7 @@ import {
   type PegawaiReportFilter,
   type VehicleReportFilter,
 } from "@/lib/reporting";
+import { assetConditionLabel } from "@/lib/assetCondition";
 
 const inputCls = "w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-900/50 outline-none focus:ring-2 focus:ring-blue-500/30";
 
@@ -58,7 +59,7 @@ function vehicleRows(rows: Vehicle[]) {
     nomor_polisi: v.no_polisi, merk: v.merk, tipe: v.tipe,
     jenis_kendaraan: v.jenis_kendaraan, tahun: v.tahun, pengguna: v.pengguna,
     penanggung_jawab: v.penanggung_jawab, lokasi: v.lokasi || v.unit_kerja,
-    kondisi: v.kondisi, kilometer: v.km_kendaraan, kapasitas_mesin: v.kapasitas_mesin,
+    kondisi: assetConditionLabel(v.kondisi), kilometer: v.km_kendaraan, kapasitas_mesin: v.kapasitas_mesin,
     nomor_bpkb: v.no_bpkb, nomor_rangka: v.no_rangka, nomor_mesin: v.no_mesin,
     harga_pembelian: v.harga_pembelian, latitude: v.latitude, longitude: v.longitude, foto: v.foto,
   }));
@@ -69,7 +70,7 @@ function equipmentRows(rows: Equipment[]) {
     asset_id: item.asset_id, kode_barang: item.kode_barang, nama_barang: item.nama_aset,
     merk: item.merk, jenis: item.jenis, jumlah: item.jumlah, satuan: item.satuan,
     tahun: item.tahun, pengguna: item.pengguna, penanggung_jawab: item.penanggung_jawab,
-    lokasi: item.lokasi, kondisi: item.kondisi, harga_pembelian: item.harga_pembelian,
+    lokasi: item.lokasi, kondisi: assetConditionLabel(item.kondisi), harga_pembelian: item.harga_pembelian,
     latitude: item.latitude, longitude: item.longitude, foto: item.foto,
   }));
 }
@@ -105,7 +106,7 @@ function vehiclePrintRows(rows: Vehicle[]) {
     "Nomor Polisi": v.no_polisi, "Kode Barang": v.kode_barang, "Nama Aset": v.nama_aset,
     "Merk/Model": [v.merk, v.tipe].filter(Boolean).join(" · "), Jenis: v.jenis_kendaraan,
     Tahun: v.tahun, Pengguna: v.pengguna, "Penanggung Jawab": v.penanggung_jawab,
-    Lokasi: v.lokasi || v.unit_kerja, Kondisi: v.kondisi,
+    Lokasi: v.lokasi || v.unit_kerja, Kondisi: assetConditionLabel(v.kondisi),
     Kilometer: v.km_kendaraan, "Kapasitas Mesin": v.kapasitas_mesin,
   }));
 }
@@ -115,7 +116,7 @@ function equipmentPrintRows(rows: Equipment[]) {
     "Kode Barang": item.kode_barang, "Nama Barang": item.nama_aset, Merk: item.merk,
     Jenis: item.jenis, Jumlah: `${item.jumlah || 0} ${item.satuan || "Unit"}`,
     Tahun: item.tahun, Pengguna: item.pengguna, "Penanggung Jawab": item.penanggung_jawab,
-    Lokasi: item.lokasi, Kondisi: item.kondisi, "Harga Pembelian": item.harga_pembelian,
+    Lokasi: item.lokasi, Kondisi: assetConditionLabel(item.kondisi), "Harga Pembelian": item.harga_pembelian,
   }));
 }
 
@@ -279,11 +280,11 @@ export default function Laporan() {
     units: uniqueSorted(pegawai.map((p) => p.unit_kerja)),
     agendaUnits: uniqueSorted(agenda.map((a) => a.bidang)),
     vehicleTypes: uniqueSorted(vehicles.map((v) => v.jenis_kendaraan)),
-    conditions: uniqueSorted(vehicles.map((v) => v.kondisi)),
+    conditions: uniqueSorted(vehicles.map((v) => assetConditionLabel(v.kondisi))),
     years: uniqueSorted(vehicles.map((v) => v.tahun)),
     users: uniqueSorted(vehicles.map((v) => v.pengguna)),
     equipmentTypes: uniqueSorted(equipment.map((item) => item.jenis)),
-    equipmentConditions: uniqueSorted(equipment.map((item) => item.kondisi)),
+    equipmentConditions: uniqueSorted(equipment.map((item) => assetConditionLabel(item.kondisi))),
     equipmentYears: uniqueSorted(equipment.map((item) => item.tahun)),
     equipmentUsers: uniqueSorted(equipment.map((item) => item.pengguna)),
   };

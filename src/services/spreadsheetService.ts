@@ -376,7 +376,9 @@ export const spreadsheetService = {
         penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
         lokasi: item.usage || item.lokasi || item.unit_kerja || "",
         unit_kerja: item.usage || item.unit_kerja || item.lokasi || "",
-        kondisi: (item.kondisi || item.condition || "BAIK").toUpperCase(),
+        // Jangan pernah menganggap kondisi kosong sebagai BAIK. Data legacy kosong
+        // harus tetap kosong agar dapat diaudit dan diverifikasi pengguna.
+        kondisi: String(item.kondisi || item.condition || "").trim().toUpperCase(),
         kapasitas_mesin: item.engine_capacity_cc ?? item.kapasitas_mesin ?? item.cc ?? "",
         no_bpkb: item.bpkb_number || item.no_bpkb || "",
         no_rangka: item.chassis_number || item.no_rangka || "",
@@ -416,7 +418,7 @@ export const spreadsheetService = {
         pengguna: item.holder_name || item.pengguna || "",
         penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
         lokasi: item.location || item.lokasi || "",
-        kondisi: (item.condition || item.kondisi || "BAIK").toUpperCase(),
+        kondisi: String(item.condition || item.kondisi || "").trim().toUpperCase(),
         harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
