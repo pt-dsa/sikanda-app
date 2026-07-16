@@ -34,14 +34,14 @@ export function ConfirmModal({
 }) {
   if (!state.open) return null;
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md border border-gray-200 dark:border-gray-800 overflow-hidden"
       >
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           <div className="flex items-start gap-3 mb-3">
             <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={22} />
             <div>
@@ -54,10 +54,10 @@ export function ConfirmModal({
             </div>
           </div>
         </div>
-        <div className="px-5 pb-5 flex justify-end gap-3">
+        <div className="safe-area-bottom px-4 sm:px-5 pb-4 sm:pb-5 grid grid-cols-2 sm:flex sm:justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="min-h-11 px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             Batal
           </button>
@@ -66,7 +66,7 @@ export function ConfirmModal({
               onClose();
               state.onConfirm();
             }}
-            className={`px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition-colors ${
+            className={`min-h-11 px-5 py-2 text-sm font-bold text-white rounded-xl shadow-sm transition-colors ${
               state.confirmClass ?? "bg-red-600 hover:bg-red-700"
             }`}
           >

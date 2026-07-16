@@ -351,12 +351,12 @@ export function PegawaiFormModal({
   const institutionSuggestions = mergeSuggestionOptions(INDONESIAN_INSTITUTIONS, fieldOptions.institusi || []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800"
+        className="bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-xl w-full max-w-3xl h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[92dvh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-800"
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
           <h2 className="font-bold text-lg text-gray-900 dark:text-white">
@@ -535,12 +535,12 @@ export function PegawaiFormModal({
           </form>
         </div>
 
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex justify-end gap-3">
+        <div className="safe-area-bottom p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 grid grid-cols-2 sm:flex sm:justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+            className="min-h-11 px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
           >
             Batal
           </button>
@@ -548,7 +548,7 @@ export function PegawaiFormModal({
             type="submit"
             form="pegawai-form"
             disabled={isSaving}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+            className="min-h-11 flex items-center justify-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-sm"
           >
             {isSaving ? (
               <>

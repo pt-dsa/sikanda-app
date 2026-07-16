@@ -82,15 +82,19 @@ function AlertCard({ title, count, subtitle, colorScheme, icon }: {
 // ---------------------------------------------------------------------------
 // Horizontal Bar Chart
 // ---------------------------------------------------------------------------
-function HorizontalBarChart({ data, labelClass = "w-16" }: { data: { name: string; value: number }[]; labelClass?: string }) {
+function HorizontalBarChart({ data, labelClass = "w-16", fillHeight = false }: {
+  data: { name: string; value: number }[];
+  labelClass?: string;
+  fillHeight?: boolean;
+}) {
   if (!data || data.length === 0) return <p className="text-sm text-gray-400 py-6 text-center">Tidak ada data</p>;
   const maxVal = Math.max(...data.map((d) => d.value), 1);
   return (
-    <div className="space-y-2.5 w-full">
+    <div className={fillHeight ? "min-h-[220px] w-full flex flex-col justify-evenly gap-3" : "space-y-2.5 w-full"}>
       {data.map((item, idx) => (
-        <div key={item.name} className="flex items-center gap-3">
+        <div key={item.name} className="flex items-center gap-2.5 sm:gap-3 w-full">
           <span className={`text-xs font-medium text-gray-600 dark:text-gray-400 shrink-0 text-right truncate ${labelClass}`} title={item.name}>{item.name}</span>
-          <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
+          <div className={`flex-1 min-w-0 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden ${fillHeight ? "h-7" : "h-5"}`}>
             <motion.div
               className="h-full rounded-full flex items-center justify-end pr-2"
               style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
@@ -456,7 +460,7 @@ export default function Dashboard() {
               {/* Masa Kerja */}
               <Card className="h-full min-h-[310px]">
                 <CardHeader className="pb-2"><div className="flex items-center gap-2"><Timer size={16} className="text-orange-500" /><CardTitle className="text-sm">Distribusi Masa Kerja</CardTitle></div></CardHeader>
-                <CardContent className="pb-5 min-h-[250px] flex flex-col justify-center"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} labelClass="w-24" /></CardContent>
+                <CardContent className="pb-5 min-h-[250px] flex flex-col"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} labelClass="w-20 sm:w-24" fillHeight /></CardContent>
               </Card>
             </motion.div>
           </section>

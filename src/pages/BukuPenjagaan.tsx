@@ -752,8 +752,8 @@ export default function BukuPenjagaan() {
       <AssetDetailModal asset={selectedAsset} isOpen={!!selectedAsset} onClose={() => setSelectedAsset(null)} />
       <ConfirmModal state={confirmState} onClose={() => setConfirmState(CONFIRM_CLOSED)} />
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => !savingSettings && setSettingsOpen(false)}>
-          <form onSubmit={saveSettings} onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60" onClick={() => !savingSettings && setSettingsOpen(false)}>
+          <form onSubmit={saveSettings} onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 p-4 sm:p-5 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pengaturan Buku Penjagaan</h2>
               <p className="text-xs text-gray-500 mt-1">Berlaku untuk perhitungan seluruh pegawai aktif.</p>
@@ -775,9 +775,9 @@ export default function BukuPenjagaan() {
             <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
               Default resmi: KGB 2 tahun, pangkat 4 tahun, dan BUP 58 tahun. Email pegawai mulai dikirim saat tenggat masuk 1 bulan ke depan dan diulang paling banyak satu kali setiap minggu; rekap dikirim ke akun Administrator/Pimpinan aktif. Perubahan konfigurasi tercatat dalam audit.
             </div>
-            <div className="flex justify-end gap-2">
-              <button type="button" disabled={savingSettings} onClick={() => setSettingsOpen(false)} className="px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700">Batal</button>
-              <button type="submit" disabled={savingSettings} className="px-4 py-2 text-sm font-bold rounded-xl bg-blue-600 text-white disabled:opacity-50">{savingSettings ? "Menyimpan…" : "Simpan"}</button>
+            <div className="safe-area-bottom grid grid-cols-2 sm:flex sm:justify-end gap-2">
+              <button type="button" disabled={savingSettings} onClick={() => setSettingsOpen(false)} className="min-h-11 px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700">Batal</button>
+              <button type="submit" disabled={savingSettings} className="min-h-11 px-4 py-2 text-sm font-bold rounded-xl bg-blue-600 text-white disabled:opacity-50">{savingSettings ? "Menyimpan…" : "Simpan"}</button>
             </div>
           </form>
         </div>

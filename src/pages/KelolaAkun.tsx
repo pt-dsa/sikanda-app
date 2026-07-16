@@ -57,6 +57,7 @@ export default function KelolaAkun() {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Ganti window.confirm — aman di dalam iframe
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -66,8 +67,9 @@ export default function KelolaAkun() {
   }
   function closeConfirm() { setConfirm(CONFIRM_CLOSED); }
 
-  async function load() {
-    setLoading(true);
+  async function load(showFullLoading = true, force = false) {
+    if (showFullLoading) setLoading(true);
+    if (force) spreadsheetService.clearCache();
     setError(null);
     setDenied(false);
     try {
@@ -78,12 +80,14 @@ export default function KelolaAkun() {
       const sorted = (res.users || []).slice().sort((a, b) => a.email.localeCompare(b.email));
       setUsers(sorted);
       setPegawai((employeeRows || []).filter((p: Pegawai) => p.is_active !== false));
+      return true;
     } catch (e: any) {
       const msg = String(e?.message || e);
       if (/admin|akses ditolak|ditolak/i.test(msg)) setDenied(true);
       else setError(msg);
+      return false;
     } finally {
-      setLoading(false);
+      if (showFullLoading) setLoading(false);
     }
   }
 
@@ -91,6 +95,14 @@ export default function KelolaAkun() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleSync() {
+    if (syncing) return;
+    setSyncing(true);
+    const ok = await load(false, true);
+    setSyncing(false);
+    if (ok) toast.success("Sinkronisasi Berhasil", "Daftar akun dan Database Pegawai telah dimuat ulang dari Supabase.");
+  }
 
   function openAdd() {
     setForm(emptyForm);
@@ -267,11 +279,21 @@ export default function KelolaAkun() {
             Daftar email yang boleh masuk SIKANDA & perannya · {users.length} akun ({aktif} aktif)
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center justify-center gap-2 min-h-11 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm"
+            title="Muat ulang daftar akun dan Database Pegawai"
+          >
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Menyinkronkan..." : "Sinkronisasi"}
+          </button>
           <button
             onClick={handleSeed}
             disabled={seeding}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm"
+            className="flex items-center justify-center gap-2 min-h-11 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm"
             title="Buat akun peran Pegawai dari Database Pegawai"
           >
             {seeding ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
@@ -279,7 +301,7 @@ export default function KelolaAkun() {
           </button>
           <button
             onClick={openAdd}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm shrink-0"
+            className="flex items-center justify-center gap-2 min-h-11 px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm shrink-0"
           >
             <Plus size={16} /> Tambah Akun
           </button>
@@ -301,38 +323,30 @@ export default function KelolaAkun() {
 
       {/* Tabel akun */}
       <Card>
-        <CardContent className="p-0 overflow-x-auto">
+        <CardContent className="p-0">
           {users.length === 0 ? (
             <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
               <UsersIcon className="mx-auto mb-3 text-gray-300" size={36} />
               Belum ada akun terdaftar. Tambahkan akun atau tarik dari Database Pegawai.
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
-                  <th className="px-4 py-3 font-bold">Email</th>
-                  <th className="px-4 py-3 font-bold">Peran</th>
-                  <th className="px-4 py-3 font-bold">Nama</th>
-                  <th className="px-4 py-3 font-bold">NIP</th>
-                  <th className="px-4 py-3 font-bold">Status</th>
-                  <th className="px-4 py-3 font-bold text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <div className="grid grid-cols-1 gap-3 p-3 md:hidden">
                 {users.map((u) => (
-                  <tr key={u.email} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                      {u.email || <span className="text-amber-500 dark:text-amber-400 italic text-xs font-normal">(email belum diisi — klik Edit)</span>}
-                    </td>
-                    <td className="px-4 py-3">
+                  <article key={u.email} className="rounded-2xl border border-gray-200/80 dark:border-gray-700 bg-white/50 dark:bg-gray-800/40 p-4 shadow-sm min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 break-all">
+                          {u.email || <span className="text-amber-500 italic font-normal">Email belum diisi</span>}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">{u.nama || "Nama belum ditautkan"}</p>
+                      </div>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_BADGE[u.role] || ""}`}>
                         {ROLE_LABEL[u.role] || u.role}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{u.nama || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{u.nip || "—"}</td>
-                    <td className="px-4 py-3">
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-700 pt-3">
+                      <span className="font-mono text-xs text-gray-500 break-all">NIP {u.nip || "—"}</span>
                       {u.is_active ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
                           <ShieldCheck size={14} /> Aktif
@@ -342,23 +356,56 @@ export default function KelolaAkun() {
                           <Ban size={14} /> Nonaktif
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEdit(u)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg" title="Edit">
-                          <Pencil size={15} />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button onClick={() => openEdit(u)} className="min-h-11 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 rounded-xl" title="Edit">
+                          <Pencil size={15} /> Edit
                         </button>
                         {u.is_active && (
-                          <button onClick={() => handleDeactivate(u)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Nonaktifkan">
-                            <Ban size={15} />
+                          <button onClick={() => handleDeactivate(u)} className="min-h-11 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-red-600 bg-red-50 dark:bg-red-900/30 rounded-xl" title="Nonaktifkan">
+                            <Ban size={15} /> Nonaktifkan
                           </button>
                         )}
-                      </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </article>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                      <th className="px-4 py-3 font-bold">Email</th>
+                      <th className="px-4 py-3 font-bold">Peran</th>
+                      <th className="px-4 py-3 font-bold">Nama</th>
+                      <th className="px-4 py-3 font-bold">NIP</th>
+                      <th className="px-4 py-3 font-bold">Status</th>
+                      <th className="px-4 py-3 font-bold text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((u) => (
+                      <tr key={u.email} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
+                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
+                          {u.email || <span className="text-amber-500 dark:text-amber-400 italic text-xs font-normal">(email belum diisi — klik Edit)</span>}
+                        </td>
+                        <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-bold ${ROLE_BADGE[u.role] || ""}`}>{ROLE_LABEL[u.role] || u.role}</span></td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{u.nama || "—"}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{u.nip || "—"}</td>
+                        <td className="px-4 py-3">
+                          {u.is_active ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold"><ShieldCheck size={14} /> Aktif</span> : <span className="inline-flex items-center gap-1 text-gray-400 text-xs font-bold"><Ban size={14} /> Nonaktif</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => openEdit(u)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg" title="Edit"><Pencil size={15} /></button>
+                            {u.is_active && <button onClick={() => handleDeactivate(u)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Nonaktifkan"><Ban size={15} /></button>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -366,12 +413,12 @@ export default function KelolaAkun() {
       {/* Modal form tambah/edit */}
       <AnimatePresence>
         {isFormOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-200 dark:border-gray-800"
+              className="bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col max-h-[100dvh] sm:max-h-[90dvh]"
             >
               <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
                 <h2 className="font-bold text-lg text-gray-900 dark:text-white">
@@ -382,7 +429,7 @@ export default function KelolaAkun() {
                 </button>
               </div>
 
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-4 overflow-y-auto overscroll-contain">
                 {error && (
                   <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm flex items-start gap-2 border border-red-200">
                     <ShieldAlert size={16} className="shrink-0 mt-0.5" />
@@ -496,11 +543,11 @@ export default function KelolaAkun() {
                 </label>}
               </div>
 
-              <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex justify-end gap-3">
-                <button onClick={() => setIsFormOpen(false)} disabled={saving} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+              <div className="p-3 sm:p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 flex justify-end gap-3 safe-area-bottom">
+                <button onClick={() => setIsFormOpen(false)} disabled={saving} className="flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
                   Batal
                 </button>
-                <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-sm">
+                <button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none min-h-11 flex items-center justify-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-sm">
                   {saving ? <><RefreshCw size={16} className="animate-spin" /> Menyimpan...</> : <><Save size={16} /> Simpan</>}
                 </button>
               </div>

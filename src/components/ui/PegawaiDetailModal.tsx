@@ -240,15 +240,15 @@ export function PegawaiDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-900 rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[92dvh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <h2 className="text-lg font-bold">Profile Detail Pegawai</h2>
           <button
             onClick={onClose}
@@ -259,7 +259,7 @@ export function PegawaiDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col md:flex-row gap-0 md:gap-6 p-6">
+          <div className="flex flex-col md:flex-row gap-0 md:gap-6 p-4 sm:p-6">
 
             {/* Sidebar */}
             <div className="w-full md:w-56 shrink-0 flex flex-col items-center text-center mb-6 md:mb-0">

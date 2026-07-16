@@ -17,7 +17,17 @@
     display: none !important;
   }
 
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 100%;
+  }
+
   body {
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     @apply bg-[#e2e8f0] text-gray-900;
@@ -25,9 +35,21 @@
   .dark body {
     @apply bg-[#1e293b] text-[#e2e8f0];
   }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
 }
 
 @layer utilities {
+  .safe-area-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
   .neuglass, .neu-flat {
     @apply bg-[#e2e8f0]/40 dark:bg-[#1e293b]/40 backdrop-blur-xl border border-white/60 dark:border-white/5;
     box-shadow: 

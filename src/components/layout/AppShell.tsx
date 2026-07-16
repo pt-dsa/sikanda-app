@@ -235,7 +235,7 @@ function LiveClock() {
 
   return (
     <div className="hidden lg:block text-sm font-bold text-gray-600 dark:text-gray-300 bg-white/40 dark:bg-gray-800/40 px-3 py-1.5 rounded-full border border-gray-200/50 dark:border-gray-700/50">
-      {dateStr.replace(', ', ',')} - {timeStr.replace(/\./g, ':')} WIB
+      {dateStr.replace(', ', ',')} | Pukul {timeStr.replace(/\./g, ':')} WIB
     </div>
   );
 }
@@ -350,8 +350,8 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
   };
 
   return (
-    <header className="flex-shrink-0 sticky top-0 z-40 flex h-16 items-center justify-between neuglass rounded-none border-t-0 border-x-0 px-4 md:px-6">
-      <div className="flex items-center gap-4 flex-shrink-0">
+    <header className="flex-shrink-0 sticky top-0 z-40 flex min-h-16 flex-wrap sm:flex-nowrap items-center justify-between gap-y-2 neuglass rounded-none border-t-0 border-x-0 px-3 py-2 sm:py-0 md:px-6">
+      <div className="order-1 flex items-center gap-2 sm:gap-4 flex-shrink-0">
         <button 
           className="md:hidden p-2.5 rounded-xl neuglass text-gray-600 dark:text-gray-300 active:neuglass-pressed transition-all hover:text-blue-600 dark:hover:text-blue-400 active:scale-95"
           onClick={() => setMobileSidebarOpen(true)}
@@ -367,11 +367,14 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
 
       </div>
       
-      <div className="flex-1 max-w-2xl px-2 sm:px-4 lg:px-8 flex justify-center">
+      <div className={cn(
+        "order-3 basis-full min-w-0 px-0 flex justify-center sm:order-2 sm:basis-auto sm:flex-1 sm:max-w-2xl sm:px-4 lg:px-8",
+        user?.role === "pegawai" && "hidden sm:flex"
+      )}>
         {user?.role !== "pegawai" ? <GlobalSearch /> : <div className="flex-1" />}
       </div>
 
-      <div className="flex items-center gap-4 flex-shrink-0">
+      <div className="order-2 sm:order-3 ml-auto flex items-center gap-1.5 sm:gap-4 flex-shrink-0">
         <LiveClock />
         
         {/* Notification Bell + panel agenda */}
@@ -392,7 +395,10 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
           {notifOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-              <div className="fixed left-2 right-2 top-[4.25rem] max-h-[calc(100dvh-4.75rem)] overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 z-[70] animate-in fade-in slide-in-from-top-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[340px] sm:max-h-[72vh]">
+              <div className={cn(
+                "fixed left-2 right-2 overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 z-[70] animate-in fade-in slide-in-from-top-2 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[340px] sm:max-h-[72vh]",
+                user?.role !== "pegawai" ? "top-[7.25rem] max-h-[calc(100dvh-7.75rem)]" : "top-[4.25rem] max-h-[calc(100dvh-4.75rem)]"
+              )}>
                 <div className="sticky top-0 bg-white dark:bg-gray-800 px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Bell size={15} className="text-blue-600 dark:text-blue-400" />
@@ -454,7 +460,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
         </div>
 
         <ThemeToggle />
-        <div className="flex items-center gap-3 ml-2 relative">
+        <div className="flex items-center gap-2 sm:gap-3 sm:ml-2 relative">
           <div className="hidden text-right md:block">
             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{getGreeting()}, {user?.nama}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user?.role}</div>

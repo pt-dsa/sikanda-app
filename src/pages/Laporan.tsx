@@ -363,13 +363,13 @@ export default function Laporan() {
       </div>
 
       {printOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm" onClick={() => setPrintOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 sm:p-4 bg-black/55 backdrop-blur-sm" onClick={() => setPrintOpen(false)}>
+          <div className="w-full max-w-lg rounded-none sm:rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[100dvh] sm:max-h-[90dvh] flex flex-col" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
               <div><h2 className="text-lg font-bold text-gray-900 dark:text-white">Pilih Data yang Akan Dicetak</h2><p className="text-xs text-gray-500 mt-0.5">Hasil cetak mengikuti filter aktif pada setiap kategori.</p></div>
               <button onClick={() => setPrintOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"><X size={19} /></button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">Kategori Cetak</label>
               <select value={printScope} onChange={(event) => setPrintScope(event.target.value as PrintScope)} className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-semibold">
                 <option value="pegawai">Data ASN / PPPK</option>
@@ -385,9 +385,9 @@ export default function Laporan() {
                 {(printScope === "equipment" || printScope === "all") && <div><p><b>Data Alat & Mesin:</b> {filteredEquipment.length} record</p><p className="text-xs text-gray-500">{filterDescription(equipmentFilter as unknown as Record<string, string>)}</p></div>}
               </div>
             </div>
-            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-2">
-              <button onClick={() => setPrintOpen(false)} className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold">Batal</button>
-              <button onClick={() => handlePrint(printScope)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"><Printer size={16} />Buka Pratinjau</button>
+            <div className="safe-area-bottom px-4 sm:px-5 py-4 border-t border-gray-200 dark:border-gray-800 grid grid-cols-2 sm:flex sm:justify-end gap-2">
+              <button onClick={() => setPrintOpen(false)} className="min-h-11 px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold">Batal</button>
+              <button onClick={() => handlePrint(printScope)} className="min-h-11 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"><Printer size={16} />Buka Pratinjau</button>
             </div>
           </div>
         </div>

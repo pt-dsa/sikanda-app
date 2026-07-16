@@ -117,7 +117,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.8-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.9-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -362,6 +362,21 @@ function supabaseKey_() {
   return SUPABASE_SERVICE_ROLE_KEY;
 }
 
+function databasePublicError_(statusCode, responseText) {
+  var detail = {};
+  try { detail = JSON.parse(responseText || '{}') || {}; } catch (ignore) {}
+  var code = String(detail.code || '');
+  if (code === '22P02') {
+    return publicError_('Data angka atau tahun memiliki format tidak valid. Muat ulang form, periksa field angka, lalu simpan kembali.');
+  }
+  if (code === '23502') return publicError_('Data wajib database belum terisi. Periksa kembali field bertanda wajib.');
+  if (code === '23503') return publicError_('Data relasi tidak valid atau sudah tidak tersedia. Sinkronkan data lalu pilih ulang nilai terkait.');
+  if (code === '23505' || Number(statusCode) === 409) return publicError_('Data dengan identitas yang sama sudah tersedia di database.');
+  if (code === '23514') return publicError_('Data tidak memenuhi aturan validasi database. Periksa nilai yang diisi lalu coba kembali.');
+  if (code === 'PGRST204' || code === '42703') return publicError_('Konfigurasi kolom database belum sesuai dengan versi SIKANDA yang aktif.');
+  return new Error('Layanan database tidak dapat memproses permintaan.');
+}
+
 function supaRequest_(method, pathAndQuery, body, prefer) {
   var serviceKey = supabaseKey_();
   var options = {
@@ -383,7 +398,7 @@ function supaRequest_(method, pathAndQuery, body, prefer) {
   var text = response.getContentText() || '';
   if (code < 200 || code >= 300) {
     console.error('[SIKANDA][Supabase] HTTP ' + code + ': ' + text.substring(0, 1000));
-    throw new Error('Layanan database tidak dapat memproses permintaan.');
+    throw databasePublicError_(code, text);
   }
   if (!text) return [];
   try { return JSON.parse(text); } catch (ignore) { return []; }
@@ -687,6 +702,45 @@ function parseCoordinate_(value) {
   return Number(text);
 }
 
+function parseOptionalAssetNumber_(value) {
+  if (isEmptyCoordinate_(value)) return null;
+  var text = String(value).trim().replace(/\s+/g, '').replace(/^Rp/i, '');
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) {
+    text = text.replace(/\./g, '').replace(',', '.');
+  } else {
+    text = text.replace(',', '.');
+  }
+  if (!/^-?\d+(\.\d+)?$/.test(text)) return NaN;
+  return Number(text);
+}
+
+function normalizeAssetNumberField_(data, key, label, options) {
+  if (!Object.prototype.hasOwnProperty.call(data, key)) return;
+  if (isEmptyCoordinate_(data[key])) {
+    delete data[key];
+    return;
+  }
+  var value = parseOptionalAssetNumber_(data[key]);
+  options = options || {};
+  if (!isFinite(value) || (options.integer && Math.floor(value) !== value)) {
+    throw publicError_('Data ' + label + ' harus berupa angka' + (options.integer ? ' bulat' : '') + '.');
+  }
+  if (options.min !== undefined && value < options.min) throw publicError_('Data ' + label + ' minimal ' + options.min + '.');
+  if (options.max !== undefined && value > options.max) throw publicError_('Data ' + label + ' maksimal ' + options.max + '.');
+  data[key] = value;
+}
+
+function normalizeAssetNumbers_(table, data) {
+  normalizeAssetNumberField_(data, 'tahun', 'tahun pembelian', { integer: true, min: 1900, max: new Date().getFullYear() + 1 });
+  normalizeAssetNumberField_(data, 'harga_pembelian', 'harga pembelian', { min: 0 });
+  if (table === 'assets_vehicle') {
+    normalizeAssetNumberField_(data, 'km_kendaraan', 'kilometer kendaraan', { min: 0 });
+    normalizeAssetNumberField_(data, 'kapasitas_mesin', 'kapasitas mesin', { min: 0 });
+  } else {
+    normalizeAssetNumberField_(data, 'jumlah', 'jumlah alat dan mesin', { min: 0.01 });
+  }
+}
+
 function normalizeAssetCoordinates_(data) {
   var hasLatitude = Object.prototype.hasOwnProperty.call(data, 'latitude');
   var hasLongitude = Object.prototype.hasOwnProperty.call(data, 'longitude');
@@ -741,9 +795,17 @@ function syncAssetCoordinates_(actor, table, assetId, data) {
     longitude: data.longitude
   };
   var locationPayload = payloadForTable_('asset_locations', locationInput, ['asset_id', 'type', 'latitude', 'longitude']);
-  var existing = supaGet_('asset_locations?select=' + locationAssetColumn + '&' + locationAssetColumn + '=eq.' + encodeURIComponent(assetId) + '&limit=1');
+  var locationSelect = [locationAssetColumn, locationLatitudeColumn, locationLongitudeColumn].join(',');
+  var existing = supaGet_('asset_locations?select=' + locationSelect + '&' + locationAssetColumn + '=eq.' + encodeURIComponent(assetId) + '&limit=1');
   if (existing.length) {
-    requireMutationRows_(supaRequest_('patch', 'asset_locations?' + locationAssetColumn + '=eq.' + encodeURIComponent(assetId), locationPayload, 'return=representation'), 'lokasi aset ' + assetId);
+    var oldLatitude = parseCoordinate_(existing[0][locationLatitudeColumn]);
+    var oldLongitude = parseCoordinate_(existing[0][locationLongitudeColumn]);
+    if (oldLatitude === Number(data.latitude) && oldLongitude === Number(data.longitude)) return;
+    // Jangan tulis ulang asset_id/type pada update koordinat. Database legacy
+    // dapat memiliki constraint nilai type berbeda; perubahan nama Pengguna
+    // tidak boleh gagal hanya karena metadata lokasi yang sebenarnya tetap.
+    var coordinatePayload = payloadForTable_('asset_locations', locationInput, ['latitude', 'longitude']);
+    requireMutationRows_(supaRequest_('patch', 'asset_locations?' + locationAssetColumn + '=eq.' + encodeURIComponent(assetId), coordinatePayload, 'return=representation'), 'lokasi aset ' + assetId);
   } else {
     requireMutationRows_(supaRequest_('post', 'asset_locations', locationPayload, 'return=representation'), 'lokasi aset ' + assetId);
   }
@@ -870,6 +932,7 @@ function saveAsset_(actor, table, data, isNew) {
   var id = String(data.asset_id || '').trim();
   if (!id && !isNew) throw publicError_('Data asset_id wajib diisi.');
   if (!id) id = (table === 'assets_vehicle' ? 'VEH-' : 'EQP-') + Utilities.getUuid();
+  normalizeAssetNumbers_(table, data);
   normalizeAssetCoordinates_(data);
   if (table === 'assets_vehicle') {
     requireAssetText_(data, 'no_polisi', 'Nomor Polisi', isNew);

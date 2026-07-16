@@ -386,7 +386,7 @@ export default function PetaSebaran() {
           />
           {filteredLocations.map((item, idx) => (
             <Marker key={`${item.type}-${item.id}-${idx}`} position={[item.lat, item.lng]} icon={getMarkerIcon(item)}>
-              <Popup className="rounded-xl overflow-hidden min-w-[300px]">
+              <Popup className="rounded-xl overflow-hidden min-w-0 w-[min(300px,calc(100vw-3rem))]">
                 <div className="p-0 -m-3">
                   {item.foto && (
                     <div 
@@ -506,7 +506,7 @@ export default function PetaSebaran() {
       </div>
 
       {zoomedImage && (
-        <div className="fixed inset-0 z-[9999] p-4 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setZoomedImage(null)}>
+        <div className="fixed inset-0 z-[9999] p-2 sm:p-4 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setZoomedImage(null)}>
           <button onClick={() => setZoomedImage(null)} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
             <X size={24} />
           </button>

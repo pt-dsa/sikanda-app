@@ -1,40 +1,38 @@
-# SIKANDA V1.1.8 Secure — Release Notes
+# SIKANDA V1.1.9 Secure — Release Notes
 
 Tanggal rilis: 16 Juli 2026 (Asia/Jakarta).
 
-## Verifikasi kecocokan pegawai–aset
+## Perbaikan update Pengguna Alat & Mesin
 
-- Istilah teknis `FUZZY` tidak lagi ditampilkan kepada pengguna dan diganti menjadi **Perlu Verifikasi**.
-- Administrator/Pimpinan dapat mengklik badge pada kartu, tabel, atau detail pegawai.
-- Klik tersebut membuka Data Cleansing dengan filter NIP dan menggulir langsung ke item pegawai–aset yang sesuai.
-- Status internal `match_quality = fuzzy` dipertahankan sebagai kontrak data sehingga tidak memerlukan migrasi database.
+- Placeholder legacy seperti `-`, `NULL`, dan nilai kosong tidak lagi dikirim sebagai isi kolom database.
+- Tahun, jumlah, harga, kilometer, dan kapasitas mesin dinormalisasi menjadi number sebelum mutasi.
+- Payload Alat & Mesin dibangun dari field yang diizinkan, bukan menyebarkan seluruh object hasil baca.
+- Backend mengulang validasi angka untuk mencegah manipulasi dari browser.
+- Koordinat yang tidak berubah tidak ditulis ulang ke `asset_locations`.
+- Update koordinat lama hanya mengubah latitude/longitude, bukan `asset_id` atau `type`, sehingga constraint metadata lokasi legacy tidak menghalangi update Pengguna.
+- Error PostgreSQL umum diterjemahkan menjadi pesan aman dan dapat ditindaklanjuti tanpa membuka detail database.
 
-## CRUD dan koordinat aset
+## Sinkronisasi
 
-- Kendaraan serta Alat & Mesin mengenali `asset_id` dan ID legacy agar edit tidak salah diproses sebagai create.
-- Form edit memuat koordinat dari kolom aktif atau fallback `asset_locations`.
-- Koordinat valid langsung membentuk minimap OpenStreetMap.
-- Latitude dan longitude kini benar-benar opsional: keduanya boleh kosong pada create maupun update.
-- Input parsial atau di luar rentang tetap ditolak; format koma desimal dinormalisasi.
-- Payload kosong tidak menghapus koordinat lama secara tidak sengaja.
-- Backend dapat menyinkronkan koordinat ke `asset_locations` bila tabel aset tidak memiliki kolom koordinat.
-- Toast identik dideduplikasi agar error tidak menumpuk ketika tombol Simpan ditekan berulang.
+- Ditambahkan tombol Sinkronisasi pada Kelola Akun, Data Kendaraan, dan Alat & Mesin.
+- Sinkronisasi membersihkan cache sesi dan memuat ulang data aktif dari Supabase melalui Apps Script.
+- Tombol memiliki status proses dan mencegah klik ganda.
+- **Tarik dari Database Pegawai** tetap terpisah karena fungsinya membuat akun baru, bukan sekadar refresh.
 
-## Ketahanan mutasi backend
+## Antarmuka dan mobile-first
 
-- Create/update/delete pegawai, kendaraan, alat & mesin, akun, konfigurasi, serta foto memeriksa baris hasil Supabase.
-- Respons kosong tidak lagi dilaporkan sebagai sukses.
-- Update akun menggunakan patch terhadap akun yang benar-benar ada.
-- Validasi field wajib dan koordinat diterapkan kembali di backend tanpa menghalangi update parsial Data Cleansing.
+- Format jam menjadi `Hari,tanggal bulan tahun | Pukul HH:mm:ss WIB`.
+- Distribusi Masa Kerja memakai tinggi card secara lebih proporsional dengan bar yang lebih jelas.
+- Topbar menempatkan pencarian pada baris penuh di mobile agar ikon navigasi tidak berdesakan.
+- Kelola Akun memakai card pada mobile dan tabel pada desktop.
+- Modal Kendaraan, Alat & Mesin, Akun, Pegawai, detail umum, konfirmasi, dan laporan mengikuti viewport dinamis, memiliki scroll internal, footer aman, serta tombol sentuh lebih besar.
+- Popup Peta Sebaran dibatasi terhadap lebar viewport mobile.
+- Overflow horizontal global dicegah dan safe area perangkat berponi/home indicator didukung.
 
-## Antarmuka
+## Database dan keamanan
 
-- Subtitle Card PPPK (Penuh Waktu) menjadi **Pegawai Pemerintah Penuh Waktu**.
-- Logo Kota Tangerang Selatan dipasang sebagai favicon dan Apple Touch Icon.
-- Peta Sebaran menggunakan normalisasi koordinat yang sama dengan form aset.
-
-## Kompatibilitas dan deployment
-
-- Arsitektur keamanan, RBAC, private Storage foto pegawai, trigger, dan migrasi V1.1.7 tetap dipertahankan.
-- Tidak ada SQL, Script Property, trigger, atau migrasi foto baru.
-- Frontend dan `apps-script/Code.gs` harus sama-sama diperbarui agar revisi bekerja lengkap.
+- Tambah Kendaraan melakukan `POST` ke `assets_vehicle`.
+- Tambah Alat & Mesin melakukan `POST` ke `assets_equipment`.
+- Seluruh mutasi melewati Apps Script, Firebase ID token, resolusi role `app_access`, dan pemeriksaan baris `return=representation`.
+- Supabase service-role dan Gemini key tetap hanya berada di Apps Script Properties.
+- Tidak ada migrasi SQL atau secret frontend baru.

@@ -4,7 +4,7 @@ import { Pegawai, Vehicle } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent } from "@/components/ui/Card";
-import { QrCode, MapPin, Plus, Edit2, Trash2, X, ImageOff, AlertCircle, ZoomIn, CheckSquare } from "lucide-react";
+import { QrCode, MapPin, Plus, Edit2, Trash2, X, ImageOff, AlertCircle, ZoomIn, CheckSquare, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { DataTable, ColumnDef } from "@/components/ui/DataTable";
 import { DetailModal } from "@/components/ui/DetailModal";
@@ -22,13 +22,12 @@ import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
 import { optionalCoordinatePayload } from "@/lib/coordinates";
+import { normalizeAssetText, optionalAssetNumber, validOptionalAssetNumber } from "@/lib/assetFields";
 
 const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
 
 function optionalNumber(value: unknown): number | undefined {
-  if (value === "" || value === null || value === undefined) return undefined;
-  const parsed = Number(String(value).replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return optionalAssetNumber(value);
 }
 
 function displayNumber(value: unknown, suffix = ""): string {
@@ -46,6 +45,7 @@ export default function Kendaraan() {
   const [data, setData] = useState<Vehicle[]>([]);
   const [employees, setEmployees] = useState<Pegawai[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [filterJenis, setFilterJenis] = useState("");
   const [filterKondisi, setFilterKondisi] = useState("");
@@ -69,7 +69,8 @@ export default function Kendaraan() {
 
   // Fungsi muat data di lingkup komponen agar bisa dipanggil ulang
   // (mis. sinkronisasi ulang saat operasi tulis gagal).
-  const load = async () => {
+  const load = async (force = false) => {
+    if (force) spreadsheetService.clearCache();
     try {
       const [res, employeeRows] = await Promise.all([
         spreadsheetService.getVehicles(),
@@ -77,8 +78,10 @@ export default function Kendaraan() {
       ]);
       setData(res);
       setEmployees(employeeRows as Pegawai[]);
+      return true;
     } catch (err: any) {
       toast.error("Gagal Memuat", err?.message || "Tidak dapat memuat data kendaraan.");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -88,6 +91,14 @@ export default function Kendaraan() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    const ok = await load(true);
+    setSyncing(false);
+    if (ok) toast.success("Sinkronisasi Berhasil", "Data Kendaraan dan Database Pegawai telah dimuat ulang dari Supabase.");
+  };
 
   const handleDelete = (id: string) => {
     setConfirmState({
@@ -168,19 +179,43 @@ export default function Kendaraan() {
       toast.error("Koordinat Tidak Valid", coordinateResult.pair.error);
       return;
     }
+    const currentYear = new Date().getFullYear() + 1;
+    if (!validOptionalAssetNumber(formData.tahun, { integer: true, min: 1900, max: currentYear })) {
+      toast.error("Tahun Tidak Valid", `Tahun pembelian harus berupa angka 1900–${currentYear}, atau dikosongkan.`);
+      return;
+    }
+    const nonNegativeFields = [
+      [formData.km_kendaraan, "Kilometer kendaraan"],
+      [formData.kapasitas_mesin, "Kapasitas mesin"],
+      [formData.harga_pembelian, "Harga pembelian"],
+    ] as const;
+    const invalidNumeric = nonNegativeFields.find(([value]) => !validOptionalAssetNumber(value, { min: 0 }));
+    if (invalidNumeric) {
+      toast.error("Nilai Angka Tidak Valid", `${invalidNumeric[1]} harus berupa angka 0 atau lebih, atau dikosongkan.`);
+      return;
+    }
     const payload: Partial<Vehicle> = {
-      ...formData,
+      asset_id: formData.asset_id,
       no_polisi: String(formData.no_polisi || "").trim().toUpperCase(),
-      kode_barang: String(formData.kode_barang || "").trim(),
+      kode_barang: normalizeAssetText(formData.kode_barang),
       nama_aset: String(formData.nama_aset || "").trim(),
       merk: String(formData.merk || "").trim(),
-      pengguna: String(formData.pengguna || "").trim(),
-      penanggung_jawab: String(formData.penanggung_jawab || "").trim(),
-      lokasi: String(formData.lokasi || formData.unit_kerja || "").trim(),
-      unit_kerja: String(formData.unit_kerja || formData.lokasi || "").trim(),
+      tipe: normalizeAssetText(formData.tipe),
+      jenis_kendaraan: normalizeAssetText(formData.jenis_kendaraan),
+      tahun: optionalAssetNumber(formData.tahun),
+      kondisi: String(formData.kondisi || "BAIK").trim().toUpperCase(),
+      pengguna: normalizeAssetText(formData.pengguna),
+      penanggung_jawab: normalizeAssetText(formData.penanggung_jawab),
+      lokasi: normalizeAssetText(formData.lokasi || formData.unit_kerja),
+      unit_kerja: normalizeAssetText(formData.unit_kerja || formData.lokasi),
       km_kendaraan: optionalNumber(formData.km_kendaraan),
       kapasitas_mesin: optionalNumber(formData.kapasitas_mesin),
+      no_bpkb: normalizeAssetText(formData.no_bpkb),
+      no_rangka: normalizeAssetText(formData.no_rangka),
+      no_mesin: normalizeAssetText(formData.no_mesin),
       harga_pembelian: optionalNumber(formData.harga_pembelian),
+      foto: formData.foto,
+      qr_url: formData.qr_url,
       ...coordinateResult.payload,
     };
     if (coordinateResult.pair.empty) {
@@ -402,13 +437,22 @@ export default function Kendaraan() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Data Kendaraan Dinas</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Manajemen master data kendaraan roda 2 dan roda 4</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded-full">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <div className="col-span-2 sm:col-span-1 flex items-center justify-center min-h-10 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded-full">
             Total: {filteredData.length} Kendaraan
           </div>
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center justify-center gap-2 min-h-10 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-full font-medium text-sm transition-all shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Menyinkronkan..." : "Sinkronisasi"}
+          </button>
           {canWriteAssets && <button
             onClick={() => openForm()}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+            className="flex items-center justify-center gap-2 min-h-10 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
           >
             <Plus size={16} />
             Tambah Data
@@ -598,8 +642,8 @@ export default function Kendaraan() {
 
       {/* Editing Form */}
       {isEditing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-all duration-300">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm transition-all duration-300">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-none sm:rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[100dvh] sm:max-h-[90dvh] animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
               <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
                 {formData.asset_id ? "Edit Kendaraan" : "Tambah Kendaraan"}
@@ -612,7 +656,7 @@ export default function Kendaraan() {
               </button>
             </div>
             <form onSubmit={handleSave} className="flex flex-col overflow-hidden max-h-full">
-              <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2">Identitas Kendaraan</div>
                 {formData.asset_id && (
                   <div className="flex flex-col gap-1">
@@ -707,11 +751,11 @@ export default function Kendaraan() {
                   autoLocate={!formData.asset_id}
                 />
               </div>
-              <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2">
-                <button type="button" disabled={saving} onClick={() => { setIsEditing(false); setPhotoFile(null); }} className="px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
+              <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2 safe-area-bottom">
+                <button type="button" disabled={saving} onClick={() => { setIsEditing(false); setPhotoFile(null); }} className="flex-1 sm:flex-none min-h-11 px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
                   Batal
                 </button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">
+                <button type="submit" disabled={saving} className="flex-1 sm:flex-none min-h-11 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">
                   {saving ? "Menyimpan..." : "Simpan"}
                 </button>
               </div>
