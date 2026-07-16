@@ -303,31 +303,31 @@ export default function Cleansing() {
         <Card className="border-l-4 border-l-red-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Total Masalah</div>
+            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Total Masalah</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.auto}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Siap Auto-Koreksi</div>
+            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Siap Auto-Koreksi</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-amber-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.manual}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Perlu Review Manual</div>
+            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Perlu Review Manual</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-gray-400">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">{stats.info}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Informasi Saja</div>
+            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Informasi Saja</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-orange-500 col-span-2 md:col-span-1">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{conditionIssues.length}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Kondisi Aset Belum Diisi</div>
+            <div className="text-sm font-extrabold leading-snug text-gray-700 dark:text-gray-200 mt-1">Kondisi Aset Belum Diisi</div>
           </CardContent>
         </Card>
       </div>

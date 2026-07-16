@@ -16,6 +16,7 @@ interface SummaryCardsProps {
   activeKey: string;                 // "" berarti Total/semua sedang aktif
   onSelect: (key: string) => void;   // "" untuk Total
   className?: string;
+  totalTone?: { bg: string; text: string };
   [key: string]: any;
 }
 
@@ -32,13 +33,17 @@ export function SummaryCards({
   activeKey,
   onSelect,
   className = "",
+  totalTone = {
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    text: "text-blue-700 dark:text-blue-300",
+  },
 }: SummaryCardsProps) {
   const cards: SummaryCardItem[] = [
-    { key: "", label: totalLabel, count: totalCount, tone: { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-800 dark:text-gray-200" } },
+    { key: "", label: totalLabel, count: totalCount, tone: totalTone },
     ...items,
   ];
 
-  // Kolom adaptif: 2 di mobile, sampai 6 di desktop (Total + 4 kondisi + kosong).
+  // Kolom adaptif: 2 di mobile, sampai 6 di desktop.
   const cols = Math.min(cards.length, 6);
   const lgCols = ["lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3", "lg:grid-cols-4", "lg:grid-cols-5", "lg:grid-cols-6"][cols - 1] || "lg:grid-cols-6";
 
@@ -49,6 +54,7 @@ export function SummaryCards({
         const tone = c.tone || { bg: "bg-gray-50 dark:bg-gray-800/40", text: "text-gray-600 dark:text-gray-300" };
         return (
           <button
+            type="button"
             key={c.key || "__total__"}
             onClick={() => onSelect(c.key)}
             aria-pressed={active}
@@ -56,8 +62,8 @@ export function SummaryCards({
               active ? "border-blue-500 ring-2 ring-blue-500/40" : "border-white/40 dark:border-white/5"
             }`}
           >
-            <p className="text-xs font-bold text-gray-600 dark:text-gray-300 capitalize pr-2 line-clamp-1" title={c.label}>
-              {c.label.toLowerCase()}
+            <p className="text-sm font-extrabold text-gray-700 dark:text-gray-200 pr-2 leading-snug line-clamp-2" title={c.label}>
+              {c.label}
             </p>
             <p className={`text-2xl font-bold mt-1 ${tone.text}`}>{c.count}</p>
           </button>

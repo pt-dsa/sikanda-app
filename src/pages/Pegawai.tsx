@@ -448,7 +448,7 @@ export default function PegawaiPage() {
                 active ? "border-blue-500 ring-2 ring-blue-500/40" : "border-white/40 dark:border-white/5"
               }`}
             >
-              <p className="text-xs font-bold text-gray-600 dark:text-gray-300">{s.label}</p>
+              <p className="text-sm font-extrabold leading-snug text-gray-700 dark:text-gray-200">{s.label}</p>
               <p className={`text-xl font-bold ${s.color}`}>{s.val}</p>
             </button>
           );

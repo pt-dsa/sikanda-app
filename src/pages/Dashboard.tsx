@@ -33,7 +33,7 @@ function KpiCard({ title, value, icon: Icon, colorClass, subtitle }: {
       <CardContent className="p-5 flex items-center gap-4">
         <div className={`p-3 rounded-2xl shrink-0 ${colorClass}`}><Icon size={22} /></div>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-gray-600 dark:text-gray-300 leading-snug">{title}</p>
+          <p className="text-sm font-extrabold text-gray-700 dark:text-gray-200 leading-snug">{title}</p>
           <h4 className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">
             {typeof value === "number" && (title.toLowerCase().includes("pagu") || title.toLowerCase().includes("realisasi"))
               ? formatCurrency(value) : typeof value === "number" ? formatNumber(value) : value}
@@ -62,7 +62,7 @@ function AlertCard({ title, count, subtitle, colorScheme, icon }: {
     <div className={`border p-5 rounded-2xl flex items-start gap-4 hover:shadow-md transition-all ${P.wrap}`}>
       <div className={`p-3 rounded-full shrink-0 ${P.icon}`}><Icon size={22} /></div>
       <div className="min-w-0">
-        <h3 className={`font-bold ${P.title}`}>{title}</h3>
+        <h3 className={`text-base font-extrabold leading-snug ${P.title}`}>{title}</h3>
         <p className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">
           {count} <span className="text-sm font-normal text-gray-600 dark:text-gray-400">Pegawai</span>
         </p>
@@ -384,7 +384,7 @@ export default function Dashboard() {
                   <CardHeader className="pb-2">
                     <div className="flex items-center gap-2">
                       <ClipboardList size={16} className="text-amber-500" />
-                      <CardTitle className="text-sm">Kriteria yang Paling Sering Belum Terpenuhi</CardTitle>
+                      <CardTitle className="text-base font-extrabold leading-snug">Kriteria yang Paling Sering Belum Terpenuhi</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="pb-4">
@@ -419,7 +419,7 @@ export default function Dashboard() {
               {/* Golongan Donut */}
               <Card className="h-full min-h-[310px]">
                 <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2"><Award size={16} className="text-blue-500" /><CardTitle className="text-sm">Distribusi Golongan</CardTitle></div>
+                  <div className="flex items-center gap-2"><Award size={16} className="text-blue-500" /><CardTitle className="text-base font-extrabold">Distribusi Golongan</CardTitle></div>
                 </CardHeader>
                 <CardContent className="pb-5 min-h-[250px] flex items-center justify-center">
                   {metrics.distribusiGolongan && metrics.distribusiGolongan.length > 0 ? (
@@ -454,12 +454,12 @@ export default function Dashboard() {
               
               {/* Pendidikan */}
               <Card className="h-full min-h-[310px]">
-                <CardHeader className="pb-2"><div className="flex items-center gap-2"><GraduationCap size={16} className="text-green-500" /><CardTitle className="text-sm">Distribusi Pendidikan</CardTitle></div></CardHeader>
+                <CardHeader className="pb-2"><div className="flex items-center gap-2"><GraduationCap size={16} className="text-green-500" /><CardTitle className="text-base font-extrabold">Distribusi Pendidikan</CardTitle></div></CardHeader>
                 <CardContent className="pb-5 min-h-[250px] flex flex-col justify-center"><HorizontalBarChart data={(metrics.distribusiPendidikan || []).slice(0, 9)} labelClass="w-24" /></CardContent>
               </Card>
               {/* Masa Kerja */}
               <Card className="h-full min-h-[310px]">
-                <CardHeader className="pb-2"><div className="flex items-center gap-2"><Timer size={16} className="text-orange-500" /><CardTitle className="text-sm">Distribusi Masa Kerja</CardTitle></div></CardHeader>
+                <CardHeader className="pb-2"><div className="flex items-center gap-2"><Timer size={16} className="text-orange-500" /><CardTitle className="text-base font-extrabold">Distribusi Masa Kerja</CardTitle></div></CardHeader>
                 <CardContent className="pb-5 min-h-[250px] flex flex-col"><HorizontalBarChart data={metrics.distribusiMasaKerja || []} labelClass="w-20 sm:w-24" fillHeight /></CardContent>
               </Card>
             </motion.div>

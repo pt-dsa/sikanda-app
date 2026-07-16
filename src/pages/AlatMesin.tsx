@@ -4,12 +4,12 @@ import { Equipment, Pegawai } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent } from "@/components/ui/Card";
-import { QrCode, MapPin, ImageOff, ZoomIn, X, Plus, Edit2, Trash2, CheckSquare, RefreshCw } from "lucide-react";
+import { QrCode, MapPin, ImageOff, ZoomIn, X, Plus, Edit2, Trash2, CheckSquare, RefreshCw, AlertCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { DetailModal } from '@/components/ui/DetailModal';
 import { DataTable, ColumnDef } from "@/components/ui/DataTable";
 import { SummaryCards } from "@/components/ui/SummaryCards";
-import { summarizeBy, toneForKondisi, canonKey } from "@/lib/summary";
+import { canonKey } from "@/lib/summary";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/Toast";
@@ -23,7 +23,14 @@ import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
 import { optionalCoordinatePayload } from "@/lib/coordinates";
 import { normalizeAssetText, optionalAssetNumber, validOptionalAssetNumber } from "@/lib/assetFields";
-import { ASSET_CONDITIONS, assetConditionLabel, isValidAssetCondition, normalizeAssetCondition } from "@/lib/assetCondition";
+import {
+  ASSET_CONDITIONS,
+  ASSET_CONDITION_UNSET,
+  assetConditionLabel,
+  isValidAssetCondition,
+  normalizeAssetCondition,
+  summarizeAssetConditions,
+} from "@/lib/assetCondition";
 
 export default function AlatMesin() {
   const { user } = useContext(AuthContext);
@@ -286,13 +293,15 @@ export default function AlatMesin() {
     });
   }, [data, search, filterJenis, filterKondisi]);
 
-  const kondisiSummary = useMemo(
-    () => summarizeBy(data, (d: Equipment) => assetConditionLabel(d.kondisi)).map((b) => ({ ...b, tone: toneForKondisi(b.key) })),
-    [data]
-  );
+  // Empat kondisi resmi selalu tampil, termasuk saat jumlahnya nol. Data kosong
+  // dipisahkan sebagai peringatan kualitas data, bukan kondisi alat/mesin.
+  const kondisiSummary = useMemo(() => summarizeAssetConditions(data), [data]);
 
   const uniqueJenis = Array.from(new Set(data.map(d => d.jenis).filter(Boolean)));
-  const uniqueKondisi = Array.from(new Set(data.map(d => assetConditionLabel(d.kondisi))));
+  const uniqueKondisi = [
+    ...ASSET_CONDITIONS,
+    ...(kondisiSummary.unset > 0 ? [ASSET_CONDITION_UNSET] : []),
+  ];
 
   const columns: ColumnDef<Equipment>[] = [
     {
@@ -448,12 +457,38 @@ export default function AlatMesin() {
       </div>
 
       <SummaryCards
-        items={kondisiSummary}
-        totalLabel="Total Aset"
+        items={kondisiSummary.items}
+        totalLabel="Total Alat & Mesin"
         totalCount={data.length}
         activeKey={canonKey(filterKondisi)}
         onSelect={(key) => setFilterKondisi(key)}
       />
+
+      {kondisiSummary.unset > 0 && (
+        <button
+          type="button"
+          onClick={() => setFilterKondisi(ASSET_CONDITION_UNSET)}
+          aria-pressed={canonKey(filterKondisi) === ASSET_CONDITION_UNSET}
+          className={`w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+            canonKey(filterKondisi) === ASSET_CONDITION_UNSET
+              ? "border-amber-500 bg-amber-100 ring-2 ring-amber-500/30 dark:bg-amber-950/40"
+              : "border-amber-200 bg-amber-50 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/20 dark:hover:bg-amber-950/40"
+          }`}
+        >
+          <span className="flex items-start gap-3">
+            <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              <span className="block text-sm font-extrabold text-amber-900 dark:text-amber-200">
+                {kondisiSummary.unset} alat & mesin belum memiliki data kondisi
+              </span>
+              <span className="block text-xs text-amber-700 dark:text-amber-300">
+                Nilai ini tidak dimasukkan ke empat card kondisi. Verifikasi melalui form edit atau Data Cleansing.
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-bold text-amber-800 dark:text-amber-200">Tampilkan data</span>
+        </button>
+      )}
 
       <Card>
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">

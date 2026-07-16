@@ -444,7 +444,7 @@ export default function BukuPenjagaan() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className={`text-2xl font-bold ${color}`}>{value}</div>
-                  <div className="text-xs font-bold text-gray-600 dark:text-gray-300 mt-0.5">{label}</div>
+                  <div className="text-sm font-extrabold leading-snug text-gray-700 dark:text-gray-200 mt-1">{label}</div>
                 </div>
                 <Icon size={20} className={`${color} opacity-60 mt-1`} />
               </div>

@@ -118,7 +118,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.10-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.11-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
