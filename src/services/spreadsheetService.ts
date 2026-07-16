@@ -6,6 +6,7 @@ import { backendSelect } from "@/services/backendClient";
 import { apiService } from "@/services/apiService";
 import { normalizeIndonesianPhoneNumber } from "@/lib/contact";
 import { resolveVehicleItemCode } from "@/lib/assetIdentity";
+import { coordinatePairFromRow } from "@/lib/coordinates";
 
 const CACHE_EXPIRY = 30 * 1000;
 const DEFERRED_V2 = new Set(["assets_inventory", "vehicle_budget", "vehicle_maintenance", "equipment_maintenance", "maintenance", "loans"]);
@@ -32,6 +33,7 @@ async function primeDashboardSnapshot() {
   cacheTableRows("pegawai", snapshot.data.pegawai || [], timestamp);
   cacheTableRows("assets_vehicle", snapshot.data.assets_vehicle || [], timestamp);
   cacheTableRows("assets_equipment", snapshot.data.assets_equipment || [], timestamp);
+  cacheTableRows("asset_locations", snapshot.data.asset_locations || [], timestamp);
   cacheTableRows("system_config", snapshot.data.system_config || [], timestamp);
 }
 
@@ -108,6 +110,25 @@ function matchAssets(nama: string, byExact: Map<string, any[]>, byFuzzy: Map<str
   const fk = fuzzyKey(nama);
   if (byFuzzy.has(fk)) return { items: byFuzzy.get(fk)!, via: "fuzzy" as const };
   return { items: [] as any[], via: "none" as const };
+}
+
+function locationTypeMatches(value: unknown, expected: "vehicle" | "equipment"): boolean {
+  const type = String(value || "").trim().toLowerCase().replace(/[_-]+/g, " ");
+  if (!type) return true;
+  return expected === "vehicle"
+    ? type.includes("kendaraan") || type.includes("vehicle")
+    : type.includes("alat") || type.includes("mesin") || type.includes("equipment");
+}
+
+function buildAssetLocationLookup(rows: any[], expected: "vehicle" | "equipment"): Map<string, any> {
+  const lookup = new Map<string, any>();
+  for (const row of rows) {
+    const assetId = String(row.asset_id || row.id_aset || "").trim();
+    if (!assetId || !locationTypeMatches(row.type || row.asset_type || row.jenis_aset, expected)) continue;
+    const coordinates = coordinatePairFromRow(row);
+    if (coordinates.latitude !== undefined && coordinates.longitude !== undefined) lookup.set(assetId, row);
+  }
+  return lookup;
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +344,11 @@ export const spreadsheetService = {
   },
 
   async getVehicles() {
-    const data = await fetchFromSheet("assets_vehicle");
+    const [data, locationRows] = await Promise.all([
+      fetchFromSheet("assets_vehicle"),
+      fetchFromSheet("asset_locations"),
+    ]);
+    const locationLookup = buildAssetLocationLookup(locationRows, "vehicle");
     return data.map((item: any) => {
       // Nomor polisi dan kode barang adalah dua identitas berbeda. Jangan
       // menyalin kode barang ke nomor polisi ketika data nomor polisi kosong.
@@ -333,8 +358,13 @@ export const spreadsheetService = {
         foto = "Kendaraan_Images/B 6590 WAQ.jpg";
       else if (no_polisi === "B 6924 NQA.")
         foto = "Kendaraan_Images/B 6924 NQA..jpg";
+      const assetId = String(item.asset_id || item.id || "").trim();
+      const ownCoordinates = coordinatePairFromRow(item);
+      const coordinates = ownCoordinates.latitude !== undefined
+        ? ownCoordinates
+        : coordinatePairFromRow(locationLookup.get(assetId) || {});
       return {
-        asset_id: item.asset_id,
+        asset_id: assetId,
         kode_barang: resolveVehicleItemCode(item),
         nama_aset: item.asset_name || item.nama_aset || item.asset_category || "Kendaraan Dinas",
         no_polisi,
@@ -353,8 +383,8 @@ export const spreadsheetService = {
         no_mesin: item.engine_number || item.no_mesin || "",
         harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
         km_kendaraan: item.current_km ?? item.km_kendaraan ?? "",
-        latitude: item.lat || item.latitude,
-        longitude: item.lng || item.longitude,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
         foto,
         qr_url: item.qr_legacy_url || item.qr_url,
       };
@@ -362,27 +392,38 @@ export const spreadsheetService = {
   },
 
   async getEquipment() {
-    const data = await fetchFromSheet("assets_equipment");
-    return data.map((item: any) => ({
-      ...item,
-      asset_id: item.asset_id,
-      kode_barang: item.asset_code || item.kode_barang,
-      nama_aset: item.asset_name || item.nama_aset || "-",
-      merk: item.brand || item.merk || "-",
-      jenis: item.asset_category || item.jenis || "-",
-      jumlah: item.quantity || item.jumlah || 1,
-      satuan: item.unit || item.satuan || "Unit",
-      tahun: item.purchase_year || item.tahun || "-",
-      pengguna: item.holder_name || item.pengguna || "-",
-      penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
-      lokasi: item.location || item.lokasi || "",
-      kondisi: (item.condition || item.kondisi || "BAIK").toUpperCase(),
-      harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
-      latitude: item.lat || item.latitude,
-      longitude: item.lng || item.longitude,
-      foto: item.photo_legacy || item.foto || item.photo,
-      qr_url: item.qr_legacy_url || item.qr_url,
-    }));
+    const [data, locationRows] = await Promise.all([
+      fetchFromSheet("assets_equipment"),
+      fetchFromSheet("asset_locations"),
+    ]);
+    const locationLookup = buildAssetLocationLookup(locationRows, "equipment");
+    return data.map((item: any) => {
+      const assetId = String(item.asset_id || item.id || "").trim();
+      const ownCoordinates = coordinatePairFromRow(item);
+      const coordinates = ownCoordinates.latitude !== undefined
+        ? ownCoordinates
+        : coordinatePairFromRow(locationLookup.get(assetId) || {});
+      return {
+        ...item,
+        asset_id: assetId,
+        kode_barang: item.asset_code || item.kode_barang,
+        nama_aset: item.asset_name || item.nama_aset || "-",
+        merk: item.brand || item.merk || "-",
+        jenis: item.asset_category || item.jenis || "-",
+        jumlah: item.quantity || item.jumlah || 1,
+        satuan: item.unit || item.satuan || "Unit",
+        tahun: item.purchase_year || item.tahun || "-",
+        pengguna: item.holder_name || item.pengguna || "-",
+        penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
+        lokasi: item.location || item.lokasi || "",
+        kondisi: (item.condition || item.kondisi || "BAIK").toUpperCase(),
+        harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        foto: item.photo_legacy || item.foto || item.photo,
+        qr_url: item.qr_legacy_url || item.qr_url,
+      };
+    });
   },
 
   async getInventory() { return []; },

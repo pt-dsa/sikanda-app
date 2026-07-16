@@ -21,6 +21,7 @@ import { SafeImage } from "@/components/ui/SafeImage";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
+import { optionalCoordinatePayload } from "@/lib/coordinates";
 
 export default function AlatMesin() {
   const { user } = useContext(AuthContext);
@@ -146,35 +147,52 @@ export default function AlatMesin() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!String(formData.kode_barang || "").trim() || !String(formData.nama_aset || "").trim()) {
-      toast.warning("Data Belum Lengkap", "Kode Barang dan Nama Barang wajib diisi.");
+    if (isSaving) return;
+    if (!String(formData.kode_barang || "").trim() || !String(formData.nama_aset || "").trim() || !String(formData.merk || "").trim()) {
+      toast.warning("Data Belum Lengkap", "Kode Barang, Nama Barang, dan Merk wajib diisi.");
       return;
     }
     if (!isOfficialEmployeeName(formData.pengguna, employees) || !isOfficialEmployeeName(formData.penanggung_jawab, employees)) {
       toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari suggestion Database Pegawai.");
       return;
     }
-    const lat = formData.latitude === "" || formData.latitude === undefined ? undefined : Number(formData.latitude);
-    const lng = formData.longitude === "" || formData.longitude === undefined ? undefined : Number(formData.longitude);
-    if ((lat === undefined) !== (lng === undefined) || (lat !== undefined && (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || Number(lng) < -180 || Number(lng) > 180))) {
-      toast.error("Koordinat Tidak Valid", "Latitude dan longitude harus diisi berpasangan dalam rentang koordinat yang benar.");
+    const coordinateResult = optionalCoordinatePayload(formData.latitude, formData.longitude);
+    if (!coordinateResult.pair.valid) {
+      toast.error("Koordinat Tidak Valid", coordinateResult.pair.error);
       return;
+    }
+    const isNew = !formData.asset_id;
+    const payload: Partial<Equipment> = {
+      ...formData,
+      kode_barang: String(formData.kode_barang || "").trim(),
+      nama_aset: String(formData.nama_aset || "").trim(),
+      merk: String(formData.merk || "").trim(),
+      jenis: String(formData.jenis || "").trim(),
+      pengguna: String(formData.pengguna || "").trim(),
+      penanggung_jawab: String(formData.penanggung_jawab || "").trim(),
+      lokasi: String(formData.lokasi || "").trim(),
+      kondisi: String(formData.kondisi || "BAIK").trim().toUpperCase(),
+      jumlah: Number(formData.jumlah || 1),
+      ...coordinateResult.payload,
+    };
+    if (coordinateResult.pair.empty) {
+      delete payload.latitude;
+      delete payload.longitude;
     }
     setIsSaving(true);
     try {
-      const isNew = !formData.asset_id;
-      const result = await spreadsheetService.saveEquipment({ ...formData, latitude: lat, longitude: lng, kondisi: formData.kondisi || "BAIK", jumlah: Number(formData.jumlah || 1) }, isNew);
+      const result = await spreadsheetService.saveEquipment(payload, isNew);
       if (photoFile) {
         try {
           const encoded = await fileToBase64(photoFile);
           await apiService.uploadAssetFoto({
             table: "assets_equipment",
             assetId: result.asset_id,
-            holderName: String(formData.pengguna || ""),
+            holderName: String(payload.pengguna || ""),
             ...encoded,
           });
         } catch (photoError: any) {
-          setFormData({ ...formData, asset_id: result.asset_id });
+          setFormData({ ...payload, asset_id: result.asset_id });
           await load();
           toast.warning("Data Tersimpan, Foto Belum Terunggah", photoError?.message || "Silakan pilih foto dan simpan kembali.");
           return;
@@ -188,6 +206,7 @@ export default function AlatMesin() {
       toast.success(isNew ? "Data Alat & Mesin Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data alat & mesin dan media telah tersimpan." : "Perubahan data alat & mesin telah tersimpan dan tervalidasi.");
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
+      await load();
     } finally {
       setIsSaving(false);
     }
@@ -273,7 +292,7 @@ export default function AlatMesin() {
       header: "Aksi",
       cell: (row) => (
         <div className="flex justify-end gap-2">
-          {row.latitude && row.longitude && (
+          {row.latitude != null && row.longitude != null && (
             <a 
               href={`https://maps.google.com/?q=${String(row.latitude).replace(',', '.').trim()},${String(row.longitude).replace(',', '.').trim()}`}
               target="_blank" rel="noreferrer"
@@ -323,7 +342,7 @@ export default function AlatMesin() {
       </div>
       
       <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-800 justify-end">
-        {row.latitude && row.longitude && (
+        {row.latitude != null && row.longitude != null && (
           <a 
             href={`https://maps.google.com/?q=${String(row.latitude).replace(',', '.').trim()},${String(row.longitude).replace(',', '.').trim()}`}
             target="_blank" rel="noreferrer"
@@ -492,7 +511,7 @@ export default function AlatMesin() {
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden relative group">
                 {(() => {
                   let lat, lng;
-                  if (selectedItem.latitude && selectedItem.longitude) {
+                  if (selectedItem.latitude != null && selectedItem.longitude != null) {
                     lat = String(selectedItem.latitude).replace(',', '.').trim();
                     lng = String(selectedItem.longitude).replace(',', '.').trim();
                   } else if (selectedItem.lokasi) {

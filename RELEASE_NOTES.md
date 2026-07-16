@@ -1,48 +1,40 @@
-# SIKANDA V1.1.7 Secure — Release Notes
+# SIKANDA V1.1.8 Secure — Release Notes
 
-Tanggal rilis: 15 Juli 2026 (Asia/Jakarta).
+Tanggal rilis: 16 Juli 2026 (Asia/Jakarta).
 
-## Foto Pegawai dan Supabase Storage
+## Verifikasi kecocokan pegawai–aset
 
-- Foto pegawai baru disimpan ke bucket private `pegawai-photos`.
-- Browser menerima signed URL sementara; service-role tetap hanya di Apps Script.
-- Signed URL dibuat secara batch dan di-cache agar daftar pegawai tidak menghasilkan puluhan request berurutan.
-- Avatar memperbarui signed URL satu kali ketika URL kedaluwarsa sebelum memakai fallback inisial.
-- Foto diperkecil maksimal 960 px dan dioptimalkan ke WebP bila hasilnya lebih kecil.
-- Migrasi Drive berjalan per batch, idempoten, menyimpan status gagal/skipped, dan mempertahankan URL Drive lama sebagai fallback.
-- Operasi penambahan viewer Drive dihapus dari jalur baca data.
+- Istilah teknis `FUZZY` tidak lagi ditampilkan kepada pengguna dan diganti menjadi **Perlu Verifikasi**.
+- Administrator/Pimpinan dapat mengklik badge pada kartu, tabel, atau detail pegawai.
+- Klik tersebut membuka Data Cleansing dengan filter NIP dan menggulir langsung ke item pegawai–aset yang sesuai.
+- Status internal `match_quality = fuzzy` dipertahankan sebagai kontrak data sehingga tidak memerlukan migrasi database.
 
-## Stabilitas dan Dashboard
+## CRUD dan koordinat aset
 
-- Dashboard memakai satu endpoint `dashboard_snapshot`, bukan beberapa cold-start Apps Script.
-- Request baca tertentu mempunyai satu retry terbatas dan request ID untuk penelusuran error.
-- Timeout dibedakan antara request baca dan mutasi; pesan error menyertakan ID aman.
-- Simpan data dan upload foto menjadi tahap terpisah. Kegagalan foto tidak lagi menyatakan bahwa record pegawai gagal dibuat.
-- Tanggal disimpan ke database dalam ISO `YYYY-MM-DD`, tetapi tetap ditampilkan dalam format Indonesia.
+- Kendaraan serta Alat & Mesin mengenali `asset_id` dan ID legacy agar edit tidak salah diproses sebagai create.
+- Form edit memuat koordinat dari kolom aktif atau fallback `asset_locations`.
+- Koordinat valid langsung membentuk minimap OpenStreetMap.
+- Latitude dan longitude kini benar-benar opsional: keduanya boleh kosong pada create maupun update.
+- Input parsial atau di luar rentang tetap ditolak; format koma desimal dinormalisasi.
+- Payload kosong tidak menghapus koordinat lama secara tidak sengaja.
+- Backend dapat menyinkronkan koordinat ke `asset_locations` bila tabel aset tidak memiliki kolom koordinat.
+- Toast identik dideduplikasi agar error tidak menumpuk ketika tombol Simpan ditekan berulang.
 
-## Notifikasi dan Trigger
+## Ketahanan mutasi backend
 
-- `healthCheckSupabaseTerjadwal` berjalan setiap 3 hari dan mencatat sukses/gagal di Script Properties.
-- Setelah dua kegagalan berurutan, Administrator/Pimpinan mendapat peringatan maksimal sekali per hari.
-- Notifikasi Buku Penjagaan dijadwalkan mingguan setiap Senin.
-- Email pegawai mulai dikirim ketika agenda masuk jendela 1 bulan sebelum tenggat dan dapat dikirim ulang satu kali setiap minggu sampai tenggat.
-- Deduplikasi memakai kombinasi NIP, jenis agenda, tanggal tenggat, dan minggu pengiriman.
+- Create/update/delete pegawai, kendaraan, alat & mesin, akun, konfigurasi, serta foto memeriksa baris hasil Supabase.
+- Respons kosong tidak lagi dilaporkan sebagai sukses.
+- Update akun menggunakan patch terhadap akun yang benar-benar ada.
+- Validasi field wajib dan koordinat diterapkan kembali di backend tanpa menghalangi update parsial Data Cleansing.
 
-## Tanya SIKANDA
+## Antarmuka
 
-- Prompt akses diselaraskan dengan RBAC final: seluruh role membaca data operasional, hak mutasi tetap berbeda.
-- Pertanyaan faktual yang belum dikenali tidak diserahkan kepada Gemini untuk dihitung; sistem meminta objek/rentang yang lebih jelas.
-- Pertanyaan notifikasi/lonceng dijawab dari feed database yang sama.
-- Temperature narasi diturunkan; setiap jawaban membawa timestamp snapshot WIB untuk audit internal.
+- Subtitle Card PPPK (Penuh Waktu) menjadi **Pegawai Pemerintah Penuh Waktu**.
+- Logo Kota Tangerang Selatan dipasang sebagai favicon dan Apple Touch Icon.
+- Peta Sebaran menggunakan normalisasi koordinat yang sama dengan form aset.
 
-## RBAC dan CSV
+## Kompatibilitas dan deployment
 
-- Ditambahkan action `data.export` hanya untuk Administrator dan Pimpinan.
-- Tombol dan fungsi CSV Data ASN/PPPK serta Buku Penjagaan sama-sama memiliki guard role.
-- Pegawai tetap tidak dapat membuka Rekap Laporan.
-- Seluruh pembatasan CRUD profil/aset V1.1.6 dipertahankan.
-
-## Kompatibilitas
-
-- Seluruh perbaikan V1.1.6 untuk KOP, peta, cleansing, WhatsApp, capture layar, format kontak, dashboard, mobile UI, dan aset dipertahankan.
-- Google Drive masih dibaca sebagai fallback selama migrasi; upload pegawai baru tidak lagi memakai Drive.
+- Arsitektur keamanan, RBAC, private Storage foto pegawai, trigger, dan migrasi V1.1.7 tetap dipertahankan.
+- Tidak ada SQL, Script Property, trigger, atau migrasi foto baru.
+- Frontend dan `apps-script/Code.gs` harus sama-sama diperbarui agar revisi bekerja lengkap.

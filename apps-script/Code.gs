@@ -86,8 +86,8 @@ var COLUMN_ALIASES = {
     tahun: ['purchase_year', 'tahun'], pengguna: ['holder_name', 'pengguna'],
     penanggung_jawab: ['person_in_charge', 'penanggung_jawab'],
     lokasi: ['usage', 'lokasi', 'unit_kerja'], kondisi: ['condition', 'kondisi'],
-    foto: ['photo_legacy', 'foto', 'photo'], latitude: ['lat', 'latitude'],
-    longitude: ['lng', 'longitude'], no_polisi: ['plate_number', 'no_polisi'],
+    foto: ['photo_legacy', 'foto', 'photo'], latitude: ['lat', 'latitude', 'gps_latitude', 'location_latitude'],
+    longitude: ['lng', 'longitude', 'lon', 'gps_longitude', 'location_longitude'], no_polisi: ['plate_number', 'no_polisi'],
     tipe: ['vehicle_type', 'tipe'], jenis_kendaraan: ['asset_category', 'jenis_kendaraan'],
     km_kendaraan: ['current_km', 'km_kendaraan'],
     unit_kerja: ['usage', 'unit_kerja', 'lokasi'],
@@ -103,16 +103,21 @@ var COLUMN_ALIASES = {
     tahun: ['purchase_year', 'tahun'], pengguna: ['holder_name', 'pengguna'],
     penanggung_jawab: ['person_in_charge', 'penanggung_jawab'],
     lokasi: ['location', 'lokasi'], kondisi: ['condition', 'kondisi'],
-    foto: ['photo_legacy', 'foto', 'photo'], latitude: ['lat', 'latitude'],
-    longitude: ['lng', 'longitude'], jenis: ['asset_category', 'jenis'],
+    foto: ['photo_legacy', 'foto', 'photo'], latitude: ['lat', 'latitude', 'gps_latitude', 'location_latitude'],
+    longitude: ['lng', 'longitude', 'lon', 'gps_longitude', 'location_longitude'], jenis: ['asset_category', 'jenis'],
     jumlah: ['quantity', 'jumlah'], satuan: ['unit', 'satuan'],
     harga_pembelian: ['acquisition_price', 'harga_pembelian'],
     qr_url: ['qr_legacy_url', 'qr_url']
+  },
+  asset_locations: {
+    asset_id: ['asset_id', 'id_aset'], type: ['type', 'asset_type', 'jenis_aset'],
+    latitude: ['lat', 'latitude', 'gps_latitude', 'location_latitude'],
+    longitude: ['lng', 'longitude', 'lon', 'gps_longitude', 'location_longitude']
   }
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.7-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.8-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -235,7 +240,7 @@ function publicError_(message) {
 function publicMessage_(err, fallback) {
   if (err && err.publicMessage) return String(err.publicMessage);
   var message = String(err && err.message ? err.message : '');
-  var safePrefixes = ['Akses ditolak', 'Akun ', 'NIP ', 'Email ', 'Data ', 'Tabel ', 'Konfigurasi ', 'Berkas ', 'Foto ', 'Pertanyaan ', 'Batas '];
+  var safePrefixes = ['Akses ditolak', 'Akun ', 'NIP ', 'Email ', 'Data ', 'Tabel ', 'Konfigurasi ', 'Berkas ', 'Foto ', 'Pertanyaan ', 'Batas ', 'Koordinat ', 'Latitude ', 'Longitude ', 'Nama ', 'Status '];
   for (var i = 0; i < safePrefixes.length; i++) {
     if (message.indexOf(safePrefixes[i]) === 0) return message;
   }
@@ -585,6 +590,7 @@ function dashboardSnapshot_(actor) {
       pegawai: employees,
       assets_vehicle: vehicles,
       assets_equipment: equipment,
+      asset_locations: selectForActor_(actor, 'asset_locations', []),
       system_config: configRowsForSnapshot_()
     }
   };
@@ -661,6 +667,89 @@ function firstExistingColumn_(table, logical) {
   return '';
 }
 
+function requireMutationRows_(rows, entityLabel) {
+  if (Object.prototype.toString.call(rows) !== '[object Array]' || rows.length === 0) {
+    throw publicError_('Data ' + entityLabel + ' tidak ditemukan atau tidak berhasil diperbarui. Muat ulang data lalu coba kembali.');
+  }
+  return rows;
+}
+
+function isEmptyCoordinate_(value) {
+  if (value === null || value === undefined) return true;
+  var text = String(value).trim().toUpperCase();
+  return ['', '-', 'NULL', 'UNDEFINED', 'N/A', 'NA'].indexOf(text) !== -1;
+}
+
+function parseCoordinate_(value) {
+  if (isEmptyCoordinate_(value)) return null;
+  var text = String(value).trim().replace(',', '.');
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) return NaN;
+  return Number(text);
+}
+
+function normalizeAssetCoordinates_(data) {
+  var hasLatitude = Object.prototype.hasOwnProperty.call(data, 'latitude');
+  var hasLongitude = Object.prototype.hasOwnProperty.call(data, 'longitude');
+  if (!hasLatitude && !hasLongitude) return;
+
+  var latitudeEmpty = !hasLatitude || isEmptyCoordinate_(data.latitude);
+  var longitudeEmpty = !hasLongitude || isEmptyCoordinate_(data.longitude);
+  if (latitudeEmpty && longitudeEmpty) {
+    delete data.latitude;
+    delete data.longitude;
+    return;
+  }
+  if (latitudeEmpty !== longitudeEmpty) {
+    throw publicError_('Koordinat tidak valid. Latitude dan longitude harus diisi berpasangan, atau kosongkan keduanya.');
+  }
+
+  var latitude = parseCoordinate_(data.latitude);
+  var longitude = parseCoordinate_(data.longitude);
+  if (!isFinite(latitude) || !isFinite(longitude)) {
+    throw publicError_('Koordinat tidak valid. Latitude dan longitude harus berupa angka.');
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    throw publicError_('Koordinat tidak valid. Latitude harus -90–90 dan longitude harus -180–180.');
+  }
+  data.latitude = latitude;
+  data.longitude = longitude;
+}
+
+function requireAssetText_(data, key, label, isNew) {
+  if (!isNew && !Object.prototype.hasOwnProperty.call(data, key)) return;
+  if (!String(data[key] || '').trim()) throw publicError_('Data ' + label + ' wajib diisi.');
+  data[key] = String(data[key]).trim();
+}
+
+function syncAssetCoordinates_(actor, table, assetId, data) {
+  if (!Object.prototype.hasOwnProperty.call(data, 'latitude') || !Object.prototype.hasOwnProperty.call(data, 'longitude')) return;
+  var assetLatitudeColumn = firstExistingColumn_(table, 'latitude');
+  var assetLongitudeColumn = firstExistingColumn_(table, 'longitude');
+  if (assetLatitudeColumn && assetLongitudeColumn) return;
+
+  var locationLatitudeColumn = firstExistingColumn_('asset_locations', 'latitude');
+  var locationLongitudeColumn = firstExistingColumn_('asset_locations', 'longitude');
+  var locationAssetColumn = firstExistingColumn_('asset_locations', 'asset_id') || 'asset_id';
+  if (!locationLatitudeColumn || !locationLongitudeColumn) {
+    throw publicError_('Koordinat belum dapat disimpan karena kolom lokasi aset belum tersedia.');
+  }
+
+  var locationInput = {
+    asset_id: assetId,
+    type: table === 'assets_vehicle' ? 'Kendaraan' : 'Alat & Mesin',
+    latitude: data.latitude,
+    longitude: data.longitude
+  };
+  var locationPayload = payloadForTable_('asset_locations', locationInput, ['asset_id', 'type', 'latitude', 'longitude']);
+  var existing = supaGet_('asset_locations?select=' + locationAssetColumn + '&' + locationAssetColumn + '=eq.' + encodeURIComponent(assetId) + '&limit=1');
+  if (existing.length) {
+    requireMutationRows_(supaRequest_('patch', 'asset_locations?' + locationAssetColumn + '=eq.' + encodeURIComponent(assetId), locationPayload, 'return=representation'), 'lokasi aset ' + assetId);
+  } else {
+    requireMutationRows_(supaRequest_('post', 'asset_locations', locationPayload, 'return=representation'), 'lokasi aset ' + assetId);
+  }
+  auditLog_(actor, 'asset.coordinates.update', 'asset_locations', assetId, { table: table });
+}
+
 function savePegawai_(actor, data, isNew) {
   var nip = String(data.nip || actor.nip || '').trim();
   if (!/^\d{18}$/.test(nip)) throw publicError_('NIP wajib berupa 18 digit angka.');
@@ -710,9 +799,9 @@ function savePegawai_(actor, data, isNew) {
     if (existing.length) throw publicError_('NIP ' + nip + ' sudah terdaftar.');
     if (columns.indexOf('created_at') !== -1) payload.created_at = new Date().toISOString();
     if (columns.indexOf('is_active') !== -1 && payload.is_active === undefined) payload.is_active = true;
-    supaRequest_('post', 'pegawai', payload, 'return=representation');
+    requireMutationRows_(supaRequest_('post', 'pegawai', payload, 'return=representation'), 'pegawai');
   } else {
-    supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), payload, 'return=representation');
+    requireMutationRows_(supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), payload, 'return=representation'), 'pegawai dengan NIP ' + nip);
   }
   auditLog_(actor, isNew ? 'pegawai.create' : 'pegawai.update', 'pegawai', nip, { fields: Object.keys(payload) });
   return { ok: true, mode: isNew ? 'create' : 'update', nip: nip };
@@ -760,9 +849,9 @@ function deletePegawai_(actor, nip) {
   nip = String(nip || '').trim();
   if (!nip) throw publicError_('NIP wajib diisi.');
   if (tableColumns_('pegawai').indexOf('is_active') === -1) throw publicError_('Konfigurasi soft delete belum tersedia. Jalankan migrasi Supabase terlebih dahulu.');
-  supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), {
+  requireMutationRows_(supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), {
     is_active: false, updated_at: new Date().toISOString(), updated_by: actor.email
-  }, 'return=representation');
+  }, 'return=representation'), 'pegawai dengan NIP ' + nip);
   auditLog_(actor, 'pegawai.deactivate', 'pegawai', nip, {});
   return { ok: true, nip: nip };
 }
@@ -777,9 +866,20 @@ function normalizeAssetTable_(table) {
 
 function saveAsset_(actor, table, data, isNew) {
   table = normalizeAssetTable_(table);
+  data = data || {};
   var id = String(data.asset_id || '').trim();
   if (!id && !isNew) throw publicError_('Data asset_id wajib diisi.');
   if (!id) id = (table === 'assets_vehicle' ? 'VEH-' : 'EQP-') + Utilities.getUuid();
+  normalizeAssetCoordinates_(data);
+  if (table === 'assets_vehicle') {
+    requireAssetText_(data, 'no_polisi', 'Nomor Polisi', isNew);
+    requireAssetText_(data, 'nama_aset', 'Nama Aset', isNew);
+    requireAssetText_(data, 'merk', 'Merk/Model', isNew);
+  } else {
+    requireAssetText_(data, 'kode_barang', 'Kode Barang', isNew);
+    requireAssetText_(data, 'nama_aset', 'Nama Barang', isNew);
+    requireAssetText_(data, 'merk', 'Merk', isNew);
+  }
   validateAssetEmployeeField_(data, 'pengguna', 'Pengguna');
   validateAssetEmployeeField_(data, 'penanggung_jawab', 'Penanggung Jawab');
   var input = {};
@@ -795,11 +895,12 @@ function saveAsset_(actor, table, data, isNew) {
   if (isNew) {
     if (columns.indexOf('created_at') !== -1) payload.created_at = new Date().toISOString();
     if (columns.indexOf('is_active') !== -1) payload.is_active = true;
-    supaRequest_('post', table, payload, 'return=representation');
+    requireMutationRows_(supaRequest_('post', table, payload, 'return=representation'), table === 'assets_vehicle' ? 'kendaraan' : 'alat dan mesin');
   } else {
     var idColumn = firstExistingColumn_(table, 'asset_id') || 'asset_id';
-    supaRequest_('patch', table + '?' + idColumn + '=eq.' + encodeURIComponent(id), payload, 'return=representation');
+    requireMutationRows_(supaRequest_('patch', table + '?' + idColumn + '=eq.' + encodeURIComponent(id), payload, 'return=representation'), (table === 'assets_vehicle' ? 'kendaraan ' : 'alat dan mesin ') + id);
   }
+  syncAssetCoordinates_(actor, table, id, data);
   auditLog_(actor, isNew ? 'asset.create' : 'asset.update', table, id, { fields: Object.keys(payload) });
   return { ok: true, mode: isNew ? 'create' : 'update', asset_id: id, table: table };
 }
@@ -821,7 +922,7 @@ function deleteAsset_(actor, table, assetId) {
   var payload = { is_active: false };
   if (columns.indexOf('updated_at') !== -1) payload.updated_at = new Date().toISOString();
   if (columns.indexOf('updated_by') !== -1) payload.updated_by = actor.email;
-  supaRequest_('patch', table + '?' + idColumn + '=eq.' + encodeURIComponent(assetId), payload, 'return=representation');
+  requireMutationRows_(supaRequest_('patch', table + '?' + idColumn + '=eq.' + encodeURIComponent(assetId), payload, 'return=representation'), (table === 'assets_vehicle' ? 'kendaraan ' : 'alat dan mesin ') + assetId);
   auditLog_(actor, 'asset.deactivate', table, assetId, {});
   return { ok: true, asset_id: assetId, table: table };
 }
@@ -849,14 +950,14 @@ function uploadFoto_(actor, body) {
   var oldPath = String(existing[0].foto_storage_path || '').trim();
   uploadStorageBlob_(path, blob);
   try {
-    supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), {
+    requireMutationRows_(supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), {
       foto_storage_path: path,
       foto_provider: 'supabase',
       foto_migration_status: 'ready',
       foto_migrated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       updated_by: actor.email
-    }, 'return=representation');
+    }, 'return=representation'), 'pegawai dengan NIP ' + nip);
     if (oldPath && oldPath !== path) deleteStorageObject_(oldPath);
     var viewUrl = signedEmployeePhotoUrls_([path])[path] || '';
     auditLog_(actor, 'pegawai.photo.update', 'pegawai', nip, { provider: 'supabase', path: path });
@@ -1024,7 +1125,7 @@ function setConfig_(actor, key, value) {
   if (MANAGED_CONFIG_KEYS.indexOf(key) === -1) throw publicError_('Konfigurasi tidak diizinkan.');
   var cleanValue = validatedConfigValue_(key, value);
   var payload = { key: key, value: cleanValue, updated_at: new Date().toISOString() };
-  supaRequest_('post', 'system_config?on_conflict=key', payload, 'resolution=merge-duplicates,return=representation');
+  requireMutationRows_(supaRequest_('post', 'system_config?on_conflict=key', payload, 'resolution=merge-duplicates,return=representation'), 'konfigurasi ' + key);
   auditLog_(actor, 'config.update', 'system_config', key, { value: cleanValue });
   return { ok: true, key: key, value: cleanValue };
 }
@@ -1059,6 +1160,15 @@ function userSave_(actor, data, isNew) {
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw publicError_('Email Google yang valid wajib diisi.');
   if (role === 'pegawai' && !/^\d{18}$/.test(nip)) throw publicError_('NIP pegawai wajib berupa 18 digit angka.');
+  if (!isNew && role === 'pegawai') {
+    var linkedEmployees = supaGet_('pegawai?select=nip,nama,email,is_active&nip=eq.' + encodeURIComponent(nip) + '&limit=1');
+    if (!linkedEmployees.length || !isActive_(linkedEmployees[0].is_active)) {
+      throw publicError_('Data pegawai aktif dengan NIP tersebut tidak ditemukan.');
+    }
+    var linkedEmail = String(linkedEmployees[0].email || '').toLowerCase().trim();
+    if (linkedEmail && linkedEmail !== email) throw publicError_('Email akun tidak sesuai dengan email pada Database Pegawai.');
+    name = String(linkedEmployees[0].nama || name).trim();
+  }
   if (email === actor.email && (role === 'pegawai' || data.is_active === false)) {
     throw publicError_('Akun yang sedang digunakan tidak dapat menurunkan atau menonaktifkan aksesnya sendiri.');
   }
@@ -1068,7 +1178,12 @@ function userSave_(actor, data, isNew) {
     is_active: data.is_active === false ? false : true,
     created_by: actor.email
   };
-  supaRequest_('post', 'app_access?on_conflict=email', payload, 'resolution=merge-duplicates,return=representation');
+  if (isNew) {
+    requireMutationRows_(supaRequest_('post', 'app_access', payload, 'return=representation'), 'akun ' + email);
+  } else {
+    delete payload.created_by;
+    requireMutationRows_(supaRequest_('patch', 'app_access?email=eq.' + encodeURIComponent(email), payload, 'return=representation'), 'akun ' + email);
+  }
   invalidateAccessCache_(email);
   auditLog_(actor, isNew ? 'account.create' : 'account.update', 'app_access', email, { role: role, active: payload.is_active });
   return { ok: true, mode: isNew ? 'create' : 'update', email: email };
@@ -1078,7 +1193,7 @@ function userDelete_(actor, email) {
   email = String(email || '').toLowerCase().trim();
   if (!email) throw publicError_('Email wajib diisi.');
   if (email === actor.email) throw publicError_('Akun yang sedang digunakan tidak dapat dinonaktifkan.');
-  supaRequest_('patch', 'app_access?email=eq.' + encodeURIComponent(email), { is_active: false }, 'return=representation');
+  requireMutationRows_(supaRequest_('patch', 'app_access?email=eq.' + encodeURIComponent(email), { is_active: false }, 'return=representation'), 'akun ' + email);
   invalidateAccessCache_(email);
   auditLog_(actor, 'account.deactivate', 'app_access', email, {});
   return { ok: true, email: email };

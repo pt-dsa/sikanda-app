@@ -292,7 +292,7 @@ export default function Dashboard() {
                 <KpiCard title="ASN" value={metrics.pegawaiASN} icon={UserCheck} colorClass="bg-green-100/60 text-green-600" subtitle="Aparatur Sipil Negara" />
               </Link>
               <Link to="/pegawai?status=PPPK_PENUH_WAKTU" className="block transition-transform hover:-translate-y-0.5">
-                <KpiCard title="PPPK (Penuh Waktu)" value={metrics.pegawaiPPPKPenuhWaktu} icon={Users} colorClass="bg-purple-100/60 text-purple-600" subtitle="Termasuk data PPPK lama tanpa kategori" />
+                <KpiCard title="PPPK (Penuh Waktu)" value={metrics.pegawaiPPPKPenuhWaktu} icon={Users} colorClass="bg-purple-100/60 text-purple-600" subtitle="Pegawai Pemerintah Penuh Waktu" />
               </Link>
               <Link to="/pegawai?status=PPPK_PARUH_WAKTU" className="block transition-transform hover:-translate-y-0.5">
                 <KpiCard title="PPPK (Paruh Waktu)" value={metrics.pegawaiPPPKParuhWaktu} icon={Users} colorClass="bg-fuchsia-100/60 text-fuchsia-600" subtitle="Pegawai pemerintah paruh waktu" />

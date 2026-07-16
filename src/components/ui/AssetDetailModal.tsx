@@ -80,7 +80,7 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Lokasi Terakhir</span>
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden relative group">
-                {asset.latitude && asset.longitude ? (
+                {asset.latitude != null && asset.longitude != null ? (
                   (() => {
                     const lat = String(asset.latitude).replace(",", ".").trim();
                     const lng = String(asset.longitude).replace(",", ".").trim();

@@ -15,19 +15,37 @@ import { apiService } from "@/services/apiService";
 // Atom bersama (dipakai juga oleh halaman Data ASN/PPPK) — dipusatkan di sini
 // agar tidak ada duplikasi/drift (lihat Aturan handoff §2).
 // ---------------------------------------------------------------------------
-export function MatchBadge({ quality }: { quality: "exact" | "fuzzy" | "none" }) {
+export function MatchBadge({ quality, onVerify }: { quality: "exact" | "fuzzy" | "none"; onVerify?: () => void }) {
   if (quality === "exact")
     return (
       <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
         <CheckCircle2 size={8} /> VERIFIED
       </span>
     );
-  if (quality === "fuzzy")
+  if (quality === "fuzzy") {
+    const className = "inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800";
+    if (onVerify) {
+      return (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onVerify();
+          }}
+          className={`${className} hover:bg-yellow-200 dark:hover:bg-yellow-900/70 focus:outline-none focus:ring-2 focus:ring-yellow-500/50`}
+          title="Klik untuk membuka data yang perlu diverifikasi"
+          aria-label="Buka verifikasi kecocokan data pegawai dan aset"
+        >
+          <CircleDot size={9} /> Perlu Verifikasi
+        </button>
+      );
+    }
     return (
-      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400">
-        <CircleDot size={8} /> FUZZY
+      <span className={className} title="Kecocokan nama pegawai dan pengguna aset perlu diverifikasi">
+        <CircleDot size={9} /> Perlu Verifikasi
       </span>
     );
+  }
   return null;
 }
 
@@ -170,12 +188,14 @@ export function PegawaiDetailModal({
   onSelectAsset,
   onEdit,
   onDelete,
+  onVerifyMatch,
 }: {
   pegawai: Pegawai;
   onClose: () => void;
   onSelectAsset: (a: any) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onVerifyMatch?: () => void;
 }) {
   const [openSection, setOpenSection] = useState<string>("biodata");
   const totalAssets = pegawai.assets?.length || 0;
@@ -267,7 +287,7 @@ export function PegawaiDetailModal({
               </span>
               {pegawai.match_quality !== "none" && (
                 <div className="mt-2">
-                  <MatchBadge quality={pegawai.match_quality} />
+                  <MatchBadge quality={pegawai.match_quality} onVerify={onVerifyMatch} />
                 </div>
               )}
 

@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { nameSimilarity, normalizeNamaForMatch } from "@/lib/cleansing";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import type { Pegawai } from "@/types";
+import { coordinatePairFromRow } from "@/lib/coordinates";
 
 // Fix Leaflet's default icon path issues in React
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -106,18 +107,13 @@ export default function PetaSebaran() {
         ]);
         const employeeDirectory = employees as Pegawai[];
 
-        const parseCoordinate = (val: any) => {
-          if (val === null || val === undefined || String(val).trim() === "") return null;
-          const parsed = Number(String(val).replace(',', '.'));
-          return isNaN(parsed) ? null : parsed;
-        };
-
         const mapLocations: MapLocation[] = [];
 
         vehicles.forEach((v: any, index: number) => {
-          const lat = parseCoordinate(v.latitude || v.lat);
-          const lng = parseCoordinate(v.longitude || v.lng);
-          if (lat !== null && lng !== null) {
+          const coordinates = coordinatePairFromRow(v);
+          const lat = coordinates.latitude;
+          const lng = coordinates.longitude;
+          if (lat !== undefined && lng !== undefined) {
             const isMotor = String(v.jenis_kendaraan || "").toLowerCase().includes("motor") || 
                            String(v.jenis_kendaraan || "").toLowerCase().includes("roda 2") ||
                            String(v.jenis_kendaraan || "").toLowerCase().includes("roda dua");
@@ -156,9 +152,10 @@ export default function PetaSebaran() {
         });
 
         equipment.forEach((e: any, index: number) => {
-          const lat = parseCoordinate(e.latitude || e.lat);
-          const lng = parseCoordinate(e.longitude || e.lng);
-          if (lat !== null && lng !== null) {
+          const coordinates = coordinatePairFromRow(e);
+          const lat = coordinates.latitude;
+          const lng = coordinates.longitude;
+          if (lat !== undefined && lng !== undefined) {
             mapLocations.push({
               id: String(e.asset_id || e.id || `equipment-${index}`),
               type: "Alat & Mesin",

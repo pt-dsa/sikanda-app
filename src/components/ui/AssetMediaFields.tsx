@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Camera, Crosshair, ImagePlus, LoaderCircle, MapPin, X } from "lucide-react";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
+import { osmMiniMapUrl, validateCoordinatePair } from "@/lib/coordinates";
 
 interface AssetMediaFieldsProps {
   latitude: string | number | undefined;
@@ -41,6 +42,7 @@ export function AssetMediaFields({
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const autoLocateAttempted = useRef(false);
+  const coordinatePair = validateCoordinatePair(latitude, longitude);
 
   useEffect(() => {
     if (autoLocate && !autoLocateAttempted.current && (latitude === "" || latitude === undefined) && (longitude === "" || longitude === undefined)) {
@@ -105,8 +107,8 @@ export function AssetMediaFields({
     <>
       <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5"><MapPin size={14} /> Koordinat GPS</p>
-          <p className="text-[11px] text-gray-400">Gunakan lokasi perangkat atau koreksi secara manual bila diperlukan.</p>
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5"><MapPin size={14} /> Koordinat GPS <span className="font-normal text-gray-400">(opsional)</span></p>
+          <p className="text-[11px] text-gray-400">Gunakan lokasi perangkat, isi manual, atau kosongkan keduanya untuk menyimpan tanpa koordinat.</p>
         </div>
         <button type="button" onClick={takeLocation} disabled={locating} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800 disabled:opacity-60">
           {locating ? <LoaderCircle size={14} className="animate-spin" /> : <Crosshair size={14} />}
@@ -115,12 +117,41 @@ export function AssetMediaFields({
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Latitude</label>
-        <input type="number" step="any" min="-90" max="90" value={latitude ?? ""} onChange={(event) => onCoordinatesChange(event.target.value, longitude ?? "")} className={inputCls} placeholder="Contoh: -6.300000" />
+        <input type="text" inputMode="decimal" value={latitude ?? ""} onChange={(event) => onCoordinatesChange(event.target.value, longitude ?? "")} className={inputCls} placeholder="Contoh: -6.300000" />
       </div>
       <div className="flex flex-col gap-1">
         <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Longitude</label>
-        <input type="number" step="any" min="-180" max="180" value={longitude ?? ""} onChange={(event) => onCoordinatesChange(latitude ?? "", event.target.value)} className={inputCls} placeholder="Contoh: 106.700000" />
+        <input type="text" inputMode="decimal" value={longitude ?? ""} onChange={(event) => onCoordinatesChange(latitude ?? "", event.target.value)} className={inputCls} placeholder="Contoh: 106.700000" />
       </div>
+      {coordinatePair.valid && !coordinatePair.empty && coordinatePair.latitude !== undefined && coordinatePair.longitude !== undefined && (
+        <div className="md:col-span-2 overflow-hidden rounded-xl border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20">
+          <div className="flex items-center justify-between gap-3 px-3 py-2">
+            <div>
+              <p className="text-xs font-bold text-blue-800 dark:text-blue-300">Minimap lokasi tersimpan</p>
+              <p className="text-[10px] text-blue-600/80 dark:text-blue-400">{coordinatePair.latitude.toFixed(7)}, {coordinatePair.longitude.toFixed(7)}</p>
+            </div>
+            <a
+              href={`https://maps.google.com/?q=${coordinatePair.latitude},${coordinatePair.longitude}`}
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 text-[11px] font-bold text-blue-700 dark:text-blue-300 hover:underline"
+            >
+              Buka peta penuh
+            </a>
+          </div>
+          <iframe
+            key={`${coordinatePair.latitude}-${coordinatePair.longitude}`}
+            title={`Minimap ${photoLabel}`}
+            src={osmMiniMapUrl(coordinatePair.latitude, coordinatePair.longitude)}
+            className="block h-44 w-full border-0 bg-gray-100 dark:bg-gray-800"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+      )}
+      {!coordinatePair.valid && (
+        <p className="md:col-span-2 text-[11px] text-red-600 dark:text-red-400">{coordinatePair.error}</p>
+      )}
       {accuracy !== null && (
         <p className="md:col-span-2 text-[11px] text-emerald-600 dark:text-emerald-400">Lokasi berhasil diambil · perkiraan akurasi ±{accuracy} meter.</p>
       )}

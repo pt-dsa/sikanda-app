@@ -29,7 +29,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback((toast: Omit<ToastMessage, "id">) => {
     const id = Math.random().toString(36).substring(2, 9);
     const newToast = { ...toast, id };
-    setToasts((prev) => [...prev, newToast]);
+    // Satu masalah tidak boleh memenuhi layar dengan toast identik ketika
+    // pengguna menekan Simpan beberapa kali. Pertahankan pesan terbaru saja.
+    setToasts((prev) => [
+      ...prev.filter((item) => !(
+        item.type === newToast.type
+        && item.message === newToast.message
+        && item.description === newToast.description
+      )),
+      newToast,
+    ]);
 
     if (toast.duration !== 0) {
       setTimeout(() => {

@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ScanSearch, RefreshCw, CheckCircle2, AlertTriangle,
@@ -47,6 +48,8 @@ const TABS: Array<{ id: FilterTab; label: string; short: string }> = [
 export default function Cleansing() {
   const { user } = useContext(AuthContext);
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetNip = String(searchParams.get("nip") || "").trim();
 
   const [pegawaiList, setPegawaiList]   = useState<Pegawai[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -105,6 +108,14 @@ export default function Cleansing() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    if (!targetNip || loading || assetScanLoading) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("asset-verification-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [assetScanLoading, loading, targetNip]);
+
   // Semua isu aktif (yang belum di-apply)
   const allIssues: CleansingIssue[] = useMemo(() => {
     if (pegawaiList.length === 0) return [];
@@ -161,8 +172,8 @@ export default function Cleansing() {
 
   // Isu kecocokan nama aset yang masih aktif (belum diterapkan)
   const visibleAssetIssues = useMemo(
-    () => assetIssues.filter((a) => !assetApplied.has(a.id)),
-    [assetIssues, assetApplied]
+    () => assetIssues.filter((a) => !assetApplied.has(a.id) && (!targetNip || String(a.matchedNip) === targetNip)),
+    [assetIssues, assetApplied, targetNip]
   );
 
   // --- Terapkan satu koreksi nama aset (SELALU individual, tidak ada bulk) ---
@@ -456,7 +467,7 @@ export default function Cleansing() {
       )}
 
       {/* ── SECTION: Kecocokan Nama Pegawai ↔ Aset (fuzzy matching, validasi manual) ── */}
-      <div>
+      <div id="asset-verification-section" className="scroll-mt-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -474,6 +485,21 @@ export default function Cleansing() {
           )}
         </div>
 
+        {targetNip && (
+          <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            <span>
+              Menampilkan data <strong>Perlu Verifikasi</strong> untuk NIP <span className="font-mono font-bold">{targetNip}</span>.
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchParams({})}
+              className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-gray-900 dark:text-amber-300"
+            >
+              Tampilkan Semua
+            </button>
+          </div>
+        )}
+
         {assetScanLoading ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-10 text-center text-gray-400 text-sm">
             Memindai data aset...
@@ -482,7 +508,9 @@ export default function Cleansing() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-10 text-center">
             <CheckCircle2 size={32} className="mx-auto text-green-500 mb-2" />
             <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">
-              Tidak ada ketidaksesuaian nama pegawai-aset yang ditemukan.
+              {targetNip
+                ? "Tidak ada data yang masih memerlukan verifikasi untuk pegawai ini."
+                : "Tidak ada ketidaksesuaian nama pegawai-aset yang ditemukan."}
             </p>
           </div>
         ) : (

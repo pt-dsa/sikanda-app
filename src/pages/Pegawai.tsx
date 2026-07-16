@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useContext } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { apiService } from "@/services/apiService";
 import { AuthContext } from "@/components/layout/AppShell";
@@ -96,6 +96,7 @@ function WhatsAppButton({ pegawai, compact = false }: { pegawai: Pegawai; compac
 export default function PegawaiPage() {
   const { user } = useContext(AuthContext);
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [data, setData] = useState<Pegawai[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +121,13 @@ export default function PegawaiPage() {
   // NIP yang punya temuan fuzzy Levenshtein nama ↔ holder_name aset
   // (kriteria ke-9 kelengkapan: relasi nama aset harus bersih).
   const [fuzzyNipSet, setFuzzyNipSet] = useState<Set<string>>(new Set());
+  const canVerifyAssetMatch = can(user?.role, "pegawai.edit.any");
+
+  function openMatchVerification(pegawai: Pegawai) {
+    if (!canVerifyAssetMatch) return;
+    setSelectedPegawai(null);
+    navigate(`/cleansing?nip=${encodeURIComponent(String(pegawai.nip || "").trim())}`);
+  }
 
   function handleDelete(p: Pegawai) {
     setConfirmState({
@@ -427,7 +435,7 @@ export default function PegawaiPage() {
         {[
           { key: "all" as const, label: "Total Pegawai", val: data.length, color: "text-gray-800 dark:text-gray-200", bg: "bg-gray-100 dark:bg-gray-800" },
           { key: "exact" as const, label: "Aset Terverifikasi", val: matchStats.exact, color: "text-green-700 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" },
-          { key: "fuzzy" as const, label: "Perlu Penyelarasan", val: matchStats.fuzzy, color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20" },
+          { key: "fuzzy" as const, label: "Perlu Verifikasi", val: matchStats.fuzzy, color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-900/20" },
           { key: "none" as const, label: "Tanpa Aset", val: matchStats.none, color: "text-gray-500", bg: "bg-gray-50 dark:bg-gray-800/30" },
         ].map((s) => {
           const active = filterMatch === s.key;
@@ -608,7 +616,10 @@ export default function PegawaiPage() {
                           <Package size={13} />
                           <span>{pegawai.assets?.length}</span>
                         </div>
-                        <MatchBadge quality={pegawai.match_quality} />
+                        <MatchBadge
+                          quality={pegawai.match_quality}
+                          onVerify={canVerifyAssetMatch && pegawai.match_quality === "fuzzy" ? () => openMatchVerification(pegawai) : undefined}
+                        />
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
@@ -699,7 +710,10 @@ export default function PegawaiPage() {
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-1">
                       <Package size={11} className="shrink-0" />
                       <span>{pegawai.assets?.length} Aset</span>
-                      <MatchBadge quality={pegawai.match_quality} />
+                      <MatchBadge
+                        quality={pegawai.match_quality}
+                        onVerify={canVerifyAssetMatch && pegawai.match_quality === "fuzzy" ? () => openMatchVerification(pegawai) : undefined}
+                      />
                     </div>
                   )}
                   {can(user?.role, "pegawai.edit.any") && (
@@ -726,6 +740,11 @@ export default function PegawaiPage() {
             pegawai={selectedPegawai}
             onClose={() => setSelectedPegawai(null)}
             onSelectAsset={(a) => { setSelectedAsset(a); }}
+            onVerifyMatch={
+              canVerifyAssetMatch && selectedPegawai.match_quality === "fuzzy"
+                ? () => openMatchVerification(selectedPegawai)
+                : undefined
+            }
             onEdit={
               canEditPegawaiRow(user, selectedPegawai.nip)
                 ? () => {

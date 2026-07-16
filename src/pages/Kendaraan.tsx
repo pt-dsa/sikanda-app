@@ -21,6 +21,7 @@ import { SafeImage } from "@/components/ui/SafeImage";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
+import { optionalCoordinatePayload } from "@/lib/coordinates";
 
 const vehicleInputCls = "px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm outline-none focus:ring-2 focus:ring-blue-500/40";
 
@@ -162,6 +163,11 @@ export default function Kendaraan() {
     e.preventDefault();
     if (saving) return;
     const isNew = !formData.asset_id;
+    const coordinateResult = optionalCoordinatePayload(formData.latitude, formData.longitude);
+    if (!coordinateResult.pair.valid) {
+      toast.error("Koordinat Tidak Valid", coordinateResult.pair.error);
+      return;
+    }
     const payload: Partial<Vehicle> = {
       ...formData,
       no_polisi: String(formData.no_polisi || "").trim().toUpperCase(),
@@ -175,9 +181,12 @@ export default function Kendaraan() {
       km_kendaraan: optionalNumber(formData.km_kendaraan),
       kapasitas_mesin: optionalNumber(formData.kapasitas_mesin),
       harga_pembelian: optionalNumber(formData.harga_pembelian),
-      latitude: optionalNumber(formData.latitude),
-      longitude: optionalNumber(formData.longitude),
+      ...coordinateResult.payload,
     };
+    if (coordinateResult.pair.empty) {
+      delete payload.latitude;
+      delete payload.longitude;
+    }
 
     if (!payload.no_polisi || !payload.nama_aset || !payload.merk) {
       toast.error("Data Belum Lengkap", "Nomor Polisi, Nama Aset, dan Merk/Model wajib diisi.");
@@ -187,13 +196,6 @@ export default function Kendaraan() {
       toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari suggestion Database Pegawai.");
       return;
     }
-    const hasLatitude = payload.latitude !== undefined;
-    const hasLongitude = payload.longitude !== undefined;
-    if (hasLatitude !== hasLongitude || (hasLatitude && (Number(payload.latitude) < -90 || Number(payload.latitude) > 90 || Number(payload.longitude) < -180 || Number(payload.longitude) > 180))) {
-      toast.error("Koordinat Tidak Valid", "Latitude dan longitude harus diisi berpasangan dalam rentang koordinat yang benar.");
-      return;
-    }
-
     setSaving(true);
     try {
       const result = await spreadsheetService.saveVehicle(payload, isNew);
@@ -310,7 +312,7 @@ export default function Kendaraan() {
       header: "Aksi",
       cell: (row) => (
         <div className="flex justify-end gap-2">
-          {row.latitude && row.longitude && (
+          {row.latitude != null && row.longitude != null && (
             <a 
               href={`https://maps.google.com/?q=${String(row.latitude).replace(',', '.').trim()},${String(row.longitude).replace(',', '.').trim()}`}
               target="_blank" rel="noreferrer"
@@ -366,7 +368,7 @@ export default function Kendaraan() {
       </div>
       
       <div className="flex gap-2 pt-2 border-t border-gray-100 dark:border-gray-800 justify-end">
-        {row.latitude && row.longitude && (
+        {row.latitude != null && row.longitude != null && (
           <a 
             href={`https://maps.google.com/?q=${String(row.latitude).replace(',', '.').trim()},${String(row.longitude).replace(',', '.').trim()}`}
             target="_blank" rel="noreferrer"
@@ -530,7 +532,7 @@ export default function Kendaraan() {
             <div className="flex flex-col items-center gap-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Lokasi Terakhir</span>
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden relative group">
-                {selectedItem.latitude && selectedItem.longitude ? (
+                {selectedItem.latitude != null && selectedItem.longitude != null ? (
                   (() => {
                     const lat = String(selectedItem.latitude).replace(',', '.').trim();
                     const lng = String(selectedItem.longitude).replace(',', '.').trim();

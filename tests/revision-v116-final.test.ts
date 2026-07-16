@@ -59,7 +59,7 @@ assert(safeImage.includes("fallbackSrcs") && safeImage.includes("sourceIndex"), 
 assert(report.includes("letterhead-inner") && report.includes("column-gap:0") && report.includes("letterhead-text") && report.includes("imagesReady") && !report.includes("left:42px"), "Logo dan judul KOP harus menjadi satu kelompok yang ditunggu hingga siap sebelum print");
 assert(normalizeIndonesianPhoneNumber("081234567890") === "6281234567890", "Kontak harus dinormalisasi ke 628");
 assert(resolveVehicleItemCode({ no_polisi: "B 1 ABC", asset_code: "B 1 ABC" }) === "", "Kode kendaraan yang menduplikasi pelat harus ditolak");
-assert(employeePage.includes("Perlu Penyelarasan") && !employeePage.includes("Aset Fuzzy Match"), "Istilah fuzzy card harus diganti");
+assert(employeePage.includes("Perlu Verifikasi") && !employeePage.includes("Aset Fuzzy Match"), "Istilah kecocokan aset harus mudah dipahami pengguna umum");
 assert(employeePage.includes("WhatsAppButton") && employeePage.includes('user?.role === "admin"') && employeePage.includes("ScreenCaptureTool"), "Admin/Pimpinan harus memiliki WhatsApp dan Administrator memiliki capture layar");
 assert(capture.includes("getDisplayMedia") && capture.includes("ClipboardItem") && capture.includes("navigator.share"), "Capture harus mendukung pilih area, salin, simpan, dan bagikan");
 assert(dashboard.includes("Pegawai Dengan Inventaris") && dashboard.includes("Pegawai Tanpa Inventaris") && dashboard.includes("outerRadius={82}"), "Dashboard harus mengisi ruang card dan memperbesar grafik golongan");
