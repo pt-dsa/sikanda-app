@@ -21,6 +21,24 @@ import { useToast } from "@/components/ui/Toast";
 const containerVars = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const itemVars = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 280, damping: 22 } } };
 const CHART_COLORS = ["#0B57D0", "#34A853", "#FBBC04", "#EA4335", "#9B59B6", "#1ABC9C"];
+const DASHBOARD_CACHE_KEY = "sikanda_dashboard_metrics_v1113";
+const DASHBOARD_CACHE_MS = 5 * 60 * 1000;
+
+function readDashboardCache(): DashboardMetrics | null {
+  try {
+    const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    return Date.now() - Number(cached.timestamp || 0) < DASHBOARD_CACHE_MS ? cached.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(data: DashboardMetrics) {
+  try { sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data })); }
+  catch { /* halaman tetap berfungsi bila penyimpanan sesi penuh */ }
+}
 
 // ---------------------------------------------------------------------------
 // KPI Card
@@ -125,15 +143,15 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
             Data Pegawai Belum Berhasil Dimuat
           </h3>
           <p className="text-sm text-amber-700 dark:text-amber-500 mb-4">
-            Aplikasi belum berhasil membaca Database Pegawai. Ini biasanya karena sesi pengguna belum valid atau konfigurasi layanan belum lengkap.
+            Data pegawai belum berhasil dimuat. Periksa koneksi Anda, lalu coba lagi. Jika kendala tetap terjadi, hubungi administrator.
           </p>
 
           <div className="bg-white/60 dark:bg-gray-900/40 rounded-xl p-4 mb-4">
-            <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Langkah Setup:</p>
+            <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Langkah yang dapat dilakukan:</p>
             <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-none">
               {[
                 `Logout lalu masuk kembali dengan Google, bukan Mode Pengembangan`,
-                `Pastikan alamat layanan aplikasi menggunakan deployment terbaru`,
+                `Pastikan alamat layanan aplikasi sudah diperbarui oleh Administrator`,
                 `Pastikan konfigurasi layanan aplikasi sudah dilengkapi oleh Administrator`,
                 `Pastikan email Google sudah aktif pada Kelola Akun, lalu klik tombol "Coba Lagi"`,
               ].map((step, i) => (
@@ -156,8 +174,8 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
 
           {errorMsg && (
             <details className="mt-3">
-              <summary className="text-xs text-amber-600 cursor-pointer hover:underline">Lihat detail teknis</summary>
-              <p className="mt-1 text-xs font-mono bg-white/60 dark:bg-gray-900/40 p-2 rounded text-red-600 dark:text-red-400 break-all">{errorMsg}</p>
+              <summary className="text-xs text-amber-600 cursor-pointer hover:underline">Lihat rincian kendala</summary>
+              <p className="mt-1 text-xs bg-white/60 dark:bg-gray-900/40 p-2 rounded text-red-600 dark:text-red-400 break-words">{errorMsg}</p>
             </details>
     
       )}
@@ -172,8 +190,9 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
 // ---------------------------------------------------------------------------
 export default function Dashboard() {
   const toast = useToast();
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialMetrics = React.useMemo(readDashboardCache, []);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(initialMetrics);
+  const [loading, setLoading] = useState(!initialMetrics);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPegawaiSetupNeeded, setIsPegawaiSetupNeeded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -183,12 +202,13 @@ export default function Dashboard() {
       setSyncing(true);
       spreadsheetService.clearCache();
     }
-    setLoading(true);
+    if (!metrics) setLoading(true);
     setErrorMsg(null);
     setIsPegawaiSetupNeeded(false);
     try {
       const data = await spreadsheetService.getDashboardMetrics();
       setMetrics(data);
+      writeDashboardCache(data);
       if (force) toast.success("Sinkronisasi Berhasil", "Seluruh informasi Dashboard telah diperbarui dari data aktif dan dihitung ulang.");
     } catch (err: any) {
       const msg = err.message || "Gagal memuat data.";
@@ -225,8 +245,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    spreadsheetService.clearCache();
-    void load();
+    // Snapshot yang masih segar langsung dirender. Permintaan baru hanya
+    // dilakukan jika belum ada cache atau pengguna menekan Sinkronisasi Data.
+    if (!initialMetrics) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -101,7 +101,7 @@ export default function KelolaAkun() {
     setSyncing(true);
     const ok = await load(false, true);
     setSyncing(false);
-    if (ok) toast.success("Sinkronisasi Berhasil", "Daftar akun dan Database Pegawai telah dimuat ulang dari Supabase.");
+    if (ok) toast.success("Sinkronisasi Berhasil", "Daftar akun dan data pegawai telah diperbarui.");
   }
 
   function openAdd() {
@@ -131,7 +131,7 @@ export default function KelolaAkun() {
       return;
     }
     if (!isEdit && !/^\d{18}$/.test(form.nip.trim())) {
-      setError("Pilih nama pegawai dari suggestion Database Pegawai terlebih dahulu.");
+      setError("Pilih nama dari daftar pegawai terlebih dahulu.");
       return;
     }
     setSaving(true);
@@ -141,7 +141,7 @@ export default function KelolaAkun() {
         !isEdit
       );
       setNotice(isEdit ? `Akun ${email} diperbarui.` : `Akun ${email} ditambahkan.`);
-      toast.success(isEdit ? "Perubahan Data Berhasil Disimpan" : "Akun Berhasil Ditambahkan", isEdit ? `Perubahan akun ${email} telah tersimpan.` : `Akun ${email} telah terhubung ke Database Pegawai.`);
+      toast.success(isEdit ? "Perubahan Data Berhasil Disimpan" : "Akun Berhasil Ditambahkan", isEdit ? `Perubahan akun ${email} telah tersimpan.` : `Akun ${email} telah terhubung dengan data pegawai.`);
       setIsFormOpen(false);
       await load();
     } catch (e: any) {
@@ -216,9 +216,9 @@ export default function KelolaAkun() {
 
   function handleSeed() {
     askConfirm({
-      title: "Tarik dari Database Pegawai",
+      title: "Buat dari Data Pegawai",
       message:
-        "Buat akun peran 'pegawai' dari Database Pegawai untuk tiap pegawai aktif ber-NIP yang belum terdaftar?\n\n" +
+        "Buat akun untuk setiap pegawai aktif ber-NIP yang belum terdaftar?\n\n" +
         "• Bila email pegawai valid, akun dibuat dan langsung AKTIF.\n" +
         "• Bila email kosong/tidak valid, data dilewati dan harus dilengkapi melalui Data ASN/PPPK.",
       confirmLabel: "Tarik Sekarang",
@@ -285,7 +285,7 @@ export default function KelolaAkun() {
             onClick={handleSync}
             disabled={syncing}
             className="flex items-center justify-center gap-2 min-h-11 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm"
-            title="Muat ulang daftar akun dan Database Pegawai"
+            title="Perbarui daftar akun dan data pegawai"
           >
             <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Menyinkronkan..." : "Sinkronisasi"}
@@ -294,10 +294,10 @@ export default function KelolaAkun() {
             onClick={handleSeed}
             disabled={seeding}
             className="flex items-center justify-center gap-2 min-h-11 px-4 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 shrink-0 shadow-sm"
-            title="Buat akun peran Pegawai dari Database Pegawai"
+            title="Buat akun dari data pegawai aktif"
           >
             {seeding ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-            Tarik dari Database Pegawai
+            Buat dari Data Pegawai
           </button>
           <button
             onClick={openAdd}
@@ -327,7 +327,7 @@ export default function KelolaAkun() {
           {users.length === 0 ? (
             <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
               <UsersIcon className="mx-auto mb-3 text-gray-300" size={36} />
-              Belum ada akun terdaftar. Tambahkan akun atau tarik dari Database Pegawai.
+              Belum ada akun terdaftar. Tambahkan akun atau buat dari data pegawai.
             </div>
           ) : (
             <>
@@ -472,7 +472,7 @@ export default function KelolaAkun() {
                         )}
                       </div>
                     )}
-                    <p className="text-[11px] text-gray-400 mt-1">Suggestion hanya menampilkan pegawai aktif yang belum memiliki akun.</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Daftar hanya menampilkan pegawai aktif yang belum memiliki akun.</p>
                   </div>
                 )}
 
@@ -482,7 +482,7 @@ export default function KelolaAkun() {
                     type="email"
                     value={form.email}
                     readOnly
-                    placeholder="Terisi otomatis dari Database Pegawai"
+                    placeholder="Terisi otomatis dari data pegawai"
                     className={inputCls}
                   />
                 </div>
@@ -506,7 +506,7 @@ export default function KelolaAkun() {
                     type="text"
                     value={form.nip}
                     readOnly
-                    placeholder="Terisi otomatis dari Database Pegawai"
+                    placeholder="Terisi otomatis dari data pegawai"
                     className={inputCls}
                   />
                 </div>
@@ -517,7 +517,7 @@ export default function KelolaAkun() {
                     type="text"
                     value={form.nama}
                     readOnly
-                    placeholder="Terisi otomatis dari Database Pegawai"
+                    placeholder="Terisi otomatis dari data pegawai"
                     className={inputCls}
                   />
                 </div>
@@ -529,7 +529,7 @@ export default function KelolaAkun() {
 
                 <div>
                   <label className={labelCls}>Jabatan Pegawai</label>
-                  <input type="text" value={selectedEmployee?.jabatan || "-"} readOnly placeholder="Terisi otomatis dari Database Pegawai" className={inputCls} />
+                  <input type="text" value={selectedEmployee?.jabatan || "-"} readOnly placeholder="Terisi otomatis dari data pegawai" className={inputCls} />
                 </div>
 
                 {isEdit && <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none cursor-pointer">

@@ -380,10 +380,10 @@ export default function Laporan() {
                 <option value="all">Seluruh Data</option>
               </select>
               <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4 text-sm text-gray-700 dark:text-gray-200 space-y-1">
-                {(printScope === "pegawai" || printScope === "all") && <div><p><b>Data ASN/PPPK:</b> {filteredPegawai.length} record</p><p className="text-xs text-gray-500">{filterDescription(pegawaiFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "pegawai" || printScope === "all") && <div><p><b>Data ASN/PPPK:</b> {filteredPegawai.length} data</p><p className="text-xs text-gray-500">{filterDescription(pegawaiFilter as unknown as Record<string, string>)}</p></div>}
                 {(printScope === "agenda" || printScope === "all") && <div><p><b>Buku Penjagaan:</b> {filteredAgenda.length} agenda</p><p className="text-xs text-gray-500">{filterDescription(agendaFilter as unknown as Record<string, string>)}</p></div>}
-                {(printScope === "vehicle" || printScope === "all") && <div><p><b>Data Kendaraan:</b> {filteredVehicles.length} record</p><p className="text-xs text-gray-500">{filterDescription(vehicleFilter as unknown as Record<string, string>)}</p></div>}
-                {(printScope === "equipment" || printScope === "all") && <div><p><b>Data Alat & Mesin:</b> {filteredEquipment.length} record</p><p className="text-xs text-gray-500">{filterDescription(equipmentFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "vehicle" || printScope === "all") && <div><p><b>Data Kendaraan:</b> {filteredVehicles.length} data</p><p className="text-xs text-gray-500">{filterDescription(vehicleFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "equipment" || printScope === "all") && <div><p><b>Data Alat & Mesin:</b> {filteredEquipment.length} data</p><p className="text-xs text-gray-500">{filterDescription(equipmentFilter as unknown as Record<string, string>)}</p></div>}
               </div>
             </div>
             <div className="safe-area-bottom px-4 sm:px-5 py-4 border-t border-gray-200 dark:border-gray-800 grid grid-cols-2 sm:flex sm:justify-end gap-2">

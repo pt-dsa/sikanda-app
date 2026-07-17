@@ -266,7 +266,7 @@ export default function Cleansing() {
               onClick={() =>
                 setConfirmState({
                   open: true,
-                  title: "Terapkan Semua Auto-Koreksi",
+                  title: "Terapkan Semua Perbaikan Otomatis",
                   message: `Akan menerapkan ${stats.auto} koreksi otomatis secara berurutan.\n\nProses ini tidak dapat diurungkan. Lanjutkan?`,
                   confirmLabel: "Ya, Terapkan Semua",
                   confirmClass: "bg-blue-600 hover:bg-blue-700",
@@ -278,7 +278,7 @@ export default function Cleansing() {
               {isApplyingAll ? (
                 <><RefreshCw size={15} className="animate-spin" /> Menerapkan...</>
               ) : (
-                <><Zap size={15} /> Terapkan Semua Auto ({stats.auto})</>
+                <><Zap size={15} /> Terapkan Semua ({stats.auto})</>
               )}
             </button>
           )}
@@ -309,13 +309,13 @@ export default function Cleansing() {
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.auto}</div>
-            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Siap Auto-Koreksi</div>
+            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Dapat Diperbaiki</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-amber-500">
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.manual}</div>
-            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Perlu Review Manual</div>
+            <div className="text-sm font-extrabold text-gray-700 dark:text-gray-200 mt-1">Perlu Ditinjau</div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-gray-400">
@@ -509,7 +509,7 @@ export default function Cleansing() {
                       ) : issue.level === "info" ? (
                         <Info size={16} className="text-blue-400 ml-auto" />
                       ) : (
-                        <span className="text-xs text-gray-400 italic">Manual</span>
+                        <span className="text-xs text-gray-400 italic">Tinjau</span>
                       )}
                     </td>
                   </tr>
@@ -532,7 +532,7 @@ export default function Cleansing() {
               <UserCheck2 size={18} className="text-indigo-600" /> Kecocokan Nama Pegawai ↔ Aset
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Saran selalu merujuk nama baku pada Database Pegawai (menu Data ASN / PPPK), bukan nama yang tersimpan di aset.
+              Saran selalu merujuk nama resmi pada menu Data ASN / PPPK, bukan variasi nama yang tercatat pada aset.
               Setiap item harus ditinjau &amp; diterapkan satu per satu (tidak ada penerapan massal).
             </p>
           </div>

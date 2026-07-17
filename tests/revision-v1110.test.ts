@@ -54,6 +54,6 @@ assert(map.includes("assetConditionLabel") && !map.includes('condition: v.kondis
 assert(report.includes("assetConditionLabel"), "ekspor dan print laporan harus memberi label kondisi kosong");
 assert(badge.indexOf('s.includes("kurang baik")') < badge.indexOf('s === "baik"'), "KURANG BAIK tidak boleh menerima badge hijau");
 assert(backend.includes("VALID_ASSET_CONDITIONS") && backend.includes("normalizeAssetCondition_(data, isNew)"), "backend harus memvalidasi enum kondisi");
-assert(backend.includes("delete data.kondisi") && backend.includes("version: '1.1.12-secure'"), "backend update legacy harus mempertahankan kondisi kosong dan melaporkan versi terbaru");
+assert(backend.includes("delete data.kondisi") && backend.includes("version: '1.1.13-secure'"), "backend update legacy harus mempertahankan kondisi kosong dan melaporkan versi terbaru");
 
 console.log("revision-v1110-tests: OK");

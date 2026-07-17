@@ -31,7 +31,7 @@ export function AssetDetailModal({ asset, isOpen, onClose }: AssetDetailModalPro
         data={
           asset
             ? {
-                "Asset ID": asset.asset_id,
+                "ID Aset": asset.asset_id,
                 "Kode Barang": asset.kode_barang || "Belum diisi",
                 "No. Polisi": asset.no_polisi,
                 "Nama Aset": asset.nama_aset || asset.jenis_kendaraan,

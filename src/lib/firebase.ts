@@ -48,7 +48,7 @@ export interface GoogleSignInResult {
 /** Buka popup Google Sign-In → kembalikan email, nama, dan idToken segar. */
 export async function signInWithGoogle(): Promise<GoogleSignInResult> {
   if (!isFirebaseConfigured()) {
-    throw new Error("Konfigurasi Firebase belum lengkap. Isi VITE_FIREBASE_* di environment aplikasi.");
+    throw new Error("Layanan masuk belum siap. Silakan hubungi administrator.");
   }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });

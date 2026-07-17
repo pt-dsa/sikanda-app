@@ -158,11 +158,13 @@ export default function TanyaSikanda() {
         { id: newId(), role: "assistant", content: res.answer, time: nowLabel() },
       ]);
     } catch (err: any) {
-      const msg = err?.message || "Terjadi kendala saat menghubungi asisten.";
+      const msg = String(err?.message || "Terjadi kendala saat menghubungi asisten.")
+        .replace(/\s*\(ID:\s*[^)]+\)\s*$/i, "")
+        .trim();
       const isBusy = /ramai|batas|kuota|429/i.test(msg);
       const errorMessage = isBusy
         ? "Pertanyaannya bagus, tetapi saya sedang menerima cukup banyak permintaan. Tunggu sebentar ya, lalu coba kirim lagi."
-        : "Saya belum berhasil menuntaskan jawaban itu. Coba sebutkan bagian datanya—misalnya pegawai, KGB, pangkat, BUP, kendaraan, atau alat dan mesin—supaya saya bisa mengeceknya lebih terarah.";
+        : `Saya belum berhasil memproses jawaban karena: ${msg} Silakan coba kirim kembali.`;
 
       setMessages((prev) => [
         ...prev,
@@ -174,7 +176,7 @@ export default function TanyaSikanda() {
           isError: true,
         },
       ]);
-      toast.error("Tanya SIKANDA", "Jawaban belum berhasil diproses. Silakan coba kembali.");
+      toast.error("Tanya SIKANDA", msg);
     } finally {
       setSending(false);
       // Kembalikan fokus ke input agar percakapan mengalir

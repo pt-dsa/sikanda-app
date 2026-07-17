@@ -382,7 +382,7 @@ export function PegawaiDetailModal({
                       <div>
                         <p className="text-sm font-bold text-gray-800 dark:text-gray-100">Tidak memiliki agenda Buku Penjagaan</p>
                         <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                          {employmentStatusLabel(pegawai)} tidak memperoleh agenda KGB, kenaikan pangkat, maupun BUP berdasarkan aturan status kepegawaian SIKANDA.
+                          {employmentStatusLabel(pegawai)} tidak memiliki agenda KGB, kenaikan pangkat, maupun BUP.
                         </p>
                       </div>
                     </div>
@@ -439,10 +439,10 @@ export function PegawaiDetailModal({
                   <div className="bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800 rounded-xl p-6 text-center">
                     <Info className="mx-auto text-gray-400 mb-2" size={20} />
                     <p className="text-sm text-gray-500">
-                      Tidak ada aset yang terhubung untuk {pegawai.nama}.
+                      Belum ada aset yang tercatat atas nama {pegawai.nama}.
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Selaraskan nama holder di Google Sheets agar sistem dapat mencocokkan aset.
+                      Jika data belum sesuai, gunakan menu Data Cleansing atau hubungi pengelola aset.
                     </p>
                   </div>
                 ) : (

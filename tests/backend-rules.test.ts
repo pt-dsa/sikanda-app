@@ -68,10 +68,10 @@ assert(
   "Fallback stabil Gemini 2.5 Flash-Lite harus tersedia",
 );
 assert(
-  source.indexOf("answerFromDatabase_(actor, question)") < source.indexOf("if (!GEMINI_API_KEY)"),
+  source.indexOf("answerFromDatabase_(actor, question, body.history || [])") < source.indexOf("if (!GEMINI_API_KEY)"),
   "Router database-first harus dijalankan sebelum ketergantungan Gemini",
 );
-assert(source.includes("NIP pegawai wajib dipilih dari Database Pegawai"), "Tambah akun harus diverifikasi ulang terhadap Database Pegawai");
+assert(source.includes("NIP wajib dipilih dari daftar pegawai."), "Tambah akun harus diverifikasi ulang terhadap daftar pegawai aktif");
 assert(source.includes("kapasitas_mesin") && source.includes("no_bpkb") && source.includes("harga_pembelian"), "Backend harus menerima field kendaraan lengkap");
 assert(source.includes("assets_equipment") && source.includes("qr_url") && source.includes("jumlah"), "Backend harus menerima field Alat & Mesin lengkap");
 assert(!source.includes("NOTIF_ADMIN_EMAIL"), "Backend tidak boleh memakai alamat rekap manual");

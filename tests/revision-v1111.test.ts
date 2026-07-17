@@ -51,6 +51,6 @@ assert(vehicle.includes("flex flex-col sm:flex-row") && equipment.includes("flex
 assert(employee.includes("text-sm font-extrabold leading-snug"), "judul card ASN/PPPK harus lebih besar dan tebal");
 assert(watchBook.includes("text-sm font-extrabold leading-snug"), "judul card Buku Penjagaan harus lebih besar dan tebal");
 assert(cleansing.includes("text-sm font-extrabold") && dashboard.includes("text-base font-extrabold"), "judul card menu lain harus diaudit dan diperjelas");
-assert(backend.includes("version: '1.1.12-secure'"), "endpoint backend harus melaporkan versi V1.1.12");
+assert(backend.includes("version: '1.1.13-secure'"), "endpoint backend harus melaporkan versi V1.1.13");
 
 console.log("revision-v1111-tests: OK");

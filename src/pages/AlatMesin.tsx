@@ -94,7 +94,7 @@ export default function AlatMesin() {
     setSyncing(true);
     const ok = await load(true);
     setSyncing(false);
-    if (ok) toast.success("Sinkronisasi Berhasil", "Data Alat & Mesin dan Database Pegawai telah dimuat ulang dari Supabase.");
+    if (ok) toast.success("Sinkronisasi Berhasil", "Data alat, mesin, dan pegawai telah diperbarui.");
   };
 
   const handleDelete = (id: string) => {
@@ -175,7 +175,7 @@ export default function AlatMesin() {
       return;
     }
     if (!isOfficialEmployeeName(formData.pengguna, employees) || !isOfficialEmployeeName(formData.penanggung_jawab, employees)) {
-      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari suggestion Database Pegawai.");
+      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari daftar pegawai.");
       return;
     }
     const coordinateResult = optionalCoordinatePayload(formData.latitude, formData.longitude);
@@ -550,7 +550,7 @@ export default function AlatMesin() {
         onClose={() => setSelectedItem(null)} 
         title="Detail Alat & Mesin" 
         data={selectedItem ? {
-          "Asset ID": selectedItem.asset_id,
+          "ID Aset": selectedItem.asset_id,
           "Kode Barang": selectedItem.kode_barang,
           "Nama Barang": selectedItem.nama_aset,
           "Merk": selectedItem.merk,
@@ -697,13 +697,13 @@ export default function AlatMesin() {
               <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain grid grid-cols-1 md:grid-cols-2 gap-4">
                 {formData.asset_id && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Asset ID</label>
+                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300">ID Aset</label>
                     <input readOnly value={formData.asset_id} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-sm opacity-70" />
                   </div>
                 )}
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Kode Barang *</label>
-                  <input required value={formData.kode_barang || ""} onChange={e => setFormData({...formData, kode_barang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kode barang sesuai database" />
+                  <input required value={formData.kode_barang || ""} onChange={e => setFormData({...formData, kode_barang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kode inventaris/barang" />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Nama Barang *</label>
@@ -765,7 +765,7 @@ export default function AlatMesin() {
                 />
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <label className="text-xs font-medium text-gray-500">URL / Isi QR</label>
-                  <input value={formData.qr_url || ""} onChange={e => setFormData({...formData, qr_url: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kosongkan untuk memakai Asset ID" />
+                  <input value={formData.qr_url || ""} onChange={e => setFormData({...formData, qr_url: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kosongkan untuk memakai ID aset" />
                 </div>
               </div>
               <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2 safe-area-bottom">

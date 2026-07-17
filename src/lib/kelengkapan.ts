@@ -10,8 +10,8 @@
 //   6. Foto terisi
 //   7. Email terisi
 //   8. Kontak terisi
-//   9. Relasi nama ↔ aset BERSIH: match_quality bukan "fuzzy" DAN tidak ada
-//      temuan Levenshtein (scanAssetNameMismatches) yang menunjuk pegawai ini.
+//   9. Relasi nama ↔ aset BERSIH: tidak ada temuan pemindaian nama aset yang
+//      menunjuk pegawai ini.
 //      Pegawai TANPA aset dianggap bersih (tidak ada nama fuzzy).
 //
 // Semua fungsi MURNI (tanpa side effects). Sumber kebenaran kriteria 1-5
@@ -87,8 +87,7 @@ export function hitungKelengkapan(
   fuzzyNipSet: Set<string>
 ): KelengkapanResult {
   const nip = String(p.nip || "").trim();
-  const relasiBersih =
-    p.match_quality !== "fuzzy" && !(nip !== "" && fuzzyNipSet.has(nip));
+  const relasiBersih = !(nip !== "" && fuzzyNipSet.has(nip));
 
   // [terpenuhi?, label] — urutan tetap agar tooltip konsisten.
   const checks: Array<[boolean, string]> = [

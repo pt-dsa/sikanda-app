@@ -20,14 +20,14 @@ const migration = read("supabase/005_sikanda_v1_1_7_storage_and_notifications.sq
 
 assert(can("admin", "data.export") && can("pimpinan", "data.export") && !can("pegawai", "data.export"), "CSV hanya boleh untuk Administrator/Pimpinan");
 assert(employeePage.includes('can(user?.role, "data.export")') && guardPage.includes('can(user?.role, "data.export")'), "Semua tombol CSV aktif harus memakai guard RBAC");
-assert(backend.includes("version: '1.1.12-secure'") && backend.includes("SUPABASE_PHOTO_BUCKET"), "Backend terbaru harus mempertahankan bucket foto private");
+assert(backend.includes("version: '1.1.13-secure'") && backend.includes("SUPABASE_PHOTO_BUCKET"), "Backend terbaru harus mempertahankan bucket foto private");
 assert(backend.includes("signedEmployeePhotoUrls_") && backend.includes("paths: missing"), "Signed URL foto harus dibuat secara batch");
 assert(backend.includes("migrateEmployeePhotos_") && backend.includes("migrasiSemuaFotoPegawaiKeSupabase"), "Migrasi Drive harus tersedia dan dapat dilanjutkan bertahap");
 assert(backend.includes("everyDays(3)") && backend.includes("everyWeeks(1)") && backend.includes("collectOneMonthWeeklyReminder_"), "Trigger health 3 harian dan notifikasi mingguan satu bulan harus tersedia");
 assert(!backend.includes("ensureActorPhotoAccess_"), "Jalur baca tidak boleh mengubah permission Drive");
 assert(backend.includes("dashboardSnapshot_") && service.includes("primeDashboardSnapshot"), "Dashboard harus memakai satu snapshot request");
 assert(backendClient.includes("requestId") && backendClient.includes("attempts = retryable.has(action) ? 2 : 1"), "Request baca harus memiliki ID dan retry terbatas");
-assert(api.includes("optimizeEmployeePhoto") && form.includes("Supabase Storage"), "Foto baru harus dikompresi dan dikirim ke Storage");
+assert(api.includes("optimizeEmployeePhoto") && form.includes("apiService.uploadFoto"), "Foto baru harus dikompresi dan dikirim melalui endpoint foto aman");
 assert(!form.includes("apiService.savePegawai({ nip: String(formData.nip), foto: uploadRes.viewUrl }"), "Upload foto tidak boleh menulis signed URL dua kali");
 assert(avatar.includes("getEmployeePhotoUrl") && avatar.includes("refreshAttempted"), "Avatar harus memperbarui signed URL saat gagal");
 assert(migration.includes("public = false") && migration.includes("foto_storage_path"), "Bucket harus private dan path tersimpan terpisah");

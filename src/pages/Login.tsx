@@ -2,8 +2,8 @@ import React, { useState, useContext } from "react";
 import { Navigate } from "react-router-dom";
 import { LogIn, ShieldAlert } from "lucide-react";
 import { AuthContext } from "../components/layout/AppShell";
-import { motion } from "motion/react";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { LoadingState } from "@/components/ui/LoadingState";
 import bgUrl from "@/assets/images_landingpage.webp";
 
 export default function Login() {
@@ -41,17 +41,7 @@ export default function Login() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center w-full max-w-[400px] mx-auto py-10 space-y-6">
-            <p className="text-gray-700 dark:text-gray-300 font-bold text-center text-lg animate-pulse">Memverifikasi akun Anda...</p>
-            <div className="w-full h-3 bg-gray-200/50 dark:bg-gray-700/50 rounded-full overflow-hidden shadow-inner border border-gray-300/30 dark:border-gray-600/30">
-              <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                initial={{ width: "0%" }}
-                animate={{ width: ["0%", "70%", "90%"] }}
-                transition={{ duration: 2.2, ease: "easeInOut" }}
-              />
-            </div>
-          </div>
+          <LoadingState compact label="Memverifikasi akun Anda" />
         ) : (
           <div className="space-y-5 flex flex-col items-center w-full max-w-[400px] mx-auto">
             {error && (

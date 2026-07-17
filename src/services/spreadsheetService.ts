@@ -8,7 +8,10 @@ import { normalizeIndonesianPhoneNumber } from "@/lib/contact";
 import { resolveVehicleItemCode } from "@/lib/assetIdentity";
 import { coordinatePairFromRow } from "@/lib/coordinates";
 
-const CACHE_EXPIRY = 30 * 1000;
+// Navigasi antar-menu memakai snapshot sesi yang sama. Perubahan data dan tombol
+// Sinkronisasi tetap menghapus cache secara eksplisit, sehingga pengguna tidak
+// perlu membayar waktu muat ulang pada setiap perpindahan menu.
+const CACHE_EXPIRY = 5 * 60 * 1000;
 const DEFERRED_V2 = new Set(["assets_inventory", "vehicle_budget", "vehicle_maintenance", "equipment_maintenance", "maintenance", "loans"]);
 const inFlight = new Map<string, Promise<any[]>>();
 
@@ -20,13 +23,14 @@ function cacheTableRows(table: string, rows: any[], timestamp = Date.now()) {
 
 async function primeDashboardSnapshot() {
   if (typeof sessionStorage !== "undefined") {
-    const cached = sessionStorage.getItem("supabase_v2_backend_pegawai");
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Date.now() - parsed.timestamp < CACHE_EXPIRY) return;
-      } catch { /* fetch fresh snapshot */ }
-    }
+    const required = ["pegawai", "assets_vehicle", "assets_equipment", "asset_locations", "system_config"];
+    const complete = required.every((table) => {
+      const cached = sessionStorage.getItem(`supabase_v2_backend_${table}`);
+      if (!cached) return false;
+      try { return Date.now() - JSON.parse(cached).timestamp < CACHE_EXPIRY; }
+      catch { return false; }
+    });
+    if (complete) return;
   }
   const snapshot = await apiService.getDashboardSnapshot();
   const timestamp = Date.now();
@@ -43,7 +47,10 @@ async function primeDashboardSnapshot() {
 // ---------------------------------------------------------------------------
 // Core fetch — Now using Supabase!
 // ---------------------------------------------------------------------------
-async function fetchFromSheet(sheetName: string): Promise<any[]> {
+async function fetchFromSheet(
+  sheetName: string,
+  options: { allowDeferredPhotos?: boolean } = {},
+): Promise<any[]> {
   if (DEFERRED_V2.has(sheetName)) return [];
   const cacheKey = `supabase_v2_backend_${sheetName}`;
 
@@ -51,7 +58,11 @@ async function fetchFromSheet(sheetName: string): Promise<any[]> {
     const cached = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(cacheKey) : null;
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.timestamp < CACHE_EXPIRY) return parsed.data;
+      const fresh = Date.now() - parsed.timestamp < CACHE_EXPIRY;
+      const photoUrlsDeferred = sheetName === "pegawai"
+        && Array.isArray(parsed.data)
+        && parsed.data.some((row: any) => row?._photo_urls_deferred === true);
+      if (fresh && (!photoUrlsDeferred || options.allowDeferredPhotos)) return parsed.data;
     }
 
     const tableName = sheetName;
@@ -227,6 +238,7 @@ export const spreadsheetService = {
         sessionStorage.removeItem(key);
       }
     });
+    sessionStorage.removeItem("sikanda_dashboard_metrics_v1113");
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("sikanda:data-changed"));
   },
 
@@ -441,10 +453,10 @@ export const spreadsheetService = {
   // ---------------------------------------------------------------------------
   // getPegawai — with GViz fix + robust column detection
   // ---------------------------------------------------------------------------
-  async getPegawai() {
+  async getPegawai(options: { allowDeferredPhotos?: boolean } = {}) {
     try {
       const [rawPegawai, vehicles, equipment, settings] = await Promise.all([
-        fetchFromSheet("pegawai"),
+        fetchFromSheet("pegawai", options),
         this.getVehicles(),
         this.getEquipment(),
         this.getSystemSettings(),
@@ -462,7 +474,7 @@ export const spreadsheetService = {
       const vMaps = buildLookupMaps(vehicles);
       const eMaps = buildLookupMaps(equipment);
 
-      return rawPegawai.map((item: any) => {
+      const mapped = rawPegawai.map((item: any) => {
         // ── ROBUST: coba beberapa varian nama kolom ──
         const nama = String(
           item.nama_pegawai ||   // "NAMA PEGAWAI" → normalizeKey
@@ -560,7 +572,28 @@ export const spreadsheetService = {
           is_incomplete: isIncomplete,
           is_active: true,
         };
-      }).filter(Boolean);
+      }).filter(Boolean) as any[];
+
+      // Satu-satunya sumber status "Perlu Verifikasi" adalah pemindaian yang
+      // juga dipakai menu Data Cleansing. Ini mencegah badge mengarah ke daftar
+      // kosong akibat dua algoritme pencocokan yang berbeda.
+      const unifiedAssets = buildUnifiedAssets(vehicles, equipment);
+      const reviewNips = buildFuzzyNipSet(mapped, unifiedAssets);
+      return mapped.map((pegawai: any) => {
+        const nip = String(pegawai.nip || "").trim();
+        if (reviewNips.has(nip)) return { ...pegawai, match_quality: "fuzzy" as const };
+        if (pegawai.match_quality !== "fuzzy") return pegawai;
+
+        // Pencocokan singkat yang ambigu tidak boleh dianggap sebagai relasi
+        // sah dan tidak boleh menempelkan aset ke pegawai yang salah.
+        return {
+          ...pegawai,
+          assets: [],
+          assets_kendaraan: [],
+          assets_alat_mesin: [],
+          match_quality: "none" as const,
+        };
+      });
 
     } catch (error: any) {
       // Propagate error — biarkan halaman Pegawai/Dashboard tampilkan pesan
@@ -580,7 +613,7 @@ export const spreadsheetService = {
       vehiclesResult,
       equipmentResult
     ] = await Promise.allSettled([
-      this.getPegawai(),
+      this.getPegawai({ allowDeferredPhotos: true }),
       this.getVehicles(),
       this.getEquipment(),
     ]);

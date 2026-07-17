@@ -169,9 +169,9 @@ export default function PetaSebaran() {
               qrUrl: e.qr_url,
               foto: e.foto,
               data: {
-                "Asset ID": e.asset_id,
+                "ID Aset": e.asset_id,
                 "Kode Barang": e.kode_barang,
-                "QR / Asset ID": e.qr_url || e.asset_id,
+                "QR / ID Aset": e.qr_url || e.asset_id,
                 "Nama Barang": e.nama_aset,
                 "Merk": e.merk,
                 "Jenis": e.jenis,

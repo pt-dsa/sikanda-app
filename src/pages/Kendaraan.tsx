@@ -106,7 +106,7 @@ export default function Kendaraan() {
     setSyncing(true);
     const ok = await load(true);
     setSyncing(false);
-    if (ok) toast.success("Sinkronisasi Berhasil", "Data Kendaraan dan Database Pegawai telah dimuat ulang dari Supabase.");
+    if (ok) toast.success("Sinkronisasi Berhasil", "Data kendaraan dan pegawai telah diperbarui.");
   };
 
   const handleDelete = (id: string) => {
@@ -244,7 +244,7 @@ export default function Kendaraan() {
       return;
     }
     if (!isOfficialEmployeeName(payload.pengguna, employees) || !isOfficialEmployeeName(payload.penanggung_jawab, employees)) {
-      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari suggestion Database Pegawai.");
+      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari daftar pegawai.");
       return;
     }
     setSaving(true);
@@ -582,7 +582,7 @@ export default function Kendaraan() {
         onClose={() => setSelectedItem(null)} 
         title="Detail Kendaraan" 
         data={selectedItem ? {
-          "Asset ID": selectedItem.asset_id,
+          "ID Aset": selectedItem.asset_id,
           "Kode Barang": selectedItem.kode_barang,
           "Nomor Polisi": selectedItem.no_polisi,
           "Merk": selectedItem.merk,
@@ -714,7 +714,7 @@ export default function Kendaraan() {
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2">Identitas Kendaraan</div>
                 {formData.asset_id && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-500">Asset ID</label>
+                    <label className="text-xs font-medium text-gray-500">ID Aset</label>
                     <input readOnly value={formData.asset_id} className={`${vehicleInputCls} bg-gray-100 dark:bg-gray-800 opacity-70`} />
                   </div>
                 )}

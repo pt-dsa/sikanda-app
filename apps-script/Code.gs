@@ -118,7 +118,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.12-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.13-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -215,7 +215,7 @@ function doPost(e) {
       case 'supa_insert':
       case 'supa_update':
       case 'supa_delete':
-        throw publicError_('Endpoint database generik dinonaktifkan untuk keamanan.');
+        throw publicError_('Operasi ini tidak diizinkan.');
       default:
         throw publicError_('Aksi tidak dikenal.');
     }
@@ -627,7 +627,7 @@ function filterQuery_(table, filters) {
   return out;
 }
 
-function selectForActor_(actor, table, filters) {
+function selectForActor_(actor, table, filters, options) {
   table = String(table || '').trim();
   if (DEFERRED_V2_TABLES.indexOf(table) !== -1) return [];
   if (ACTIVE_DATA_TABLES.indexOf(table) === -1) throw publicError_('Tabel tidak diizinkan.');
@@ -637,7 +637,10 @@ function selectForActor_(actor, table, filters) {
   rows = rows.filter(function (row) { return isActive_(row.is_active); });
   if (table === 'pegawai') {
     rows.forEach(function (row) { row.kontak = normalizeIndonesianPhone_(row.kontak); });
-    hydrateEmployeePhotoUrls_(rows);
+    // Ringkasan/notifikasi/Tanya SIKANDA tidak menampilkan foto. Melewati
+    // pembuatan signed URL pada jalur tersebut memangkas waktu respons tanpa
+    // mengubah otorisasi atau isi data.
+    if (!(options && options.skipPhotoUrls)) hydrateEmployeePhotoUrls_(rows);
   }
 
   // Seluruh role aktif membaca sumber data operasional yang sama. Otorisasi
@@ -656,7 +659,8 @@ function selectForActor_(actor, table, filters) {
 /** Satu request untuk Dashboard. Menghindari beberapa cold-start Apps Script dan
  * tidak menjalankan operasi izin Drive pada jalur baca. */
 function dashboardSnapshot_(actor) {
-  var employees = selectForActor_(actor, 'pegawai', []);
+  var employees = selectForActor_(actor, 'pegawai', [], { skipPhotoUrls: true });
+  employees.forEach(function (row) { row._photo_urls_deferred = true; });
   var vehicles = selectForActor_(actor, 'assets_vehicle', []);
   var equipment = selectForActor_(actor, 'assets_equipment', []);
   return {
@@ -989,7 +993,7 @@ function normalizePegawaiDates_(data, allowed) {
 function deletePegawai_(actor, nip) {
   nip = String(nip || '').trim();
   if (!nip) throw publicError_('NIP wajib diisi.');
-  if (tableColumns_('pegawai').indexOf('is_active') === -1) throw publicError_('Konfigurasi soft delete belum tersedia. Jalankan migrasi Supabase terlebih dahulu.');
+  if (tableColumns_('pegawai').indexOf('is_active') === -1) throw publicError_('Fitur penonaktifan data belum siap. Silakan hubungi administrator.');
   requireMutationRows_(supaRequest_('patch', 'pegawai?nip=eq.' + encodeURIComponent(nip), {
     is_active: false, updated_at: new Date().toISOString(), updated_by: actor.email
   }, 'return=representation'), 'pegawai dengan NIP ' + nip);
@@ -1052,7 +1056,7 @@ function validateAssetEmployeeField_(data, key, label) {
   if (!Object.prototype.hasOwnProperty.call(data, key)) return;
   var name = String(data[key] || '').trim();
   if (!name) return;
-  if (!employeeNipByName_(name)) throw publicError_('Data ' + label + ' wajib dipilih dari Database Pegawai aktif.');
+  if (!employeeNipByName_(name)) throw publicError_('Data ' + label + ' wajib dipilih dari daftar pegawai aktif.');
 }
 
 function deleteAsset_(actor, table, assetId) {
@@ -1060,7 +1064,7 @@ function deleteAsset_(actor, table, assetId) {
   assetId = String(assetId || '').trim();
   if (!assetId) throw publicError_('Data asset_id wajib diisi.');
   var columns = tableColumns_(table);
-  if (columns.indexOf('is_active') === -1) throw publicError_('Konfigurasi soft delete belum tersedia. Jalankan migrasi Supabase terlebih dahulu.');
+  if (columns.indexOf('is_active') === -1) throw publicError_('Fitur penonaktifan data belum siap. Silakan hubungi administrator.');
   var idColumn = firstExistingColumn_(table, 'asset_id') || 'asset_id';
   var payload = { is_active: false };
   if (columns.indexOf('updated_at') !== -1) payload.updated_at = new Date().toISOString();
@@ -1286,7 +1290,7 @@ function userSave_(actor, data, isNew) {
   var name = String(data.nama || '').trim();
 
   if (isNew) {
-    if (!/^\d{18}$/.test(nip)) throw publicError_('NIP pegawai wajib dipilih dari Database Pegawai.');
+    if (!/^\d{18}$/.test(nip)) throw publicError_('NIP wajib dipilih dari daftar pegawai.');
     var employees = supaGet_('pegawai?select=*&nip=eq.' + encodeURIComponent(nip) + '&limit=1');
     if (!employees.length || !isActive_(employees[0].is_active)) {
       throw publicError_('Data pegawai aktif dengan NIP tersebut tidak ditemukan.');
@@ -1309,7 +1313,7 @@ function userSave_(actor, data, isNew) {
       throw publicError_('Data pegawai aktif dengan NIP tersebut tidak ditemukan.');
     }
     var linkedEmail = String(linkedEmployees[0].email || '').toLowerCase().trim();
-    if (linkedEmail && linkedEmail !== email) throw publicError_('Email akun tidak sesuai dengan email pada Database Pegawai.');
+    if (linkedEmail && linkedEmail !== email) throw publicError_('Email akun tidak sesuai dengan data pegawai.');
     name = String(linkedEmployees[0].nama || name).trim();
   }
   if (email === actor.email && (role === 'pegawai' || data.is_active === false)) {
@@ -1375,7 +1379,7 @@ function aiAsk_(actor, body) {
   var question = String(body.question || '').trim();
   if (!question) throw publicError_('Pertanyaan tidak boleh kosong.');
   question = question.substring(0, AI_MAX_QUESTION_CHARS);
-  var databaseAnswer = answerFromDatabase_(actor, question);
+  var databaseAnswer = answerFromDatabase_(actor, question, body.history || []);
   if (databaseAnswer) {
     auditLog_(actor, 'ai.ask.database', 'tanya_sikanda', '', { question_length: question.length });
     return { ok: true, answer: databaseAnswer, route: 'database', snapshot_at: Utilities.formatDate(new Date(), 'Asia/Jakarta', "yyyy-MM-dd'T'HH:mm:ssXXX") };
@@ -1581,7 +1585,7 @@ function compactAsset_(row, type) {
   };
 }
 
-function answerFromDatabase_(actor, question) {
+function answerFromDatabase_(actor, question, history) {
   var q = normalizeQuestion_(question);
   if (/^(halo|hai|hi|selamat pagi|selamat siang|selamat sore|selamat malam)\b/.test(q)) {
     return 'Halo, **' + escapeMarkdown_(actor.nama || 'Sobat SIKANDA') + '**. Senang bisa membantu. Mau mengecek data pegawai, Buku Penjagaan, kendaraan, atau alat dan mesin hari ini?';
@@ -1603,6 +1607,13 @@ function answerFromDatabase_(actor, question) {
   if (/\bkgb\b|kenaikan gaji/.test(q)) { agendaCode = 'KGB'; agendaLabel = 'KGB'; }
   else if (/kenaikan pangkat|\bpangkat\b/.test(q)) { agendaCode = 'PANGKAT'; agendaLabel = 'kenaikan pangkat'; }
   else if (/\bbup\b|pensiun/.test(q)) { agendaCode = 'BUP'; agendaLabel = 'BUP/pensiun'; }
+
+  // "Sudah terlewat" adalah rentang masa lalu, bukan enam bulan ke depan.
+  // Gunakan sumber fakta yang sama dengan lonceng agar jawaban tidak mungkin
+  // berbeda dengan notifikasi yang sedang dilihat pengguna.
+  if (/(terlewat|terlambat|lewat tenggat|melewati tenggat|sudah lewat|jatuh tempo lewat)/.test(q)) {
+    return overdueAgendaAnswer_(actor, agendaCode, agendaLabel, q);
+  }
 
   if (agendaCode && /(siapa|daftar|jatuh tempo|agenda|bulan ke depan|mendatang|adakah|ada kah|waktu dekat|terdekat|tahun ini)/.test(q)) {
     var monthMatch = q.match(/(\d{1,2})\s*bulan/);
@@ -1710,7 +1721,7 @@ function answerFromDatabase_(actor, question) {
     }
     if (/(siapa|pengguna|daftar|tampilkan|kondisi|rusak)/.test(q)) return assetListAnswer_(equipment, equipmentLabel, false);
     var unitCount = equipment.reduce(function (total, row) { return total + (parseFloat(row.quantity || row.jumlah || 1) || 0); }, 0);
-    return 'Saya sudah cek. Terdapat **' + equipment.length + ' record ' + equipmentLabel + '** dengan total **' + unitCount + ' unit** dalam lingkup akses Anda.';
+    return 'Saya sudah cek. Terdapat **' + equipment.length + ' data ' + equipmentLabel + '** dengan total **' + unitCount + ' unit** dalam lingkup akses Anda.';
   }
 
   if (/ringkasan|ringkas|kondisi umum|dashboard|seluruh data/.test(q)) {
@@ -1727,7 +1738,7 @@ function pppkCategory_(row) {
 }
 
 function activeEmployees_(actor) {
-  return selectForActor_(actor, 'pegawai', []).filter(function (row) {
+  return selectForActor_(actor, 'pegawai', [], { skipPhotoUrls: true }).filter(function (row) {
     var active = String(row.is_active == null ? 'TRUE' : row.is_active).trim().toUpperCase();
     var note = String(row.keterangan || '').trim().toUpperCase();
     return ['FALSE', '0', 'TIDAK'].indexOf(active) === -1 && note !== 'DATA DUMMY' && String(row.nama || row.nama_pegawai || '').trim();
@@ -1788,7 +1799,7 @@ function assetListAnswer_(rows, label, vehicle) {
     var condition = row.condition || row.kondisi || 'belum diisi';
     lines.push((i + 1) + '. **' + escapeMarkdown_(name) + '** (' + escapeMarkdown_(identity) + ') — ' + escapeMarkdown_(condition) + ' — pengguna: ' + escapeMarkdown_(holder));
   }
-  if (rows.length > limit) lines.push('\nDaftar ditampilkan sampai 40 record. Buka menu terkait untuk melihat seluruh data.');
+  if (rows.length > limit) lines.push('\nDaftar ditampilkan sampai 40 data. Buka menu terkait untuk melihat seluruh hasil.');
   return lines.join('\n');
 }
 
@@ -1818,7 +1829,7 @@ function birthdayAnswer_(actor, daysAhead, normalizedQuestion) {
   if (named) employees = [named];
   var rows = buildBirthdayFacts_(employees, daysAhead, jakartaToday_());
   if (!rows.length) {
-    if (named) return '**' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** tidak berulang tahun dalam rentang ' + (daysAhead === 0 ? 'hari ini' : daysAhead + ' hari ke depan') + '. Tanggal lahir pada Database Pegawai: **' + escapeMarkdown_(named.tgl_lahir || named.tanggal_lahir || 'belum tersedia') + '**.';
+    if (named) return '**' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** tidak berulang tahun dalam rentang ' + (daysAhead === 0 ? 'hari ini' : daysAhead + ' hari ke depan') + '. Tanggal lahir yang tercatat: **' + escapeMarkdown_(named.tgl_lahir || named.tanggal_lahir || 'belum tersedia') + '**.';
     return daysAhead === 0 ? 'Hari ini **tidak ada pegawai yang berulang tahun** pada lingkup data Anda.' : 'Dalam **' + daysAhead + ' hari ke depan belum ada pegawai yang berulang tahun** pada lingkup data Anda.';
   }
   var lines = [daysAhead === 0 ? 'Hari ini ada **' + rows.length + ' pegawai yang berulang tahun**:' : 'Dalam ' + daysAhead + ' hari ke depan ada **' + rows.length + ' pegawai yang berulang tahun**:'];
@@ -1868,7 +1879,7 @@ function systemSummaryAnswer_(actor) {
   return 'Berikut kondisi umum data aktif yang dapat Anda akses:\n\n' +
     '- **' + employees.length + ' pegawai** (' + asn + ' ASN dan ' + pppk + ' PPPK)\n' +
     '- **' + vehicles.length + ' kendaraan dinas**\n' +
-    '- **' + equipment.length + ' record alat dan mesin**\n\n' +
+    '- **' + equipment.length + ' data alat dan mesin**\n\n' +
     'Untuk rincian agenda KGB, kenaikan pangkat, BUP, kondisi aset, atau nama pengguna aset, sebutkan bagian yang ingin diperiksa dan saya akan menelusurinya.';
 }
 
@@ -1884,6 +1895,35 @@ function agendaAnswer_(actor, code, label, months) {
   var lines = ['Saya sudah cek. Ada **' + rows.length + ' pegawai** dengan agenda ' + label + ' dalam ' + months + ' bulan ke depan:'];
   for (var r = 0; r < limit; r++) lines.push((r + 1) + '. **' + rows[r].nama + '** — NIP ' + rows[r].nip + ' — ' + formatIndo_(rows[r].date));
   if (rows.length > limit) lines.push('\nDaftar dibatasi 50 nama. Gunakan Buku Penjagaan untuk melihat seluruh hasil.');
+  return lines.join('\n');
+}
+
+function overdueAgendaAnswer_(actor, code, label, normalizedQuestion) {
+  var employees = activeEmployees_(actor);
+  var named = findMentionedEmployee_(employees, normalizedQuestion || '');
+  var rows = buildAgendaFacts_(actor, jakartaToday_(), employees).filter(function (item) {
+    if (item.days >= 0) return false;
+    if (code && item.code !== code) return false;
+    return !named || String(item.nip || '') === String(named.nip || '');
+  });
+
+  var subject = label || 'Buku Penjagaan';
+  if (!rows.length) {
+    if (named) {
+      return 'Saya sudah cek. **' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** tidak memiliki agenda ' + subject + ' yang terlewat.';
+    }
+    return 'Saya sudah cek. **Tidak ada agenda ' + subject + ' yang terlewat** pada lingkup data Anda.';
+  }
+
+  rows.sort(function (a, b) { return a.days - b.days || a.nama.localeCompare(b.nama); });
+  var lines = [named
+    ? 'Benar. **' + escapeMarkdown_(named.nama || named.nama_pegawai || '-') + '** memiliki agenda yang sudah melewati tenggat:'
+    : 'Saya menemukan **' + rows.length + ' agenda ' + subject + ' yang sudah melewati tenggat**:'];
+  var limit = Math.min(rows.length, 50);
+  for (var i = 0; i < limit; i++) {
+    lines.push((i + 1) + '. **' + escapeMarkdown_(rows[i].nama) + '** — ' + escapeMarkdown_(rows[i].label) + ' — ' + formatIndo_(rows[i].date) + ' (**terlewat ' + Math.abs(rows[i].days) + ' hari**)');
+  }
+  if (rows.length > limit) lines.push('\nDaftar dibatasi 50 agenda. Buka Buku Penjagaan untuk melihat seluruh hasil.');
   return lines.join('\n');
 }
 
@@ -2280,11 +2320,11 @@ function buildBirthdayFacts_(employees, daysAhead, today) {
   return rows.sort(function (a, b) { return a.days - b.days || a.nama.localeCompare(b.nama); });
 }
 
-function buildAgendaFacts_(actor, today) {
+function buildAgendaFacts_(actor, today, employeeRows) {
   var config = getPublicConfig_();
   var kgbCycle = intConfig_(config, 'KGB_CYCLE_YEARS', 2), rankCycle = intConfig_(config, 'PANGKAT_CYCLE_YEARS', 4), bupAge = intConfig_(config, 'BUP_USIA', 58);
   var rows = [];
-  activeEmployees_(actor).forEach(function (employee) {
+  (employeeRows || activeEmployees_(actor)).forEach(function (employee) {
     var rules = employmentRules_(employee), tmt = employee.tgl_mulai_golongan || employee.terhitung_mulai_tanggal_golongan, birth = employee.tgl_lahir || employee.tanggal_lahir;
     var common = { nip: String(employee.nip || '').trim(), nama: String(employee.nama || employee.nama_pegawai || '').trim(), jabatan: String(employee.jabatan || '').trim() };
     var append = function (code, label, date) { if (date) rows.push({ nip: common.nip, nama: common.nama, jabatan: common.jabatan, code: code, label: label, date: date, days: Math.round((date.getTime() - today.getTime()) / 86400000) }); };
@@ -2298,11 +2338,12 @@ function buildAgendaFacts_(actor, today) {
 /** Satu feed fakta untuk lonceng dan router Tanya SIKANDA. */
 function getNotificationFeed_(actor) {
   var today = jakartaToday_();
-  var agenda = buildAgendaFacts_(actor, today);
+  var employees = activeEmployees_(actor);
+  var agenda = buildAgendaFacts_(actor, today, employees);
   return {
     ok: true,
     generated_at: Utilities.formatDate(new Date(), 'Asia/Jakarta', "yyyy-MM-dd'T'HH:mm:ss"),
-    birthdays: buildBirthdayFacts_(activeEmployees_(actor), 7, today).map(function (item) { return { nip: item.nip, nama: item.nama, jabatan: item.jabatan, tanggal: formatDateKey_(item.date), daysUntil: item.days }; }),
+    birthdays: buildBirthdayFacts_(employees, 7, today).map(function (item) { return { nip: item.nip, nama: item.nama, jabatan: item.jabatan, tanggal: formatDateKey_(item.date), daysUntil: item.days }; }),
     overdue: agenda.filter(function (item) { return item.days < 0; }).map(notificationAgendaDto_),
     kgb: agenda.filter(function (item) { return item.code === 'KGB' && item.days >= 0 && item.days <= 182; }).map(notificationAgendaDto_),
     pangkat: agenda.filter(function (item) { return item.code === 'PANGKAT' && item.days >= 0 && item.days <= 182; }).map(notificationAgendaDto_),

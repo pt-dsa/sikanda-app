@@ -1,5 +1,11 @@
 import { APPS_SCRIPT_URL, isBackendConfigured } from "@/appsScriptConfig";
 import { getFirebaseIdToken } from "@/lib/firebase";
+import {
+  beginLoadingTask,
+  completeLoadingTask,
+  failLoadingTask,
+  updateLoadingTask,
+} from "@/lib/loadingProgress";
 
 export type BackendPayload = Record<string, any>;
 export type BackendAuth = { idToken?: string };
@@ -38,19 +44,19 @@ export async function callBackend<T = any>(
   explicitAuth?: BackendAuth
 ): Promise<T> {
   await acquireConcurrencySlot();
+  const action = String(payload.action || "");
+  const requestId = globalThis.crypto?.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  beginLoadingTask(requestId, "Memeriksa sesi pengguna");
   try {
-  
+
   if (!isBackendConfigured()) {
-    throw new Error(
-      "Backend Apps Script belum dikonfigurasi. Isi VITE_APPS_SCRIPT_URL di environment Google AI Studio atau GitHub Actions."
-    );
+    throw new Error("Layanan SIKANDA belum siap digunakan. Silakan hubungi administrator.");
   }
 
   const auth = await buildAuth(explicitAuth);
-  const action = String(payload.action || "");
-  const retryable = new Set(["ping", "whoami", "supa_select", "get_config", "notification_feed", "dashboard_snapshot", "employee_photo_url"]);
+  updateLoadingTask(requestId, 18, "Menghubungkan data SIKANDA");
+  const retryable = new Set(["ping", "whoami", "supa_select", "get_config", "notification_feed", "dashboard_snapshot", "employee_photo_url", "ai_ask"]);
   const attempts = retryable.has(action) ? 2 : 1;
-  const requestId = globalThis.crypto?.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -58,6 +64,7 @@ export async function callBackend<T = any>(
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
+      updateLoadingTask(requestId, 32, attempt > 0 ? "Mengulangi koneksi" : "Mengambil data terbaru");
       const res = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -65,16 +72,19 @@ export async function callBackend<T = any>(
         redirect: "follow",
         signal: controller.signal,
       });
+      updateLoadingTask(requestId, 72, "Memproses data");
       let json: any;
       try {
         json = await res.json();
       } catch {
-        throw new Error("Respons server tidak valid. Pastikan Web App Apps Script sudah di-deploy sebagai Web App.");
+        throw new Error("Jawaban layanan SIKANDA tidak dapat dibaca. Silakan coba lagi.");
       }
+      updateLoadingTask(requestId, 92, "Menyiapkan tampilan");
       if (!json || json.ok !== true) {
         const suffix = json?.request_id ? ` (ID: ${json.request_id})` : ` (ID: ${requestId})`;
         throw new Error(((json && json.error) || "Operasi gagal di server SIKANDA.") + suffix);
       }
+      completeLoadingTask(requestId);
       return json as T;
     } catch (e: any) {
       const aborted = e?.name === "AbortError";
@@ -91,6 +101,9 @@ export async function callBackend<T = any>(
     }
   }
   throw lastError || new Error(`Operasi gagal di server SIKANDA (ID: ${requestId}).`);
+  } catch (error) {
+    failLoadingTask(requestId);
+    throw error;
   } finally {
     releaseConcurrencySlot();
   }

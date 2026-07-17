@@ -133,7 +133,7 @@ export default function PegawaiPage() {
     setConfirmState({
       open: true,
       title: "Nonaktifkan Pegawai",
-      message: `Nonaktifkan "${p.nama}" (NIP ${p.nip})?\n\nData tidak dihapus permanen — hanya disembunyikan dari daftar aktif (soft delete) dan tetap tersimpan untuk audit.`,
+      message: `Nonaktifkan "${p.nama}" (NIP ${p.nip})?\n\nData tidak dihapus permanen dan tetap dapat ditelusuri oleh administrator.`,
       confirmLabel: "Nonaktifkan",
       confirmClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {

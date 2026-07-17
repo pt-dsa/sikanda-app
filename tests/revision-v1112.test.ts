@@ -36,6 +36,6 @@ assert(modal.includes("agendaPolicy.kgb") && modal.includes("agendaPolicy.pangka
 assert(shell.includes("PegawaiAvatar") && shell.includes("foto: res.foto") && shell.includes("foto_nip: res.photo_nip"), "Header harus memakai foto pegawai dari sesi terverifikasi");
 assert(backend.includes("function actorEmployeeIdentity_") && backend.includes("foto_storage_path") && backend.includes("signedEmployeePhotoUrls_"), "Backend login harus mengambil foto private pegawai secara aman");
 assert(backend.includes("&email=eq.") && backend.includes("email berasal dari Firebase yang sudah diverifikasi"), "Pencarian foto berdasarkan email hanya boleh menjadi fallback identitas terverifikasi");
-assert(backend.includes("version: '1.1.12-secure'") && metadata.includes("V1.1.12 Secure"), "Versi frontend dan backend harus konsisten V1.1.12");
+assert(backend.includes("version: '1.1.13-secure'") && metadata.includes("V1.1.13 Secure"), "Versi frontend dan backend harus konsisten V1.1.13");
 
 console.log("revision-v1112-tests: OK");

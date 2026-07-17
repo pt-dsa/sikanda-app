@@ -88,7 +88,7 @@ export function EmployeeAutocomplete({
               </span>
             </button>
           )) : (
-            <div className="px-3 py-3 text-xs text-gray-500">Pegawai tidak ditemukan. Gunakan nama yang tersedia pada Database Pegawai.</div>
+            <div className="px-3 py-3 text-xs text-gray-500">Pegawai tidak ditemukan. Pilih nama yang tersedia pada daftar pegawai.</div>
           )}
         </div>
       )}

@@ -97,7 +97,7 @@ const Field = React.memo(function Field({
 });
 
 const SuggestionField = React.memo(function SuggestionField({
-  label, name, value, onChange, locked, placeholder = "Pilih suggestion atau ketik nilai baru", colSpan = false, options = [],
+  label, name, value, onChange, locked, placeholder = "Pilih opsi atau ketik nilai baru", colSpan = false, options = [],
 }: Pick<FieldProps, "label" | "name" | "value" | "onChange" | "locked" | "placeholder" | "colSpan"> & { options: string[] }) {
   const listId = `pegawai-${name}-options`;
   return (
@@ -114,7 +114,7 @@ const SuggestionField = React.memo(function SuggestionField({
         className={inputCls}
       />
       <datalist id={listId}>{options.map((option) => <option key={option} value={option} />)}</datalist>
-      {!locked && <p className="mt-1 text-[10px] text-gray-400">Pilih dari suggestion atau ketik nilai baru bila belum tersedia.</p>}
+      {!locked && <p className="mt-1 text-[10px] text-gray-400">Pilih dari daftar atau ketik nilai baru bila belum tersedia.</p>}
     </div>
   );
 });
@@ -433,7 +433,7 @@ export function PegawaiFormModal({
                   className="hidden"
                 />
                 <p className="text-[10px] text-gray-400">
-                  JPG/PNG/WebP, maks 5 MB. Dioptimalkan dan disimpan private di Supabase Storage.
+                  JPG/PNG/WebP, maksimal 5 MB. Foto disimpan aman dan hanya dapat diakses pengguna berwenang.
                 </p>
               </div>
             </div>
