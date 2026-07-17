@@ -21,7 +21,7 @@ export const apiService = {
   // Identitas / sesi — diverifikasi di Apps Script memakai Firebase idToken,
   // lalu dicocokkan ke Supabase app_access.
   whoami: async (idToken?: string) => {
-    return callBackend<{ ok: true; email: string; role: "admin" | "pimpinan" | "pegawai"; nip: string; nama: string }>(
+    return callBackend<{ ok: true; email: string; role: "admin" | "pimpinan" | "pegawai"; nip: string; photo_nip: string; nama: string; foto: string }>(
       { action: "whoami" },
       idToken ? { idToken } : undefined
     );

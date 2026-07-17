@@ -1,6 +1,30 @@
-# SIKANDA V1.1.11 Secure — Release Notes
+# SIKANDA V1.1.12 Secure — Release Notes
 
-Tanggal rilis: 16 Juli 2026 (Asia/Jakarta).
+Tanggal rilis: 17 Juli 2026 (Asia/Jakarta).
+
+## Aturan agenda berdasarkan status
+
+- Modal profil tidak lagi membuat tiga kartu agenda secara statis untuk setiap pegawai.
+- Sumber tunggal `employmentAgendaPolicy()` menetapkan: ASN mendapat KGB/Pangkat/BUP; PPPK Penuh Waktu mendapat KGB; PPPK Paruh Waktu dan Pensiun tidak mendapat agenda aktif.
+- PPPK Paruh Waktu menampilkan keterangan eksplisit “Tidak memiliki agenda Buku Penjagaan”, bukan tanggal agenda yang sebenarnya tidak berlaku.
+- Mesin Buku Penjagaan, dashboard, laporan, notifikasi, dan Tanya SIKANDA tetap mengikuti kebijakan server yang sama.
+
+## Foto pegawai setelah login
+
+- `whoami` mengembalikan foto pegawai yang sudah di-hydrate menjadi signed URL dari bucket Supabase private.
+- NIP pada `app_access` tetap menjadi identitas otorisasi dan tidak ditimpa oleh pencarian foto.
+- Jika akun manajer belum mempunyai NIP pegawai, backend boleh mencari foto melalui email yang sama persis dengan email Firebase terverifikasi.
+- Header memakai komponen avatar aman yang dapat memperbarui signed URL kedaluwarsa. Inisial hanya menjadi fallback jika foto tidak tersedia atau gagal dimuat.
+
+## Verifikasi V1.1.12
+
+- TypeScript `tsc --noEmit`: lulus.
+- Empat belas suite regresi: lulus.
+- Build Vite produksi: lulus.
+- Sintaks Apps Script: valid.
+- Audit dependency production: 0 kerentanan.
+
+## Baseline V1.1.11 yang dipertahankan
 
 ## Card kondisi dan keterbacaan
 

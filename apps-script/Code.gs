@@ -118,7 +118,7 @@ var COLUMN_ALIASES = {
 };
 
 function doGet() {
-  return json_({ ok: true, service: 'SIKANDA', version: '1.1.11-secure', time: new Date().toISOString() });
+  return json_({ ok: true, service: 'SIKANDA', version: '1.1.12-secure', time: new Date().toISOString() });
 }
 
 function doPost(e) {
@@ -143,7 +143,7 @@ function doPost(e) {
         return json_({ ok: true, pong: true, who: actor.email, role: actor.role });
       case 'whoami':
         touchLastLogin_(actor.email);
-        return json_({ ok: true, email: actor.email, role: actor.role, nip: actor.nip || '', nama: actor.nama || '' });
+        return json_(whoamiPayload_(actor));
       case 'supa_select':
         return json_({ ok: true, data: selectForActor_(actor, String(body.table || ''), body.filters || []) });
       case 'get_config':
@@ -523,6 +523,66 @@ function hydrateEmployeePhotoUrls_(rows) {
     if (path && signed[path]) row.foto = signed[path];
   });
   return rows;
+}
+
+/**
+ * Profil visual untuk header login. Relasi NIP pada app_access tetap menjadi
+ * identitas otorisasi; pencarian email hanya dipakai sebagai fallback foto bagi
+ * akun manajer yang belum memiliki NIP. Kegagalan Storage tidak boleh membuat
+ * login gagal.
+ */
+function actorEmployeeIdentity_(actor) {
+  var fallback = {
+    nip: String(actor.nip || '').trim(),
+    photo_nip: String(actor.nip || '').trim(),
+    nama: String(actor.nama || '').trim(),
+    foto: ''
+  };
+  try {
+    var select = 'nip,nama,email,foto,foto_storage_path,is_active';
+    var accessNip = fallback.nip;
+    var email = String(actor.email || '').toLowerCase().trim();
+    var rows = accessNip
+      ? supaGet_('pegawai?select=' + select + '&nip=eq.' + encodeURIComponent(accessNip) + '&is_active=eq.true&limit=1')
+      : [];
+
+    // Fallback aman: email berasal dari Firebase yang sudah diverifikasi dan
+    // harus sama persis dengan email pegawai di database.
+    if (!rows.length && email && isManager_(actor)) {
+      rows = supaGet_('pegawai?select=' + select + '&email=eq.' + encodeURIComponent(email) + '&is_active=eq.true&limit=1');
+    }
+    if (!rows.length) return fallback;
+
+    var row = rows[0];
+    var path = String(row.foto_storage_path || '').trim();
+    var photoUrl = String(row.foto || '').trim();
+    if (path) {
+      try { photoUrl = signedEmployeePhotoUrls_([path])[path] || photoUrl; }
+      catch (photoErr) { console.warn('[SIKANDA] Signed URL avatar belum tersedia: ' + photoErr.message); }
+    }
+    return {
+      nip: fallback.nip,
+      photo_nip: String(row.nip || '').trim(),
+      nama: String(row.nama || fallback.nama).trim(),
+      foto: photoUrl
+    };
+  } catch (err) {
+    console.warn('[SIKANDA] Profil visual login belum dapat dimuat: ' + err.message);
+    return fallback;
+  }
+}
+
+function whoamiPayload_(actor) {
+  var profile = actorEmployeeIdentity_(actor);
+  return {
+    ok: true,
+    email: actor.email,
+    role: actor.role,
+    nip: profile.nip,
+    photo_nip: profile.photo_nip,
+    nama: profile.nama || actor.nama || '',
+    foto: profile.foto || ''
+  };
 }
 
 function employeePhotoUrl_(actor, nip) {

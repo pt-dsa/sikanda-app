@@ -21,6 +21,8 @@ export interface AppUser {
   role: Role;
   nip?: string; // relasi ke sheet pegawai (WAJIB untuk role 'pegawai')
   nama?: string;
+  foto?: string; // signed URL foto pegawai untuk avatar sesi
+  foto_nip?: string; // NIP sumber foto; dapat berbeda dari relasi akun manajer
   is_active?: boolean;
 }
 

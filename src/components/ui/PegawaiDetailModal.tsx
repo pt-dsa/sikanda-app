@@ -6,7 +6,7 @@ import {
 import { motion } from "motion/react";
 import { formatDate } from "@/lib/utils";
 import type { Pegawai } from "@/types";
-import { employmentStatusLabel } from "@/lib/employmentStatus";
+import { employmentAgendaPolicy, employmentStatusLabel } from "@/lib/employmentStatus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { assetConditionLabel } from "@/lib/assetCondition";
 import { resolveAssetPhotoCandidates } from "@/lib/media";
@@ -201,6 +201,7 @@ export function PegawaiDetailModal({
 }) {
   const [openSection, setOpenSection] = useState<string>("biodata");
   const totalAssets = pegawai.assets?.length || 0;
+  const agendaPolicy = employmentAgendaPolicy(pegawai);
 
   const toggle = (s: string) => setOpenSection((p) => (p === s ? "" : s));
 
@@ -374,31 +375,51 @@ export function PegawaiDetailModal({
 
               {/* Buku Penjagaan */}
               <Section id="penjagaan" title="Buku Penjagaan" icon={AlertTriangle}>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/40">
-                    <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400 mb-1">Jadwal KGB Berikutnya</p>
-                    <KGBStatus tglKgb={pegawai.tgl_kgb} />
-                    <p className="text-[10px] text-yellow-600 mt-1">
-                      Mulai Golongan: {pegawai.tgl_mulai_golongan || "-"}
-                    </p>
+                {!agendaPolicy.hasAgenda ? (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/40">
+                    <div className="flex items-start gap-3">
+                      <Info size={18} className="mt-0.5 shrink-0 text-blue-500" />
+                      <div>
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-100">Tidak memiliki agenda Buku Penjagaan</p>
+                        <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                          {employmentStatusLabel(pegawai)} tidak memperoleh agenda KGB, kenaikan pangkat, maupun BUP berdasarkan aturan status kepegawaian SIKANDA.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40">
-                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Usulan Kenaikan Pangkat</p>
-                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                      {pegawai.tgl_pangkat ? formatDate(pegawai.tgl_pangkat) : "-"}
-                    </span>
-                    <p className="text-[10px] text-blue-600 mt-1">
-                      Mulai Jabatan: {pegawai.tgl_mulai_jabatan || "-"}
-                    </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {agendaPolicy.kgb && (
+                      <div className="p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/40">
+                        <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400 mb-1">Jadwal KGB Berikutnya</p>
+                        <KGBStatus tglKgb={pegawai.tgl_kgb} />
+                        <p className="text-[10px] text-yellow-600 mt-1">
+                          Mulai Golongan: {pegawai.tgl_mulai_golongan || "-"}
+                        </p>
+                      </div>
+                    )}
+                    {agendaPolicy.pangkat && (
+                      <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40">
+                        <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Usulan Kenaikan Pangkat</p>
+                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                          {pegawai.tgl_pangkat ? formatDate(pegawai.tgl_pangkat) : "-"}
+                        </span>
+                        <p className="text-[10px] text-blue-600 mt-1">
+                          Mulai Jabatan: {pegawai.tgl_mulai_jabatan || "-"}
+                        </p>
+                      </div>
+                    )}
+                    {agendaPolicy.bup && (
+                      <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40">
+                        <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">Batas Usia Pensiun</p>
+                        <PensiunStatus tglPensiun={pegawai.tgl_pensiun} />
+                        <p className="text-[10px] text-red-600 mt-1">
+                          Tgl. Lahir: {pegawai.tgl_lahir || "-"}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40">
-                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">Batas Usia Pensiun</p>
-                    <PensiunStatus tglPensiun={pegawai.tgl_pensiun} />
-                    <p className="text-[10px] text-red-600 mt-1">
-                      Tgl. Lahir: {pegawai.tgl_lahir || "-"}
-                    </p>
-                  </div>
-                </div>
+                )}
                 {pegawai.catatan_mutasi_masuk && (
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <InfoRow label="Catatan Mutasi Masuk" value={pegawai.catatan_mutasi_masuk} />

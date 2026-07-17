@@ -1,10 +1,18 @@
-# SIKANDA V1.1.11 Secure
+# SIKANDA V1.1.12 Secure
 
 SIKANDA adalah Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah berbasis React/Vite, Firebase Authentication, Google Apps Script, dan Supabase PostgreSQL/Storage.
 
-Mulai dari **`00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.11_SECURE.md`**. Paket berisi source frontend lengkap, backend Apps Script, build produksi, migrasi Supabase historis, 13 rangkaian pengujian, release notes, dan laporan verifikasi.
+Mulai dari **`00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.12_SECURE.md`**. Paket berisi source frontend lengkap, backend Apps Script, build produksi, migrasi Supabase historis, 14 rangkaian pengujian, release notes, dan laporan verifikasi.
 
-## Fokus V1.1.11
+## Fokus V1.1.12
+
+- PPPK (Paruh Waktu) tidak lagi menampilkan kartu KGB, kenaikan pangkat, atau BUP pada modal profil.
+- Aturan agenda kini berasal dari satu fungsi kebijakan yang juga dipakai pembentuk Buku Penjagaan; ASN mendapat tiga agenda, PPPK Penuh Waktu hanya KGB, sedangkan PPPK Paruh Waktu dan Pensiun tidak mendapat agenda aktif.
+- Header setelah login menampilkan foto pegawai dari Supabase Storage private. Relasi utama memakai NIP `app_access`; email Firebase terverifikasi hanya menjadi fallback foto untuk akun manajer yang belum tertaut NIP.
+- URL foto ditandatangani di backend. `SUPABASE_SERVICE_ROLE_KEY` tetap tidak pernah dikirim ke browser.
+- Inisial tetap tersedia sebagai fallback aman ketika data foto tidak ada, relasi akun belum benar, atau gambar gagal dimuat.
+
+## Baseline yang dipertahankan dari V1.1.11
 
 - Data Kendaraan dan Alat & Mesin selalu menampilkan lima card tetap: **Total**, **Kondisi Baik**, **Kurang Baik**, **Rusak Ringan**, dan **Rusak Berat**, termasuk ketika nilainya `0`.
 - Setiap kondisi mempunyai tema warna yang berbeda; card dapat diklik sebagai filter.
@@ -21,12 +29,12 @@ Mulai dari **`00_PANDUAN_IMPLEMENTASI_SIKANDA_V1.1.11_SECURE.md`**. Paket berisi
 ## Urutan upgrade
 
 1. Backup source, deployment Apps Script, dan database.
-2. Import `SIKANDA_v1.1.11_SECURE_AI_STUDIO_FINAL.zip` ke Google AI Studio.
+2. Import `SIKANDA_v1.1.12_SECURE_AI_STUDIO_FINAL.zip` ke Google AI Studio.
 3. Ganti penuh backend dengan `apps-script/Code.gs`, lalu deploy sebagai **New version** pada deployment Web App yang sama.
 4. Deploy frontend ke GitHub Pages.
 5. Hard refresh browser dan jalankan UAT pada panduan.
 
-V1.1.11 tidak membutuhkan SQL, Script Property, trigger, atau migrasi foto baru. Capture terbaru menunjukkan 171 record kondisi kosong (133 Kendaraan + 38 Alat & Mesin); jangan mengisinya massal sebagai BAIK.
+V1.1.12 tidak membutuhkan SQL, Script Property, trigger, atau migrasi foto baru. Agar avatar tampil, pastikan `app_access.nip` sama dengan `pegawai.nip`, atau email akun manajer sama persis dengan `pegawai.email`, serta record pegawai memiliki `foto_storage_path`/`foto`.
 
 ## Verifikasi lokal
 

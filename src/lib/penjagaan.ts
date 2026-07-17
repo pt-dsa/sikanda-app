@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { parseAnyDate } from "@/lib/utils";
-import { employmentStatusLabel, kategoriPppk } from "@/lib/employmentStatus";
+import { employmentAgendaPolicy, employmentStatusLabel } from "@/lib/employmentStatus";
 
 export type KategoriPenjagaan = "KGB" | "PANGKAT" | "BUP";
 export type BucketPenjagaan = "terlambat" | "le3" | "le6" | "le12" | "jauh";
@@ -258,23 +258,22 @@ export function buildPenjagaanEvents(pegawaiList: any[], today: Date = startOfTo
   const events: PenjagaanEvent[] = [];
   for (const p of pegawaiList) {
     const base = baseOf(p);
-    const status = String(p.status || '').trim().toUpperCase();
-    const category = kategoriPppk(p);
-    const isAsn = status === 'ASN';
-    const isFullTimePppk = status.startsWith('PPPK') && category === 'penuh_waktu';
+    const policy = employmentAgendaPolicy(p);
     const kgbCycle = Number(p.kgb_cycle_years) || 2;
     const pangkatCycle = Number(p.pangkat_cycle_years) || 4;
 
     // ASN memperoleh seluruh agenda. PPPK penuh waktu hanya memperoleh KGB.
-    // PPPK tanpa kategori sengaja tidak diagendakan agar tidak terjadi asumsi
-    // hak; administrator harus menentukan kategorinya terlebih dahulu.
-    if (isAsn || isFullTimePppk) {
+    // Data PPPK lama tanpa kategori mengikuti kebijakan kompatibilitas sebagai
+    // PPPK penuh waktu; kategori paruh waktu selalu menghasilkan nol agenda.
+    if (policy.kgb) {
       pushCycleEvent(events, base, "KGB", "KGB (Kenaikan Gaji Berkala)",
         String(p.tgl_kgb || ""), prevCycleDate(p.tgl_mulai_golongan, kgbCycle), today);
     }
-    if (isAsn) {
+    if (policy.pangkat) {
       pushCycleEvent(events, base, "PANGKAT", "Kenaikan Pangkat",
         String(p.tgl_pangkat || ""), prevCycleDate(p.tgl_mulai_golongan, pangkatCycle), today);
+    }
+    if (policy.bup) {
       pushBupEvent(events, base, String(p.tgl_pensiun || ""), today);
     }
   }

@@ -14,6 +14,7 @@ import { signInWithGoogle, firebaseSignOut, onFirebaseAuth, getFirebaseIdToken }
 import { canViewMenu, type AppUser, type MenuKey } from "@/lib/rbac";
 import { motion, AnimatePresence } from "motion/react";
 import { PegawaiFormModal } from "@/components/ui/PegawaiFormModal";
+import { PegawaiAvatar } from "@/components/ui/PegawaiDetailModal";
 import { useToast } from "@/components/ui/Toast";
 import type { Pegawai } from "@/types";
 import type { NotificationAgendaItem, NotificationFeed } from "@/services/apiService";
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const idToken = await getFirebaseIdToken();
           if (!idToken) return;
           const res = await apiService.whoami(idToken);
-          const fresh: AppUser = { email: res.email, role: res.role, nip: res.nip, nama: res.nama, is_active: true };
+          const fresh: AppUser = { email: res.email, role: res.role, nip: res.nip, nama: res.nama, foto: res.foto, foto_nip: res.photo_nip, is_active: true };
           setUser(fresh);
           localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
         } catch (e: any) {
@@ -98,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const g = await signInWithGoogle();
       const res = await apiService.whoami(g.idToken); // backend verifikasi + cek app_access
-      const sess: AppUser = { email: res.email || g.email, role: res.role, nip: res.nip, nama: res.nama || g.name, is_active: true };
+      const sess: AppUser = { email: res.email || g.email, role: res.role, nip: res.nip, nama: res.nama || g.name, foto: res.foto, foto_nip: res.photo_nip, is_active: true };
       localStorage.removeItem(DEV_KEY);
       localStorage.setItem(SESSION_KEY, JSON.stringify(sess));
       setUser(sess);
@@ -466,10 +467,16 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
             <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user?.role}</div>
           </div>
           <button 
-            className="h-9 w-9 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 text-white flex items-center justify-center font-bold shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            className="h-9 w-9 overflow-hidden rounded-full flex items-center justify-center shadow-sm cursor-pointer hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            aria-label="Buka menu profil pengguna"
           >
-            {user?.nama?.[0]?.toUpperCase() || 'A'}
+            <PegawaiAvatar
+              foto={String(user?.foto || "")}
+              nama={String(user?.nama || "Administrator SIKANDA")}
+              nip={String(user?.foto_nip || user?.nip || "")}
+              size="sm"
+            />
           </button>
           
           {profileDropdownOpen && (
