@@ -27,7 +27,7 @@ export default function Login() {
   const isDev = false;
 
   return (
-    <div
+    <main
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-cover bg-center bg-no-repeat bg-gray-900"
       style={{ backgroundImage: `url(${bgUrl})` }}
     >
@@ -68,8 +68,8 @@ export default function Login() {
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center max-w-[330px]">
               Pilih email yang digunakan untuk login SIKANDA.
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-[300px] -mt-2">
-              Hanya akun yang telah didaftarkan Administrator yang dapat masuk.
+            <p className="text-xs text-gray-600 dark:text-gray-300 text-center max-w-[330px] -mt-2">
+              Hanya akun terdaftar yang dapat masuk. Aktivitas akses dicatat untuk keamanan dan data diproses khusus untuk layanan kepegawaian serta aset SIKANDA.
             </p>
 
             {isDev && (
@@ -86,6 +86,6 @@ export default function Login() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

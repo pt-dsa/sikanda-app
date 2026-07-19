@@ -4,7 +4,7 @@ import { Equipment, Pegawai } from "@/types";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent } from "@/components/ui/Card";
-import { QrCode, MapPin, ImageOff, ZoomIn, X, Plus, Edit2, Trash2, CheckSquare, RefreshCw, AlertCircle } from "lucide-react";
+import { QrCode, MapPin, ImageOff, ZoomIn, X, Plus, Edit2, Trash2, CheckSquare, RefreshCw, AlertCircle, FileUp, Paperclip, ExternalLink } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { DetailModal } from '@/components/ui/DetailModal';
 import { DataTable, ColumnDef } from "@/components/ui/DataTable";
@@ -15,6 +15,7 @@ import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
 import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
+import { KibImportModal } from "@/components/equipment/KibImportModal";
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
 import { SafeImage } from "@/components/ui/SafeImage";
@@ -46,6 +47,11 @@ export default function AlatMesin() {
   const [search, setSearch] = useState("");
   const [filterJenis, setFilterJenis] = useState("");
   const [filterKondisi, setFilterKondisi] = useState("");
+  const [filterTahun, setFilterTahun] = useState("");
+  const [filterIndex, setFilterIndex] = useState("");
+  const [filterBidang, setFilterBidang] = useState("");
+  const [filterPengguna, setFilterPengguna] = useState("");
+  const [showImport, setShowImport] = useState(false);
 
   const [selectedQR, setSelectedQR] = useState<string | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -56,6 +62,7 @@ export default function AlatMesin() {
   const [formData, setFormData] = useState<Partial<Equipment>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const handledEditIdRef = useRef("");
 
   useEffect(() => {
@@ -174,8 +181,8 @@ export default function AlatMesin() {
       toast.warning("Data Belum Lengkap", "Kode Barang, Nama Barang, dan Merk wajib diisi.");
       return;
     }
-    if (!isOfficialEmployeeName(formData.pengguna, employees) || !isOfficialEmployeeName(formData.penanggung_jawab, employees)) {
-      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari daftar pegawai.");
+    if (!isOfficialEmployeeName(formData.penanggung_jawab, employees)) {
+      toast.error("Nama Pegawai Tidak Valid", "Penanggung Jawab harus dipilih dari daftar pegawai. Pengguna boleh mengikuti NAMA PEMEGANG pada KIB B.");
       return;
     }
     const coordinateResult = optionalCoordinatePayload(formData.latitude, formData.longitude);
@@ -194,6 +201,15 @@ export default function AlatMesin() {
     }
     if (!validOptionalAssetNumber(formData.harga_pembelian, { min: 0 })) {
       toast.error("Harga Tidak Valid", "Harga pembelian harus berupa angka 0 atau lebih, atau dikosongkan.");
+      return;
+    }
+    const unitIndexes = Array.isArray(formData.unit_indexes) ? formData.unit_indexes.map((value) => String(value).trim()).filter(Boolean) : [];
+    if (new Set(unitIndexes.map((value) => value.toUpperCase())).size !== unitIndexes.length) {
+      toast.error("INDEX Ganda", "Daftar INDEX per unit tidak boleh berisi nilai yang sama.");
+      return;
+    }
+    if (unitIndexes.length > Number(formData.jumlah || 1)) {
+      toast.error("Jumlah INDEX Tidak Valid", "Jumlah INDEX per unit tidak boleh melebihi jumlah barang.");
       return;
     }
     const isNew = !formData.asset_id;
@@ -217,6 +233,15 @@ export default function AlatMesin() {
       harga_pembelian: optionalAssetNumber(formData.harga_pembelian),
       foto: formData.foto,
       qr_url: formData.qr_url,
+      opd: normalizeAssetText(formData.opd),
+      kib_index: normalizeAssetText(formData.kib_index),
+      unit_indexes: unitIndexes,
+      register_barang: normalizeAssetText(formData.register_barang),
+      spesifikasi: normalizeAssetText(formData.spesifikasi),
+      bidang: normalizeAssetText(formData.bidang),
+      mutasi: normalizeAssetText(formData.mutasi),
+      dokumentasi: Array.isArray(formData.dokumentasi) ? formData.dokumentasi.map(({ url, ...doc }: any) => doc) : [],
+      dokumentasi_primary_id: formData.dokumentasi_primary_id,
       ...coordinateResult.payload,
     };
     if (isValidAssetCondition(normalizedCondition)) payload.kondisi = normalizedCondition;
@@ -243,12 +268,23 @@ export default function AlatMesin() {
           return;
         }
       }
+      const failedAttachments: string[] = [];
+      for (const file of attachmentFiles) {
+        try {
+          const encoded = await fileToBase64(file);
+          await apiService.uploadEquipmentAttachment({ assetId: result.asset_id, ...encoded });
+        } catch (attachmentError: any) {
+          failedAttachments.push(`${file.name}: ${attachmentError?.message || "gagal"}`);
+        }
+      }
       setIsEditing(false);
       setFormData({});
       setPhotoFile(null);
+      setAttachmentFiles([]);
       spreadsheetService.clearCache();
       await load();
-      toast.success(isNew ? "Data Alat & Mesin Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data alat & mesin dan media telah tersimpan." : "Perubahan data alat & mesin telah tersimpan dan tervalidasi.");
+      if (failedAttachments.length) toast.warning("Data Tersimpan, Sebagian Lampiran Gagal", failedAttachments.join(" · "));
+      else toast.success(isNew ? "Data Alat & Mesin Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data alat & mesin, koordinat, dan media telah tersimpan." : "Perubahan data alat & mesin telah tersimpan dan tervalidasi.");
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
       await load();
@@ -259,6 +295,7 @@ export default function AlatMesin() {
 
   function openForm(item?: Equipment) {
     setPhotoFile(null);
+    setAttachmentFiles([]);
     if (item) {
       setFormData(item);
     } else {
@@ -285,19 +322,31 @@ export default function AlatMesin() {
         item.merk?.toLowerCase().includes(search.toLowerCase()) ||
         item.jenis?.toLowerCase().includes(search.toLowerCase()) ||
         item.pengguna?.toLowerCase().includes(search.toLowerCase()) ||
-        item.penanggung_jawab?.toLowerCase().includes(search.toLowerCase())
+        item.penanggung_jawab?.toLowerCase().includes(search.toLowerCase()) ||
+        item.kode_barang?.toLowerCase().includes(search.toLowerCase()) ||
+        item.kib_index?.toLowerCase().includes(search.toLowerCase()) ||
+        item.bidang?.toLowerCase().includes(search.toLowerCase()) ||
+        item.spesifikasi?.toLowerCase().includes(search.toLowerCase())
       ) : true;
       const matchJenis = filterJenis ? String(item.jenis || "").toLowerCase() === String(filterJenis || "").toLowerCase() : true;
       const matchKondisi = filterKondisi ? canonKey(assetConditionLabel(item.kondisi)) === canonKey(filterKondisi) : true;
-      return matchSearch && matchJenis && matchKondisi;
+      const matchTahun = filterTahun ? String(item.tahun || "") === filterTahun : true;
+      const indexes = [item.kib_index, ...(Array.isArray(item.unit_indexes) ? item.unit_indexes : [])].filter(Boolean).join(" ").toLowerCase();
+      const matchIndex = filterIndex ? indexes.includes(filterIndex.toLowerCase().trim()) : true;
+      const matchBidang = filterBidang ? canonKey(item.bidang) === canonKey(filterBidang) : true;
+      const matchPengguna = filterPengguna ? canonKey(item.pengguna) === canonKey(filterPengguna) : true;
+      return matchSearch && matchJenis && matchKondisi && matchTahun && matchIndex && matchBidang && matchPengguna;
     });
-  }, [data, search, filterJenis, filterKondisi]);
+  }, [data, search, filterJenis, filterKondisi, filterTahun, filterIndex, filterBidang, filterPengguna]);
 
   // Empat kondisi resmi selalu tampil, termasuk saat jumlahnya nol. Data kosong
   // dipisahkan sebagai peringatan kualitas data, bukan kondisi alat/mesin.
   const kondisiSummary = useMemo(() => summarizeAssetConditions(data), [data]);
 
   const uniqueJenis = Array.from(new Set(data.map(d => d.jenis).filter(Boolean)));
+  const uniqueTahun = Array.from(new Set(data.map(d => String(d.tahun || "")).filter(Boolean))).sort().reverse();
+  const uniqueBidang = Array.from(new Set(data.map(d => d.bidang).filter(Boolean))).sort();
+  const uniquePengguna = Array.from(new Set(data.map(d => d.pengguna).filter(Boolean))).sort();
   const uniqueKondisi = [
     ...ASSET_CONDITIONS,
     ...(kondisiSummary.unset > 0 ? [ASSET_CONDITION_UNSET] : []),
@@ -446,6 +495,13 @@ export default function AlatMesin() {
             <RefreshCw size={16} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Menyinkronkan..." : "Sinkronisasi"}
           </button>
+          {canWriteAssets && <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="flex items-center justify-center gap-2 min-h-10 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-medium text-sm transition-all shadow-sm"
+          >
+            <FileUp size={16} /> Import Data
+          </button>}
           {canWriteAssets && <button 
             onClick={() => openForm()}
             className="flex items-center justify-center gap-2 min-h-10 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all shadow-sm hover:shadow-md"
@@ -491,9 +547,9 @@ export default function AlatMesin() {
       )}
 
       <Card>
-        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           <SearchInput 
-            placeholder="Cari nama barang, merk..." 
+            placeholder="Cari barang, kode, spesifikasi..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -502,8 +558,18 @@ export default function AlatMesin() {
             value={filterJenis}
             onChange={(e) => setFilterJenis(e.target.value)}
           >
-            <option value="">Semua Jenis</option>
+            <option value="">Semua Kategori</option>
             {uniqueJenis.map((j: any) => <option key={j} value={j}>{j}</option>)}
+          </select>
+          <select className="w-full rounded-full border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-2 text-sm" value={filterTahun} onChange={(e) => setFilterTahun(e.target.value)}>
+            <option value="">Semua Tahun</option>{uniqueTahun.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <input className="w-full rounded-full border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-2 text-sm" value={filterIndex} onChange={(e) => setFilterIndex(e.target.value)} placeholder="Filter INDEX..." />
+          <select className="w-full rounded-full border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-2 text-sm" value={filterBidang} onChange={(e) => setFilterBidang(e.target.value)}>
+            <option value="">Semua Bidang</option>{uniqueBidang.map((value: any) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select className="w-full rounded-full border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-2 text-sm" value={filterPengguna} onChange={(e) => setFilterPengguna(e.target.value)}>
+            <option value="">Semua Pengguna</option>{uniquePengguna.map((value: any) => <option key={value} value={value}>{value}</option>)}
           </select>
           <select 
             className="w-full rounded-full border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
@@ -515,6 +581,14 @@ export default function AlatMesin() {
           </select>
         </CardContent>
       </Card>
+
+      <KibImportModal
+        open={showImport}
+        existing={data}
+        onClose={() => setShowImport(false)}
+        onError={(message) => toast.error("Import Gagal", message)}
+        onImported={async (message) => { setShowImport(false); spreadsheetService.clearCache(); await load(true); toast.success("Import Berhasil", message); }}
+      />
 
       {false && selectedRows.length > 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-4">
@@ -552,15 +626,22 @@ export default function AlatMesin() {
         data={selectedItem ? {
           "ID Aset": selectedItem.asset_id,
           "Kode Barang": selectedItem.kode_barang,
+          "INDEX": selectedItem.kib_index || (selectedItem.unit_indexes?.length ? selectedItem.unit_indexes.join(", ") : "Belum diisi"),
           "Nama Barang": selectedItem.nama_aset,
-          "Merk": selectedItem.merk,
-          "Jenis": selectedItem.jenis,
+          "Nama Umum / Merk": selectedItem.merk,
+          "Spesifikasi": selectedItem.spesifikasi,
+          "Kategori": selectedItem.jenis,
+          "OPD": selectedItem.opd,
+          "Bidang": selectedItem.bidang,
+          "Register": selectedItem.register_barang,
           "Jumlah": selectedItem.jumlah ? `${selectedItem.jumlah} ${selectedItem.satuan || ''}` : '',
           "Kondisi": assetConditionLabel(selectedItem.kondisi),
           "Tahun": selectedItem.tahun,
           "Pengguna": selectedItem.pengguna,
           "Penanggung Jawab": selectedItem.penanggung_jawab,
           "Harga Pembelian": selectedItem.harga_pembelian,
+          "Lokasi": selectedItem.lokasi,
+          "Mutasi": selectedItem.mutasi,
         } : null} 
       >
         {selectedItem && (
@@ -569,7 +650,8 @@ export default function AlatMesin() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Foto Alat & Mesin</span>
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center relative group">
                 {(() => {
-                  const f = (selectedItem as any).foto || (selectedItem as any).foto_alat_mesin || (selectedItem as any).foto_alat__mesin || (selectedItem as any).gambar || "";
+                  const primaryGalleryPhoto = Array.isArray(selectedItem.dokumentasi) ? selectedItem.dokumentasi.find((doc: any) => doc.id === selectedItem.dokumentasi_primary_id || doc.is_primary)?.url : "";
+                  const f = primaryGalleryPhoto || (selectedItem as any).foto || (selectedItem as any).foto_alat_mesin || (selectedItem as any).foto_alat__mesin || (selectedItem as any).gambar || "";
                   if (!f) {
                     return (
                       <div className="flex flex-col items-center text-gray-400">
@@ -656,6 +738,10 @@ export default function AlatMesin() {
                  <QRCodeSVG value={(selectedItem as any).qr_url || selectedItem.asset_id || "N/A"} size={100} />
               </div>
             </div>
+            {Array.isArray(selectedItem.dokumentasi) && selectedItem.dokumentasi.length > 0 && <div className="md:col-span-3 space-y-3">
+              <h4 className="flex items-center gap-2 text-sm font-bold"><Paperclip size={16}/>Lampiran & Galeri ({selectedItem.dokumentasi.length})</h4>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{selectedItem.dokumentasi.map((doc: any) => doc.kind === "image" && doc.url ? <button key={doc.id} type="button" onClick={() => setZoomedImage(doc.url)} className="overflow-hidden rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800"><SafeImage src={doc.url} alt={doc.name} className="aspect-video w-full object-cover"/><span className="block truncate p-2 text-xs">{doc.name}</span></button> : <a key={doc.id} href={doc.url || doc.external_url} target="_blank" rel="noreferrer" className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center text-xs font-semibold hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"><Paperclip size={22}/><span className="line-clamp-2">{doc.name}</span><ExternalLink size={13}/></a>)}</div>
+            </div>}
           </div>
         )}
       </DetailModal>
@@ -706,15 +792,23 @@ export default function AlatMesin() {
                   <input required value={formData.kode_barang || ""} onChange={e => setFormData({...formData, kode_barang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kode inventaris/barang" />
                 </div>
                 <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">OPD</label>
+                  <input value={formData.opd || ""} onChange={e => setFormData({...formData, opd: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nama OPD" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">INDEX</label>
+                  <input value={formData.kib_index || ""} onChange={e => setFormData({...formData, kib_index: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Boleh dikosongkan dan dilengkapi nanti" />
+                </div>
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Nama Barang *</label>
                   <input required value={formData.nama_aset || ""} onChange={e => setFormData({...formData, nama_aset: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Papan Tulis" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Merk</label>
+                  <label className="text-xs font-medium text-gray-500">Nama Umum / Merk *</label>
                   <input required value={formData.merk || ""} onChange={e => setFormData({...formData, merk: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Panasonic" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500">Jenis</label>
+                  <label className="text-xs font-medium text-gray-500">Kategori</label>
                   <input value={formData.jenis || ""} onChange={e => setFormData({...formData, jenis: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: Elektronik" />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -729,8 +823,27 @@ export default function AlatMesin() {
                   <label className="text-xs font-medium text-gray-500">Tahun Pembelian</label>
                   <input type="number" min="1900" max={new Date().getFullYear() + 1} value={formData.tahun ?? ""} onChange={e => setFormData({...formData, tahun: e.target.value || undefined})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Contoh: 2018" />
                 </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Register</label>
+                  <input value={formData.register_barang || ""} onChange={e => setFormData({...formData, register_barang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nomor register" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Bidang</label>
+                  <input value={formData.bidang || ""} onChange={e => setFormData({...formData, bidang: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Bidang/unit organisasi" />
+                </div>
+                <div className="md:col-span-2 flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Spesifikasi</label>
+                  <textarea rows={3} value={formData.spesifikasi || ""} onChange={e => setFormData({...formData, spesifikasi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Spesifikasi teknis barang" />
+                </div>
+                <div className="md:col-span-2 flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-500">Daftar INDEX per Unit</label>
+                  <textarea rows={3} value={(formData.unit_indexes || []).join("\n")} onChange={e => setFormData({...formData, unit_indexes: e.target.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean)})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Satu INDEX per baris untuk aset hasil penggabungan" />
+                  <p className="text-[11px] text-gray-400">Jumlah INDEX yang diisi tidak mengubah total Jumlah barang.</p>
+                </div>
                 <div className="md:col-span-2">
-                  <EmployeeAutocomplete label="Pengguna" value={String(formData.pengguna || "")} employees={employees} onChange={(pengguna) => setFormData({ ...formData, pengguna })} placeholder="Ketik nama pengguna alat/mesin..." />
+                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Pengguna / Nama Pemegang</label>
+                  <input list="equipment-users" value={String(formData.pengguna || "")} onChange={(e) => setFormData({ ...formData, pengguna: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nama pegawai atau unit sesuai KIB B" />
+                  <datalist id="equipment-users">{employees.map((employee) => <option key={employee.nip} value={employee.nama}/>)}</datalist>
                 </div>
                 <div className="md:col-span-2">
                   <EmployeeAutocomplete label="Penanggung Jawab" value={String(formData.penanggung_jawab || "")} employees={employees} onChange={(penanggung_jawab) => setFormData({ ...formData, penanggung_jawab })} placeholder="Ketik nama penanggung jawab..." />
@@ -751,6 +864,10 @@ export default function AlatMesin() {
                   <label className="text-xs font-medium text-gray-500">Lokasi</label>
                   <input value={formData.lokasi || ""} onChange={e => setFormData({...formData, lokasi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Lokasi/unit penempatan" />
                 </div>
+                <div className="flex flex-col gap-1 md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500">Mutasi</label>
+                  <textarea rows={2} value={formData.mutasi || ""} onChange={e => setFormData({...formData, mutasi: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Catatan mutasi barang" />
+                </div>
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Lokasi Koordinat dan Media</div>
                 <AssetMediaFields
                   latitude={formData.latitude}
@@ -763,13 +880,19 @@ export default function AlatMesin() {
                   photoLabel="Foto Alat & Mesin"
                   autoLocate={!formData.asset_id}
                 />
+                <div className="md:col-span-2 space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                  <div><p className="text-xs font-bold text-gray-700 dark:text-gray-300">Lampiran & Galeri</p><p className="text-[11px] text-gray-400">Maksimal 20 berkas; gambar, PDF, Word, atau Excel; masing-masing maksimal 5 MB.</p></div>
+                  <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setAttachmentFiles(Array.from(e.target.files || []))} className="block w-full text-xs file:mr-3 file:rounded-full file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-bold file:text-blue-700" />
+                  {attachmentFiles.length > 0 && <div className="text-xs text-gray-600 dark:text-gray-300">Lampiran baru: {attachmentFiles.map(f => f.name).join(", ")}</div>}
+                  {Array.isArray(formData.dokumentasi) && formData.dokumentasi.length > 0 && <div className="space-y-2">{formData.dokumentasi.map((doc: any) => <div key={doc.id} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 p-2 text-xs dark:bg-gray-800"><span className="min-w-0 truncate">{doc.name}{(doc.id === formData.dokumentasi_primary_id || doc.is_primary) ? " · Foto utama" : ""}</span>{doc.id && canWriteAssets && <span className="flex shrink-0 items-center gap-2">{doc.kind === "image" && doc.id !== formData.dokumentasi_primary_id && <button type="button" className="font-bold text-blue-600" onClick={async()=>{if(!formData.asset_id)return;try{await apiService.setPrimaryEquipmentAttachment(formData.asset_id,doc.id);setFormData({...formData,dokumentasi_primary_id:doc.id,dokumentasi:(formData.dokumentasi||[]).map((d:any)=>({...d,is_primary:d.id===doc.id}))});toast.success("Foto Utama Diperbarui","Foto galeri dipakai sebagai foto utama.");}catch(error:any){toast.error("Gagal Mengubah Foto Utama",error.message)}}}>Jadikan utama</button>}<button type="button" className="text-red-600" onClick={async()=>{if(!formData.asset_id)return; try{await apiService.deleteEquipmentAttachment(formData.asset_id,doc.id);setFormData({...formData,dokumentasi:(formData.dokumentasi||[]).filter((d:any)=>d.id!==doc.id),dokumentasi_primary_id:formData.dokumentasi_primary_id===doc.id?undefined:formData.dokumentasi_primary_id});toast.success("Lampiran Dihapus","Lampiran berhasil dihapus.");}catch(error:any){toast.error("Gagal Menghapus Lampiran",error.message)}}}><Trash2 size={15}/></button></span>}</div>)}</div>}
+                </div>
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <label className="text-xs font-medium text-gray-500">URL / Isi QR</label>
                   <input value={formData.qr_url || ""} onChange={e => setFormData({...formData, qr_url: e.target.value})} className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Kosongkan untuk memakai ID aset" />
                 </div>
               </div>
               <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex justify-end gap-2 safe-area-bottom">
-                <button type="button" disabled={isSaving} onClick={() => { setIsEditing(false); setPhotoFile(null); }} className="flex-1 sm:flex-none min-h-11 px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
+                <button type="button" disabled={isSaving} onClick={() => { setIsEditing(false); setPhotoFile(null); setAttachmentFiles([]); }} className="flex-1 sm:flex-none min-h-11 px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full font-medium text-sm transition-all border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 disabled:opacity-50">
                   Batal
                 </button>
                 <button type="submit" disabled={isSaving} className="flex-1 sm:flex-none min-h-11 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-all disabled:opacity-50">

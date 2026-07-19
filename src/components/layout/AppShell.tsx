@@ -29,7 +29,6 @@ function agendaTimeLabel(item: NotificationAgendaItem) {
   return item.selisihHari < 30 ? `${item.selisihHari} hari lagi` : `${Math.floor(item.selisihHari / 30)} bulan lagi`;
 }
 
-const SESSION_KEY = "sikanda_session";
 const DEV_KEY = "sikanda_dev";
 
 interface AuthContextValue {
@@ -42,56 +41,46 @@ interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue>({
   user: null,
-  loading: false,
+  loading: true,
   loginWithGoogle: async () => {},
   loginDev: () => {},
   logout: async () => {},
 });
 
-function readSession(): AppUser | null {
-  try {
-    // Public-safe: jangan mempertahankan sesi development dari preview/checkpoint lama.
-    if (localStorage.getItem(DEV_KEY) === "1") {
-      localStorage.removeItem(DEV_KEY);
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    const saved = localStorage.getItem(SESSION_KEY);
-    return saved ? (JSON.parse(saved) as AppUser) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(() => readSession());
-  const [loading, setLoading] = useState(false);
+  // Otorisasi selalu dimulai kosong. Role tidak pernah dipulihkan dari
+  // localStorage; backend whoami adalah satu-satunya sumber kebenaran.
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Sinkron dengan sesi Firebase. Bila Firebase punya user → REFRESH peran dari
-  // backend (whoami) sebagai sumber kebenaran (mencegah localStorage dipalsukan).
-  // Bila Firebase kehilangan sesi dan BUKAN mode dev → bersihkan sesi.
+  // Fail-closed: setiap perubahan sesi menghapus profil dan cache lama terlebih
+  // dahulu. Aplikasi baru dibuka setelah token Firebase diverifikasi backend.
   useEffect(() => {
+    let active = true;
     const unsub = onFirebaseAuth(async (signedIn) => {
-      const isDev = localStorage.getItem(DEV_KEY) === "1";
-      if (signedIn) {
-        try {
+      spreadsheetService.clearCache();
+      setUser(null);
+      setLoading(true);
+      try {
+        if (signedIn) {
           const idToken = await getFirebaseIdToken();
-          if (!idToken) return;
+          if (!idToken) throw new Error("Sesi Google tidak tersedia.");
           const res = await apiService.whoami(idToken);
           const fresh: AppUser = { email: res.email, role: res.role, nip: res.nip, nama: res.nama, foto: res.foto, foto_nip: res.photo_nip, is_active: true };
-          setUser(fresh);
-          localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
-        } catch (e: any) {
-          console.error("[SIKANDA] whoami error on auth sync:", e);
-          // JANGAN sign out pengguna jika backend gagal (karena masalah jaringan, timeout, atau limit API).
-          // Jika token benar-benar kedaluwarsa, Firebase SDK akan mengetahuinya dan memanggil onFirebaseAuth(false).
+          if (active) setUser(fresh);
         }
-      } else if (!isDev) {
-        localStorage.removeItem(SESSION_KEY);
-        setUser(null);
+      } catch (e: any) {
+        console.error("[SIKANDA] verifikasi sesi ditolak:", e);
+        spreadsheetService.clearCache();
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
       }
     });
-    return unsub;
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   const loginWithGoogle = async () => {
@@ -101,9 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await apiService.whoami(g.idToken); // backend verifikasi + cek app_access
       const sess: AppUser = { email: res.email || g.email, role: res.role, nip: res.nip, nama: res.nama || g.name, foto: res.foto, foto_nip: res.photo_nip, is_active: true };
       localStorage.removeItem(DEV_KEY);
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sess));
+      spreadsheetService.clearCache();
       setUser(sess);
     } catch (e) {
+      setUser(null);
+      spreadsheetService.clearCache();
       await firebaseSignOut(); // gagal otorisasi → jangan biarkan sesi Firebase menggantung
       throw e;
     } finally {
@@ -114,15 +105,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Public-safe: mode developer dinonaktifkan. Semua akses wajib lewat Google/Firebase.
   const loginDev = () => {
     localStorage.removeItem(DEV_KEY);
-    localStorage.removeItem(SESSION_KEY);
+    spreadsheetService.clearCache();
     setUser(null);
   };
 
   const logout = async () => {
-    await firebaseSignOut();
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(DEV_KEY);
     setUser(null);
+    setLoading(true);
+    spreadsheetService.clearCache();
+    localStorage.removeItem(DEV_KEY);
+    try {
+      await firebaseSignOut();
+    } finally {
+      spreadsheetService.clearCache();
+      setLoading(false);
+    }
   };
 
   return (

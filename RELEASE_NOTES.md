@@ -1,26 +1,21 @@
-# SIKANDA V1.1.13 Secure — Release Notes
+# Release Notes — SIKANDA V1.1.14 Production Hardening
 
-Tanggal rilis: 17 Juli 2026 (Asia/Jakarta)
-
-## Perbaikan utama
-
-- Menyatukan sumber status “Perlu Verifikasi” dengan hasil Data Cleansing sehingga tautan NIP tidak lagi membuka daftar kosong.
-- Mengganti loading berulang dengan persentase berdasarkan tahap permintaan data yang benar-benar selesai.
-- Menghapus frasa teknis pada keterangan agenda PPPK Paruh Waktu.
-- Mempercepat Dashboard melalui satu snapshot, penundaan proses foto, cache metrik/sesi, dan deduplikasi permintaan.
-- Memperbaiki Tanya SIKANDA untuk pertanyaan agenda terlambat, kesetaraan dengan lonceng notifikasi, konteks percakapan, retry jaringan, dan pesan gagal yang relevan.
-- Membersihkan istilah teknis internal dari tampilan pengguna di profil, form, Data Cleansing, Dashboard, Kelola Akun, dan pesan kesalahan.
-
-## Keamanan
-
-Firebase token verification, app_access, backend RBAC, field allowlist, RLS, Supabase private Storage, audit log, sanitasi error, dan model service-role-only dipertahankan. Tidak ada migrasi SQL atau secret baru.
-
-## Quality gate
-
-- TypeScript: lulus.
-- 15 suite regresi: lulus.
-- Build produksi: lulus.
-- Backend health: `1.1.13-secure`.
-
-UAT pada deployment nyata tetap wajib sebelum promosi production.
-
+- Otorisasi fail-closed; role tidak lagi dipulihkan dari localStorage.
+- Firebase session-only dan cache dibersihkan saat logout/pergantian akun.
+- Foto aset dipindahkan dari Drive ke Supabase Storage private.
+- Migrasi foto aset Drive lama tersedia secara batch.
+- Bootstrap admin default nonaktif dan pengelola terakhir dilindungi.
+- AI generatif default nonaktif; konteks eksternal hanya agregat anonim dan input sensitif disamarkan.
+- Model default diperbarui ke `gemini-3.5-flash` dengan fallback `gemini-3.1-flash-lite`.
+- Koordinat aset disimpan atomik pada baris aset.
+- Trigger audit database fail-closed ditambahkan.
+- Firebase Hosting security headers dan deployment workflow production ditambahkan.
+- GitHub Actions dipin ke commit immutable.
+- Test hardening V1.1.14 ditambahkan; build production disertakan dalam ZIP.
+- Import cerdas CSV KIB B dengan header baku, dukungan teks multiline, format rupiah Indonesia, dan pratinjau validasi.
+- Baris tanpa INDEX yang identik diagregasi tanpa mengubah total unit; INDEX per unit dapat dilengkapi melalui CRUD.
+- Validasi duplikat bertingkat: INDEX/fingerprint pasti, sedangkan Kode Barang yang sama hanya menjadi peringatan klasifikasi.
+- Kolom KIB B diselaraskan ke struktur lama tanpa menghapus foto, koordinat, QR, audit, maupun metadata aset.
+- Filter Tahun, Kategori, INDEX, Bidang, dan Pengguna ditambahkan pada menu Alat & Mesin.
+- Form tambah/edit mendukung OPD, INDEX, Register, Spesifikasi, Kategori, Bidang, Nama Pemegang, Mutasi, dan daftar INDEX per unit.
+- Lampiran & Galeri private mendukung banyak foto, PDF, Word, Excel, tautan dokumentasi CSV, dan penghapusan terkontrol.

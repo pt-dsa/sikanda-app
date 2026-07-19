@@ -62,13 +62,13 @@ assert(
   "PPPK paruh waktu tidak memperoleh agenda",
 );
 assert(vm.runInContext("employmentRules_({status:'PPPK'}).kgb", context), "PPPK lama tanpa kategori harus dianggap penuh waktu");
-assert(vm.runInContext("GEMINI_MODEL", context) === "gemini-2.5-flash", "Model default harus Gemini 2.5 Flash");
+assert(vm.runInContext("GEMINI_MODEL", context) === "gemini-3.5-flash", "Model default harus Gemini 3.5 Flash");
 assert(
-  vm.runInContext("configuredGeminiModels_().indexOf('gemini-2.5-flash-lite') !== -1", context),
-  "Fallback stabil Gemini 2.5 Flash-Lite harus tersedia",
+  vm.runInContext("configuredGeminiModels_().indexOf('gemini-3.1-flash-lite') !== -1", context),
+  "Fallback stabil Gemini 3.1 Flash-Lite harus tersedia",
 );
 assert(
-  source.indexOf("answerFromDatabase_(actor, question, body.history || [])") < source.indexOf("if (!GEMINI_API_KEY)"),
+  source.indexOf("answerFromDatabase_(actor, question, body.history || [])") < source.indexOf("if (!AI_GENERATIVE_ENABLED || !GEMINI_API_KEY)"),
   "Router database-first harus dijalankan sebelum ketergantungan Gemini",
 );
 assert(source.includes("NIP wajib dipilih dari daftar pegawai."), "Tambah akun harus diverifikasi ulang terhadap daftar pegawai aktif");

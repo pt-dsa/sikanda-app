@@ -34,6 +34,33 @@ export interface Equipment extends Asset {
   satuan?: string;
   harga_pembelian?: string | number;
   qr_url?: string;
+  opd?: string;
+  kib_index?: string;
+  unit_indexes?: string[];
+  register_barang?: string;
+  spesifikasi?: string;
+  bidang?: string;
+  mutasi?: string;
+  dokumentasi?: EquipmentAttachment[];
+  dokumentasi_primary_id?: string;
+  import_source?: string;
+  import_batch_id?: string;
+  import_fingerprint?: string;
+  imported_at?: string;
+}
+
+export interface EquipmentAttachment {
+  id: string;
+  name: string;
+  mime_type: string;
+  size: number;
+  storage_path?: string;
+  url?: string;
+  external_url?: string;
+  kind: "image" | "document" | "link";
+  created_at?: string;
+  created_by?: string;
+  is_primary?: boolean;
 }
 
 export interface Inventory extends Asset {

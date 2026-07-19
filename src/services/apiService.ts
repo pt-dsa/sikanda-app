@@ -52,6 +52,23 @@ export const apiService = {
     fileName: string;
   }) => callBackend<UploadFotoResult>({ action: "upload_asset_foto", ...params }),
 
+  importEquipment: (records: Record<string, any>[], batchId: string) =>
+    callBackend<{ ok: true; received: number; inserted: number; skipped: number; asset_ids: string[] }>({
+      action: "equipment_import", records, batchId,
+    }),
+
+  uploadEquipmentAttachment: (params: {
+    assetId: string; base64: string; mimeType: string; fileName: string;
+  }) => callBackend<{ ok: true; attachment: Record<string, any> }>({
+    action: "equipment_attachment_upload", ...params,
+  }),
+
+  deleteEquipmentAttachment: (assetId: string, attachmentId: string) =>
+    callBackend<{ ok: true }>({ action: "equipment_attachment_delete", assetId, attachmentId }),
+
+  setPrimaryEquipmentAttachment: (assetId: string, attachmentId: string) =>
+    callBackend<{ ok: true }>({ action: "equipment_attachment_primary", assetId, attachmentId }),
+
   // Aset: koreksi nama pengguna (Tahap 6 — Data Cleansing fuzzy matching).
   fixAssetHolder: async (table: string, assetId: string, newHolderName: string) => {
     if (table !== "assets_vehicle" && table !== "assets_equipment") {

@@ -20,7 +20,7 @@ const migration = read("supabase/005_sikanda_v1_1_7_storage_and_notifications.sq
 
 assert(can("admin", "data.export") && can("pimpinan", "data.export") && !can("pegawai", "data.export"), "CSV hanya boleh untuk Administrator/Pimpinan");
 assert(employeePage.includes('can(user?.role, "data.export")') && guardPage.includes('can(user?.role, "data.export")'), "Semua tombol CSV aktif harus memakai guard RBAC");
-assert(backend.includes("version: '1.1.13-secure'") && backend.includes("SUPABASE_PHOTO_BUCKET"), "Backend terbaru harus mempertahankan bucket foto private");
+assert(backend.includes("version: '1.1.14-production'") && backend.includes("SUPABASE_PHOTO_BUCKET"), "Backend terbaru harus mempertahankan bucket foto private");
 assert(backend.includes("signedEmployeePhotoUrls_") && backend.includes("paths: missing"), "Signed URL foto harus dibuat secara batch");
 assert(backend.includes("migrateEmployeePhotos_") && backend.includes("migrasiSemuaFotoPegawaiKeSupabase"), "Migrasi Drive harus tersedia dan dapat dilanjutkan bertahap");
 assert(backend.includes("everyDays(3)") && backend.includes("everyWeeks(1)") && backend.includes("collectOneMonthWeeklyReminder_"), "Trigger health 3 harian dan notifikasi mingguan satu bulan harus tersedia");

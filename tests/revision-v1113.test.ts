@@ -58,9 +58,9 @@ assert(
   "Tanya SIKANDA harus dapat mengulang koneksi aman dan tidak menyamarkan kesalahan sebagai jawaban",
 );
 assert(
-  pkg.includes('"version": "1.1.13"') && metadata.includes("V1.1.13 Secure") &&
-  backend.includes("version: '1.1.13-secure'"),
-  "versi frontend, metadata, dan backend harus konsisten V1.1.13",
+  pkg.includes('"version": "1.1.14"') && metadata.includes("V1.1.14 Production Hardening") &&
+  backend.includes("version: '1.1.14-production'"),
+  "versi frontend, metadata, dan backend harus konsisten V1.1.14",
 );
 
 console.log("revision-v1113-tests: OK");

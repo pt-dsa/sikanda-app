@@ -1,6 +1,6 @@
 {
   "name": "SIKANDA",
-  "description": "SIKANDA V1.1.13 Secure - Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah",
+  "description": "SIKANDA V1.1.14 Production Hardening - KIB B Smart Import, galeri lampiran, dan pengelolaan aset daerah",
   "requestFramePermissions": ["camera", "geolocation"],
   "majorCapabilities": []
 }

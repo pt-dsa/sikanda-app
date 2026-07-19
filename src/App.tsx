@@ -29,7 +29,8 @@ const TanyaSikanda = lazy(() => import("@/pages/TanyaSikanda"));
 // Penjaga route per-peran: menolak akses via URL langsung bila peran tak berhak.
 // (Sidebar sudah menyembunyikan menunya; ini lapis kedua untuk URL manual.)
 function MenuGuard({ menu, children }: { menu: MenuKey; children: React.ReactNode }) {
-  const { user } = useContext(AuthContext);
+  const { user, loading } = useContext(AuthContext);
+  if (loading) return <LoadingState />;
   if (!user) return <Navigate to="/login" replace />;
   if (!canViewMenu(user.role, menu)) {
     return <Navigate to={user.role === "pegawai" ? "/pegawai" : "/dashboard"} replace />;
@@ -42,6 +43,9 @@ function GuardedPage({ menu, children }: { menu: MenuKey; children: React.ReactN
 }
 
 function ProtectedLayout() {
+  const { user, loading } = useContext(AuthContext);
+  if (loading) return <LoadingState />;
+  if (!user) return <Navigate to="/login" replace />;
   return (
     <AppShell>
       {/* Fallback Suspense WAJIB pakai LoadingState (anti layar putih).

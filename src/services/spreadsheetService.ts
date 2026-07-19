@@ -239,6 +239,7 @@ export const spreadsheetService = {
       }
     });
     sessionStorage.removeItem("sikanda_dashboard_metrics_v1113");
+    sessionStorage.removeItem("sheet_last_updated");
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("sikanda:data-changed"));
   },
 
@@ -292,7 +293,13 @@ export const spreadsheetService = {
   },
 
   async saveEquipment(data: Partial<any>, isNew: boolean) {
-    const allowed = ['asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna', 'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude', 'jenis', 'jumlah', 'satuan', 'harga_pembelian', 'qr_url'];
+    const allowed = [
+      'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
+      'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
+      'jenis', 'jumlah', 'satuan', 'harga_pembelian', 'qr_url', 'opd',
+      'kib_index', 'unit_indexes', 'register_barang', 'spesifikasi', 'bidang',
+      'mutasi', 'dokumentasi', 'dokumentasi_primary_id'
+    ];
     const sanitized = this._sanitizeData(data, allowed);
     
     const result = await apiService.saveAsset('assets_equipment', sanitized, isNew);
@@ -401,6 +408,15 @@ export const spreadsheetService = {
         longitude: coordinates.longitude,
         foto,
         qr_url: item.qr_legacy_url || item.qr_url,
+        opd: item.opd || "",
+        kib_index: item.kib_index || "",
+        unit_indexes: Array.isArray(item.unit_indexes) ? item.unit_indexes : [],
+        register_barang: item.register_barang || "",
+        spesifikasi: item.spesifikasi || "",
+        bidang: item.bidang || "",
+        mutasi: item.mutasi || "",
+        dokumentasi: Array.isArray(item.dokumentasi) ? item.dokumentasi : [],
+        dokumentasi_primary_id: item.dokumentasi_primary_id || "",
       };
     });
   },

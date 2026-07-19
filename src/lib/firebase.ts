@@ -13,7 +13,7 @@ import {
   signOut,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence
+  browserSessionPersistence
 } from "firebase/auth";
 
 const env = import.meta.env;
@@ -37,7 +37,9 @@ export function isFirebaseConfigured(): boolean {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(() => {});
+// Sesi berakhir saat browser ditutup; role aplikasi tetap selalu diverifikasi
+// ulang oleh backend pada setiap pemuatan halaman.
+setPersistence(auth, browserSessionPersistence).catch(() => {});
 
 export interface GoogleSignInResult {
   email: string;
