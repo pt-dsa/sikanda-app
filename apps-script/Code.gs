@@ -2569,6 +2569,13 @@ function answerFromDatabase_(actor, question, history) {
     return 'Saya sudah cek data aktif SIKANDA. Saat ini terdapat **' + filtered.length + ' ' + label + '** dalam lingkup akses Anda.';
   }
 
+  if (/(belum siap|belum registrasi|belum melengkapi|tanpa email|tidak ada email)/.test(q) && /(pegawai|akun)/.test(q)) {
+    var incompleteEmployees = activeEmployees_(actor).filter(function(row) {
+      return !row.email || String(row.email).trim() === '';
+    });
+    return namedEmployeeListAnswer_(incompleteEmployees, 'pegawai yang belum melengkapi data email (belum bisa didaftarkan akunnya)');
+  }
+
   if (/(tampilkan|daftar|siapa saja)/.test(q) && /(pegawai|asn|pppk)/.test(q)) {
     var listedEmployees = activeEmployees_(actor);
     var employeeLabel = 'pegawai aktif';
