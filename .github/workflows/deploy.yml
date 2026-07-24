@@ -1,4 +1,4 @@
-name: Deploy SIKANDA ke GitHub Pages (Staging Manual)
+name: Deploy SIKANDA ke GitHub Pages (Production)
 
 on:
   workflow_dispatch:
