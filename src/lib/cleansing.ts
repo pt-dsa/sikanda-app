@@ -20,7 +20,7 @@ export type AssetSheetName = "assets_vehicle" | "assets_equipment";
 
 export const ASSET_SHEET_LABEL: Record<AssetSheetName, string> = {
   assets_vehicle: "Kendaraan",
-  assets_equipment: "Alat & Mesin",
+  assets_equipment: "Inventaris",
 };
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,102 @@ export interface AssetNameIssue {
   matchedNip: string;
   matchedNama: string;         // nama BAKU dari sheet pegawai (sumber kebenaran)
   similarity: number;          // 0..1
-  confidence: "tinggi" | "sedang";
+  confidence: "tinggi" | "sedang" | "belum";
+  currentNip?: string;
+  currentRaw?: string;
+  reason?: "missing_nip" | "name_mismatch" | "employee_missing" | "unmatched";
+}
+
+export interface AssetEmployeeSource {
+  sheet: AssetSheetName;
+  assetId: string;
+  assetLabel: string;
+  holderName: string;
+  holderNip?: string;
+  holderRaw?: string;
+  holderStatus?: string;
+}
+
+/**
+ * Pindai semua relasi pengguna aset. Baris dianggap bersih hanya bila NIP
+ * menunjuk pegawai aktif dan nama tampil sudah sama dengan nama resminya.
+ * Nama hasil impor/legacy yang belum bertaut tetap ditampilkan walaupun tidak
+ * memiliki saran fuzzy, sehingga admin dapat mencari pegawai secara manual.
+ */
+export function scanAssetEmployeeLinks(
+  pegawaiList: Pegawai[],
+  assets: AssetEmployeeSource[],
+): AssetNameIssue[] {
+  const employees = pegawaiList
+    .map((employee) => ({
+      employee,
+      nip: String(employee.nip || "").trim(),
+      nama: String(employee.nama || "").trim(),
+      normalized: normalizeNamaPenuh(employee.nama),
+      fuzzy: normalizeNamaForMatch(employee.nama),
+    }))
+    .filter((row) => row.nip && row.nama && employeeIsActive(row.employee));
+  const byNip = new Map(employees.map((row) => [row.nip, row]));
+  const byExact = new Map<string, typeof employees>();
+  for (const row of employees) {
+    const list = byExact.get(row.normalized) || [];
+    list.push(row);
+    byExact.set(row.normalized, list);
+  }
+
+  return assets.flatMap((asset): AssetNameIssue[] => {
+    const currentNip = String(asset.holderNip || "").trim();
+    const currentName = String(asset.holderName || "").trim();
+    const currentRaw = String(asset.holderRaw || currentName || "").trim();
+    const linked = currentNip ? byNip.get(currentNip) : undefined;
+    if (linked && normalizeNamaPenuh(currentName) === linked.normalized) return [];
+
+    let candidate = linked;
+    let similarity = linked ? 1 : 0;
+    let reason: AssetNameIssue["reason"] = linked ? "name_mismatch" : "missing_nip";
+    const sourceForMatch = currentRaw || currentName;
+    const exact = sourceForMatch ? (byExact.get(normalizeNamaPenuh(sourceForMatch)) || []) : [];
+    if (!candidate && exact.length === 1) {
+      candidate = exact[0];
+      similarity = 1;
+    }
+    if (!candidate && sourceForMatch) {
+      const sourceNorm = normalizeNamaForMatch(sourceForMatch);
+      const ranked = employees
+        .map((row) => ({ row, score: nameSimilarity(sourceNorm, row.fuzzy) }))
+        .sort((left, right) => right.score - left.score);
+      if (ranked[0] && ranked[0].score >= SIMILARITY_MIN_RELEVANT
+        && (!ranked[1] || ranked[0].score - ranked[1].score >= 0.06 || ranked[0].row.fuzzy === ranked[1].row.fuzzy)) {
+        candidate = ranked[0].row;
+        similarity = ranked[0].score;
+      }
+    }
+    if (!candidate) reason = currentNip ? "employee_missing" : "unmatched";
+
+    return [{
+      id: `${asset.sheet}|${asset.assetId}`,
+      sheet: asset.sheet,
+      sheetLabel: ASSET_SHEET_LABEL[asset.sheet],
+      assetId: asset.assetId,
+      assetLabel: asset.assetLabel,
+      currentHolder: currentRaw || currentName || "Belum diisi",
+      currentNip,
+      currentRaw,
+      matchedNip: candidate?.nip || "",
+      matchedNama: candidate?.nama || "",
+      similarity,
+      confidence: candidate ? (similarity >= SIMILARITY_HIGH ? "tinggi" : "sedang") : "belum",
+      reason,
+    }];
+  }).sort((left, right) => {
+    if (left.confidence === "belum" && right.confidence !== "belum") return 1;
+    if (right.confidence === "belum" && left.confidence !== "belum") return -1;
+    return right.similarity - left.similarity || left.assetLabel.localeCompare(right.assetLabel, "id-ID");
+  });
+}
+
+function employeeIsActive(employee: Pegawai): boolean {
+  return employee.is_active !== false && String(employee.keterangan || "").trim().toUpperCase() !== "DATA DUMMY";
 }
 
 /**

@@ -14,7 +14,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
 import { useLocation } from "react-router-dom";
-import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
+import { EmployeeAutocomplete, isOfficialEmployeeSelection } from "@/components/ui/EmployeeAutocomplete";
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
 import { SafeImage } from "@/components/ui/SafeImage";
@@ -218,7 +218,9 @@ export default function Kendaraan() {
       jenis_kendaraan: normalizeAssetText(formData.jenis_kendaraan),
       tahun: optionalAssetNumber(formData.tahun),
       pengguna: normalizeAssetText(formData.pengguna),
+      pengguna_nip: normalizeAssetText(formData.pengguna_nip),
       penanggung_jawab: normalizeAssetText(formData.penanggung_jawab),
+      penanggung_jawab_nip: normalizeAssetText(formData.penanggung_jawab_nip),
       lokasi: normalizeAssetText(formData.lokasi || formData.unit_kerja),
       unit_kerja: normalizeAssetText(formData.unit_kerja || formData.lokasi),
       km_kendaraan: optionalNumber(formData.km_kendaraan),
@@ -243,7 +245,8 @@ export default function Kendaraan() {
       toast.error("Data Belum Lengkap", "Nomor Polisi, Nama Aset, dan Merk/Model wajib diisi.");
       return;
     }
-    if (!isOfficialEmployeeName(payload.pengguna, employees) || !isOfficialEmployeeName(payload.penanggung_jawab, employees)) {
+    if (!isOfficialEmployeeSelection(payload.pengguna, payload.pengguna_nip, employees)
+      || !isOfficialEmployeeSelection(payload.penanggung_jawab, payload.penanggung_jawab_nip, employees)) {
       toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari daftar pegawai.");
       return;
     }
@@ -301,12 +304,19 @@ export default function Kendaraan() {
 
   const filteredData = useMemo(() => {
     return data.filter(item => {
+      const needle = search.trim().toLocaleLowerCase("id-ID");
+      const matchSearch = !needle || [
+        item.no_polisi, item.kode_barang, item.nama_aset, item.merk, item.tipe,
+        item.jenis_kendaraan, item.pengguna, item.penanggung_jawab, item.unit_kerja,
+      ].some((value) => String(value || "").toLocaleLowerCase("id-ID").includes(needle));
       const matchJenis = filterJenis ? String(item.jenis_kendaraan || "").toLowerCase() === String(filterJenis || "").toLowerCase() : true;
       // canonKey (trim+UPPERCASE) di kedua sisi → angka kartu == jumlah baris terfilter.
       const matchKondisi = filterKondisi ? canonKey(assetConditionLabel(item.kondisi)) === canonKey(filterKondisi) : true;
-      return matchJenis && matchKondisi;
+      return matchSearch && matchJenis && matchKondisi;
     });
-  }, [data, filterJenis, filterKondisi]);
+  }, [data, search, filterJenis, filterKondisi]);
+
+  const hasActiveFilters = Boolean(search || filterJenis || filterKondisi);
 
   // Empat kondisi resmi selalu tampil, termasuk saat jumlahnya nol. Data kosong
   // dipisahkan sebagai peringatan kualitas data, bukan kondisi kendaraan.
@@ -466,7 +476,7 @@ export default function Kendaraan() {
         </div>
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
           <div className="col-span-2 sm:col-span-1 flex items-center justify-center min-h-10 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded-full">
-            Total: {filteredData.length} Kendaraan
+            {hasActiveFilters ? `Hasil filter: ${filteredData.length} kendaraan` : `Total: ${data.length} kendaraan`}
           </div>
           <button
             type="button"
@@ -756,10 +766,26 @@ export default function Kendaraan() {
                 </div>
                 <div className="md:col-span-2 text-xs font-bold uppercase tracking-wider text-blue-600 border-b border-blue-100 pb-2 mt-2">Penguasaan dan Lokasi</div>
                 <div className="flex flex-col gap-1">
-                  <EmployeeAutocomplete label="Pengguna" value={String(formData.pengguna || "")} employees={employees} onChange={(pengguna) => setFormData({ ...formData, pengguna })} placeholder="Ketik nama pengguna kendaraan..." />
+                  <EmployeeAutocomplete
+                    label="Pengguna"
+                    value={String(formData.pengguna || "")}
+                    selectedNip={String(formData.pengguna_nip || "")}
+                    employees={employees}
+                    onChange={(pengguna) => setFormData((previous) => ({ ...previous, pengguna, pengguna_nip: "" }))}
+                    onSelect={(employee) => employee && setFormData((previous) => ({ ...previous, pengguna: employee.nama, pengguna_nip: employee.nip }))}
+                    placeholder="Cari nama, NIP, atau jabatan pegawai..."
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <EmployeeAutocomplete label="Penanggung Jawab" value={String(formData.penanggung_jawab || "")} employees={employees} onChange={(penanggung_jawab) => setFormData({ ...formData, penanggung_jawab })} placeholder="Ketik nama penanggung jawab..." />
+                  <EmployeeAutocomplete
+                    label="Penanggung Jawab"
+                    value={String(formData.penanggung_jawab || "")}
+                    selectedNip={String(formData.penanggung_jawab_nip || "")}
+                    employees={employees}
+                    onChange={(penanggung_jawab) => setFormData((previous) => ({ ...previous, penanggung_jawab, penanggung_jawab_nip: "" }))}
+                    onSelect={(employee) => employee && setFormData((previous) => ({ ...previous, penanggung_jawab: employee.nama, penanggung_jawab_nip: employee.nip }))}
+                    placeholder="Cari nama, NIP, atau jabatan pegawai..."
+                  />
                 </div>
                 <div className="flex flex-col gap-1 md:col-span-2">
                   <label className="text-xs font-medium text-gray-500">Lokasi / Unit Kerja</label>

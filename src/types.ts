@@ -6,7 +6,11 @@ export interface Asset {
   merk?: string;
   tahun?: string | number;
   pengguna?: string;
+  pengguna_nip?: string;
+  pengguna_raw?: string;
+  pengguna_match_status?: "matched" | "unmatched" | "review" | string;
   penanggung_jawab?: string;
+  penanggung_jawab_nip?: string;
   lokasi?: string;
   kondisi?: string;
   foto?: string;

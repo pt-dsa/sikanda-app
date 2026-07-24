@@ -18,7 +18,7 @@
 // selaras dengan modul Cleansing (scanPegawai) — jangan divergen.
 // ---------------------------------------------------------------------------
 
-import { scanAssetNameMismatches, type AssetSheetName } from "@/lib/cleansing";
+import { scanAssetEmployeeLinks, type AssetSheetName } from "@/lib/cleansing";
 import type { Pegawai, DistribusiItem } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -31,6 +31,9 @@ export interface UnifiedAsset {
   assetId: string;
   assetLabel: string;
   holderName: string;
+  holderNip?: string;
+  holderRaw?: string;
+  holderStatus?: string;
 }
 
 export function buildUnifiedAssets(
@@ -43,12 +46,18 @@ export function buildUnifiedAssets(
       assetId: String(v.asset_id || ""),
       assetLabel: `${v.merk || ""} ${v.tipe || ""} — ${v.no_polisi || "-"}`.trim(),
       holderName: String(v.pengguna || ""),
+      holderNip: String(v.pengguna_nip || ""),
+      holderRaw: String(v.pengguna_raw || v.pengguna || ""),
+      holderStatus: String(v.pengguna_match_status || ""),
     })),
     ...equipment.map((eq: any) => ({
       sheet: "assets_equipment" as AssetSheetName,
       assetId: String(eq.asset_id || ""),
       assetLabel: String(eq.nama_aset || "-"),
       holderName: String(eq.pengguna || ""),
+      holderNip: String(eq.pengguna_nip || ""),
+      holderRaw: String(eq.pengguna_raw || eq.pengguna || ""),
+      holderStatus: String(eq.pengguna_match_status || ""),
     })),
   ].filter((a) => a.assetId);
 }
@@ -63,7 +72,7 @@ export function buildFuzzyNipSet(
   unifiedAssets: UnifiedAsset[]
 ): Set<string> {
   const set = new Set<string>();
-  const issues = scanAssetNameMismatches(pegawaiList, unifiedAssets);
+  const issues = scanAssetEmployeeLinks(pegawaiList, unifiedAssets);
   for (const i of issues) {
     const nip = String(i.matchedNip || "").trim();
     if (nip) set.add(nip);

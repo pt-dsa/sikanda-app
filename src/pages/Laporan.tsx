@@ -231,7 +231,7 @@ export default function Laporan() {
     if (scope === "pegawai" || scope === "all") sections.push(rowsToPrintTable("Data ASN / PPPK", employeePrintRows(filteredPegawai), filterDescription(pegawaiFilter as unknown as Record<string, string>)));
     if (scope === "agenda" || scope === "all") sections.push(rowsToPrintTable("Buku Penjagaan", agendaPrintRows(filteredAgenda), filterDescription(agendaFilter as unknown as Record<string, string>)));
     if (scope === "vehicle" || scope === "all") sections.push(rowsToPrintTable("Data Kendaraan", vehiclePrintRows(filteredVehicles), filterDescription(vehicleFilter as unknown as Record<string, string>)));
-    if (scope === "equipment" || scope === "all") sections.push(rowsToPrintTable("Data Alat & Mesin", equipmentPrintRows(filteredEquipment), filterDescription(equipmentFilter as unknown as Record<string, string>)));
+    if (scope === "equipment" || scope === "all") sections.push(rowsToPrintTable("Data Inventaris", equipmentPrintRows(filteredEquipment), filterDescription(equipmentFilter as unknown as Record<string, string>)));
     const content = `<!doctype html><html><head><meta charset="utf-8"><title>Rekap SIKANDA</title><style>
       @page{size:A4 landscape;margin:9mm 8mm 10mm}*{box-sizing:border-box}html,body{margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:8.2px;line-height:1.25}p{color:#334155;margin:4px 0 7px}section{break-before:page;page-break-before:always;width:100%}section:first-of-type{break-before:auto;page-break-before:auto}h2{font-size:13px;margin:10px 0 3px}small{font-weight:normal;color:#64748b}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tfoot{display:table-footer-group}tr{break-inside:avoid;page-break-inside:avoid}th,td{border:0.7px solid #64748b;padding:3.5px 4px;text-align:left;vertical-align:top;word-break:normal;overflow-wrap:anywhere;white-space:normal}th{background:#dfeaf7;text-transform:none;font-weight:800;text-align:center;vertical-align:middle}tbody tr:nth-child(even){background:#f8fafc}td:first-child{white-space:nowrap}table[data-columns="12"]{font-size:7.4px}table[data-columns="11"]{font-size:7.7px}.letterhead{display:flex;align-items:center;justify-content:center;min-height:106px;width:100%}.letterhead-inner{display:grid;grid-template-columns:106px 700px;align-items:center;justify-content:center;column-gap:0;width:min(100%,806px);margin:0 auto}.letterhead-logo{width:106px;height:106px;object-fit:contain;display:block}.letterhead-text{width:700px;height:auto;object-fit:contain;display:block}.letterhead-lines{margin:3px 0 8px}.letterhead-lines span{display:block;border-top:2.4px solid #000;margin-top:2px}.letterhead-lines span+span{border-top-width:.8px}.report-title{font-size:15px;font-weight:900;margin:7px 0 1px}.meta{font-size:8px;color:#475569;margin-bottom:7px}.filter{padding:4px 6px;background:#f1f5f9;border-left:3px solid #2563eb}
     </style></head><body>
@@ -350,7 +350,7 @@ export default function Laporan() {
             <button onClick={() => exportCsv(vehicleRows(filteredVehicles), `Data_Kendaraan_${filterSlug(vehicleFilter as unknown as Record<string, string>)}`)} disabled={isExporting || loading} className="w-full flex justify-center items-center gap-2 px-4 py-2.5 neuglass-pressed text-blue-700 font-semibold rounded-full disabled:opacity-50"><Download size={17} />Unduh CSV Hasil Filter</button>
           </CardContent></Card>
 
-        <Card><CardHeader><CardTitle className="text-lg">Data Alat &amp; Mesin</CardTitle><p className="text-xs text-gray-500">{filteredEquipment.length} dari {equipment.length} data</p></CardHeader>
+        <Card><CardHeader><CardTitle className="text-lg">Data Inventaris</CardTitle><p className="text-xs text-gray-500">{filteredEquipment.length} dari {equipment.length} data</p></CardHeader>
           <CardContent className="space-y-2.5">
             {searchInput(equipmentFilter.search, (search) => setEquipmentFilter({ ...equipmentFilter, search }), "Nama barang, merk, pengguna...")}
             <div className="grid grid-cols-2 gap-2">
@@ -359,7 +359,7 @@ export default function Laporan() {
               {selectInput(equipmentFilter.tahun, (tahun) => setEquipmentFilter({ ...equipmentFilter, tahun }), "Semua Tahun", options.equipmentYears)}
               {selectInput(equipmentFilter.pengguna, (pengguna) => setEquipmentFilter({ ...equipmentFilter, pengguna }), "Semua Pengguna", options.equipmentUsers)}
             </div>
-            <button onClick={() => exportCsv(equipmentRows(filteredEquipment), `Data_Alat_Mesin_${filterSlug(equipmentFilter as unknown as Record<string, string>)}`)} disabled={isExporting || loading} className="w-full flex justify-center items-center gap-2 px-4 py-2.5 neuglass-pressed text-blue-700 font-semibold rounded-full disabled:opacity-50"><Download size={17} />Unduh CSV Hasil Filter</button>
+            <button onClick={() => exportCsv(equipmentRows(filteredEquipment), `Data_Inventaris_${filterSlug(equipmentFilter as unknown as Record<string, string>)}`)} disabled={isExporting || loading} className="w-full flex justify-center items-center gap-2 px-4 py-2.5 neuglass-pressed text-blue-700 font-semibold rounded-full disabled:opacity-50"><Download size={17} />Unduh CSV Hasil Filter</button>
           </CardContent></Card>
       </div>
 
@@ -376,14 +376,14 @@ export default function Laporan() {
                 <option value="pegawai">Data ASN / PPPK</option>
                 <option value="agenda">Buku Penjagaan</option>
                 <option value="vehicle">Data Kendaraan</option>
-                <option value="equipment">Data Alat & Mesin</option>
+                <option value="equipment">Data Inventaris</option>
                 <option value="all">Seluruh Data</option>
               </select>
               <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4 text-sm text-gray-700 dark:text-gray-200 space-y-1">
                 {(printScope === "pegawai" || printScope === "all") && <div><p><b>Data ASN/PPPK:</b> {filteredPegawai.length} data</p><p className="text-xs text-gray-500">{filterDescription(pegawaiFilter as unknown as Record<string, string>)}</p></div>}
                 {(printScope === "agenda" || printScope === "all") && <div><p><b>Buku Penjagaan:</b> {filteredAgenda.length} agenda</p><p className="text-xs text-gray-500">{filterDescription(agendaFilter as unknown as Record<string, string>)}</p></div>}
                 {(printScope === "vehicle" || printScope === "all") && <div><p><b>Data Kendaraan:</b> {filteredVehicles.length} data</p><p className="text-xs text-gray-500">{filterDescription(vehicleFilter as unknown as Record<string, string>)}</p></div>}
-                {(printScope === "equipment" || printScope === "all") && <div><p><b>Data Alat & Mesin:</b> {filteredEquipment.length} data</p><p className="text-xs text-gray-500">{filterDescription(equipmentFilter as unknown as Record<string, string>)}</p></div>}
+                {(printScope === "equipment" || printScope === "all") && <div><p><b>Data Inventaris:</b> {filteredEquipment.length} data</p><p className="text-xs text-gray-500">{filterDescription(equipmentFilter as unknown as Record<string, string>)}</p></div>}
               </div>
             </div>
             <div className="safe-area-bottom px-4 sm:px-5 py-4 border-t border-gray-200 dark:border-gray-800 grid grid-cols-2 sm:flex sm:justify-end gap-2">

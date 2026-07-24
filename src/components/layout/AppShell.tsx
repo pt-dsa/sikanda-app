@@ -10,7 +10,8 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { GlobalSearch } from "@/components/ui/GlobalSearch";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { apiService } from "@/services/apiService";
-import { signInWithGoogle, firebaseSignOut, onFirebaseAuth, getFirebaseIdToken } from "@/lib/firebase";
+import { authService, type CaptchaProof } from "@/services/authService";
+import { clearAuthSession, readAuthSession } from "@/lib/authSession";
 import { canViewMenu, type AppUser, type MenuKey } from "@/lib/rbac";
 import { motion, AnimatePresence } from "motion/react";
 import { PegawaiFormModal } from "@/components/ui/PegawaiFormModal";
@@ -29,23 +30,33 @@ function agendaTimeLabel(item: NotificationAgendaItem) {
   return item.selisihHari < 30 ? `${item.selisihHari} hari lagi` : `${Math.floor(item.selisihHari / 30)} bulan lagi`;
 }
 
-const DEV_KEY = "sikanda_dev";
-
 interface AuthContextValue {
   user: AppUser | null;
   loading: boolean;
-  loginWithGoogle: () => Promise<void>;
-  loginDev: () => void;
+  loginWithPassword: (params: { nip: string; password: string; captcha: CaptchaProof; clientKey: string }) => Promise<void>;
+  registerAccount: (params: { nip: string; email: string; password: string; captcha: CaptchaProof; clientKey: string }) => Promise<{ requiresLogin: boolean; message?: string }>;
   logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
-  loginWithGoogle: async () => {},
-  loginDev: () => {},
+  loginWithPassword: async () => {},
+  registerAccount: async () => ({ requiresLogin: false }),
   logout: async () => {},
 });
+
+function appUserFromIdentity(identity: any): AppUser {
+  return {
+    email: String(identity?.email || ""),
+    role: identity?.role,
+    nip: String(identity?.nip || ""),
+    nama: String(identity?.nama || ""),
+    foto: String(identity?.foto || ""),
+    foto_nip: String(identity?.photo_nip || identity?.foto_nip || ""),
+    is_active: true,
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Otorisasi selalu dimulai kosong. Role tidak pernah dipulihkan dari
@@ -53,77 +64,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fail-closed: setiap perubahan sesi menghapus profil dan cache lama terlebih
-  // dahulu. Aplikasi baru dibuka setelah token Firebase diverifikasi backend.
+  // Fail-closed: profil/role tidak disimpan di browser. Sesi Supabase yang ada
+  // selalu diverifikasi ulang oleh Apps Script sebelum aplikasi dibuka.
   useEffect(() => {
     let active = true;
-    const unsub = onFirebaseAuth(async (signedIn) => {
+    const restore = async () => {
       spreadsheetService.clearCache();
       setUser(null);
       setLoading(true);
       try {
-        if (signedIn) {
-          const idToken = await getFirebaseIdToken();
-          if (!idToken) throw new Error("Sesi Google tidak tersedia.");
-          const res = await apiService.whoami(idToken);
-          const fresh: AppUser = { email: res.email, role: res.role, nip: res.nip, nama: res.nama, foto: res.foto, foto_nip: res.photo_nip, is_active: true };
-          if (active) setUser(fresh);
-        }
+        if (!readAuthSession()) return;
+        const identity = await apiService.whoami();
+        if (active) setUser(appUserFromIdentity(identity));
       } catch (e: any) {
-        console.error("[SIKANDA] verifikasi sesi ditolak:", e);
-        spreadsheetService.clearCache();
+        console.error("[SIKANDA] verifikasi sesi gagal:", e);
         if (active) setUser(null);
       } finally {
         if (active) setLoading(false);
       }
-    });
+    };
+    restore();
     return () => {
       active = false;
-      unsub();
     };
   }, []);
 
-  const loginWithGoogle = async () => {
+  useEffect(() => {
+    const invalidate = () => {
+      clearAuthSession();
+      spreadsheetService.clearCache();
+      setUser(null);
+      setLoading(false);
+    };
+    window.addEventListener("sikanda:auth-invalid", invalidate);
+    return () => window.removeEventListener("sikanda:auth-invalid", invalidate);
+  }, []);
+
+  const loginWithPassword: AuthContextValue["loginWithPassword"] = async (params) => {
     setLoading(true);
     try {
-      const g = await signInWithGoogle();
-      const res = await apiService.whoami(g.idToken); // backend verifikasi + cek app_access
-      const sess: AppUser = { email: res.email || g.email, role: res.role, nip: res.nip, nama: res.nama || g.name, foto: res.foto, foto_nip: res.photo_nip, is_active: true };
-      localStorage.removeItem(DEV_KEY);
+      const result = await authService.login(params.nip, params.password, params.captcha, params.clientKey);
+      if (!result.user) throw new Error("Identitas akun tidak tersedia.");
       spreadsheetService.clearCache();
-      setUser(sess);
+      setUser(appUserFromIdentity(result.user));
     } catch (e) {
       setUser(null);
       spreadsheetService.clearCache();
-      await firebaseSignOut(); // gagal otorisasi → jangan biarkan sesi Firebase menggantung
+      clearAuthSession();
       throw e;
     } finally {
       setLoading(false);
     }
   };
 
-  // Public-safe: mode developer dinonaktifkan. Semua akses wajib lewat Google/Firebase.
-  const loginDev = () => {
-    localStorage.removeItem(DEV_KEY);
-    spreadsheetService.clearCache();
-    setUser(null);
+  const registerAccount: AuthContextValue["registerAccount"] = async (params) => {
+    setLoading(true);
+    try {
+      const result = await authService.register(params.nip, params.email, params.password, params.captcha, params.clientKey);
+      if (result.user) setUser(appUserFromIdentity(result.user));
+      return { requiresLogin: result.requiresLogin, message: result.message };
+    } catch (error) {
+      setUser(null);
+      clearAuthSession();
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = async () => {
     setUser(null);
     setLoading(true);
     spreadsheetService.clearCache();
-    localStorage.removeItem(DEV_KEY);
     try {
-      await firebaseSignOut();
+      await authService.logout();
     } finally {
+      clearAuthSession();
       spreadsheetService.clearCache();
       setLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginDev, logout }}>
+    <AuthContext.Provider value={{ user, loading, loginWithPassword, registerAccount, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -134,8 +157,8 @@ const navItems: { icon: any; label: string; href: string; menu: MenuKey }[] = [
   { icon: Users, label: "Data ASN / PPPK", href: "/pegawai", menu: "pegawai" },
   { icon: CalendarCheck, label: "Buku Penjagaan", href: "/buku-penjagaan", menu: "buku-penjagaan" },
   { icon: CarFront, label: "Data Kendaraan", href: "/kendaraan", menu: "kendaraan" },
-  { icon: Wrench, label: "Alat & Mesin", href: "/alat-mesin", menu: "alat-mesin" },
-  { icon: Package, label: "Inventaris", href: "/inventaris", menu: "inventaris" },
+  { icon: Wrench, label: "Inventaris", href: "/alat-mesin", menu: "alat-mesin" },
+  { icon: Package, label: "Alat & Mesin", href: "/inventaris", menu: "inventaris" },
   { icon: WalletCards, label: "Pagu Anggaran", href: "/pagu", menu: "pagu" },
   { icon: Wrench, label: "Pemeliharaan Kendaraan", href: "/pemeliharaan-kendaraan", menu: "pemeliharaan-kendaraan" },
   { icon: CalendarClock, label: "Peminjaman", href: "/peminjaman", menu: "peminjaman" },
@@ -249,7 +272,7 @@ function NotifSection({
   close: () => void;
   limit?: number;
 }) {
-  if (items.length === 0) return null;
+  if (!items || items.length === 0) return null;
   const shown = items.slice(0, limit);
   const extra = items.length - shown.length;
   return (
@@ -285,7 +308,7 @@ function NotifSection({
 }
 
 function BirthdaySection({ items, close }: { items: NotificationFeed["birthdays"]; close: () => void }) {
-  if (!items.length) return null;
+  if (!items || !items.length) return null;
   return (
     <div className="py-1">
       <div className="px-4 py-2 flex items-center gap-2">
@@ -315,9 +338,12 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
   useEffect(() => {
     async function loadAlerts() {
       try {
+        if (!readAuthSession()) return;
         setFeed(await apiService.getNotificationFeed());
-      } catch (err) {
-        console.error("Error loading alerts:", err);
+      } catch (err: any) {
+        if (!/Sesi/i.test(err?.message || "")) {
+          console.error("Error loading alerts:", err);
+        }
       }
     }
     void loadAlerts();
@@ -332,7 +358,7 @@ function Topbar({ setMobileSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpe
 
   const notif = feed || { overdue: [], kgb: [], pangkat: [], bup: [], birthdays: [] };
 
-  const totalNotif = notif.overdue.length + notif.kgb.length + notif.pangkat.length + notif.bup.length + notif.birthdays.length;
+  const totalNotif = (notif.overdue?.length || 0) + (notif.kgb?.length || 0) + (notif.pangkat?.length || 0) + (notif.bup?.length || 0) + (notif.birthdays?.length || 0);
 
   const getGreeting = () => {
     const hour = parseInt(new Intl.DateTimeFormat('id-ID', {

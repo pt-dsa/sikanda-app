@@ -17,6 +17,8 @@ export interface AccessUser {
   nama: string;
   is_active: boolean;
   last_login?: string;
+  auth_status?: "ready" | "active" | "disabled";
+  registered_at?: string;
 }
 
 export const accessService = {
@@ -31,6 +33,9 @@ export const accessService = {
 
   userDelete: async (email: string): Promise<{ ok: true; email: string }> =>
     callBackend({ action: "user_delete", email }),
+
+  userResetRegistration: async (email: string): Promise<{ ok: true; email: string }> =>
+    callBackend({ action: "user_reset_registration", email }),
 
   userSeedFromPegawai: async (): Promise<{ ok: true; added: number; note?: string }> =>
     callBackend({ action: "user_seed_from_pegawai" }),

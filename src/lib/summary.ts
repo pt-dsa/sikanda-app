@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // SIKANDA — HELPER RINGKASAN KARTU (sumber tunggal untuk kartu klikable)
 // ---------------------------------------------------------------------------
-// Dipakai oleh modul aset/transaksi (Kendaraan, Alat & Mesin, Inventaris,
+// Dipakai oleh modul aset/transaksi (Kendaraan, Inventaris, Alat & Mesin,
 // Pagu Anggaran, Pemeliharaan, Peminjaman) agar:
 //   1. Kartu ringkasan DIBANGUN dari nilai NYATA yang ada di data (bukan
 //      bucket hardcoded yang bisa salah hitung bila string kondisi/status

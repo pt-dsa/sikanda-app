@@ -53,7 +53,12 @@ function aggregateKey(row: Record<string, string>) {
 }
 
 function exactKey(item: Partial<Equipment>) {
-  return [normalizeKibCode(item.kode_barang), normText(item.nama_aset), String(item.tahun || ""), normText(item.merk)].join("|");
+  return [
+    normalizeKibCode(item.kode_barang), normText(item.nama_aset), String(item.tahun || ""), normText(item.merk),
+    normText(item.spesifikasi), normText(item.jenis), normText(item.bidang), normText(item.lokasi),
+    normText(item.pengguna_raw || item.pengguna), String(item.harga_pembelian ?? ""),
+    normText(item.register_barang), normText(item.mutasi), String(item.jumlah ?? 1),
+  ].join("|");
 }
 
 export async function prepareKibImport(file: File | string, existing: Equipment[]): Promise<KibImportResult> {
@@ -72,7 +77,7 @@ export async function prepareKibImport(file: File | string, existing: Equipment[
   if (parsed.errors.length) throw new Error(`CSV tidak dapat dibaca pada baris ${parsed.errors[0].row + 2}: ${parsed.errors[0].message}`);
 
   const invalid: Array<{ row: number; message: string }> = [];
-  const grouped = new Map<string, { row: Record<string, string>; rows: number[] }>();
+  const grouped = new Map<string, { row: Record<string, string>; rows: number[]; indexes: string[] }>();
   const sourceIndexes = new Map<string, number>();
   parsed.data.forEach((raw, index) => {
     const rowNo = index + 2;
@@ -91,17 +96,28 @@ export async function prepareKibImport(file: File | string, existing: Equipment[
       if (firstRow) { invalid.push({ row: rowNo, message: `INDEX sama dengan baris ${firstRow}.` }); return; }
       sourceIndexes.set(indexKey, rowNo);
     }
-    const key = row.INDEX ? `INDEX:${normText(row.INDEX)}:${rowNo}` : `GROUP:${aggregateKey(row)}`;
+    // INDEX adalah identitas per unit, bukan pembeda jenis barang. Baris yang
+    // sama tetap digabung; INDEX yang tersedia disimpan sebagai daftar unit.
+    const key = `GROUP:${aggregateKey(row)}`;
     const current = grouped.get(key);
-    if (current) current.rows.push(rowNo); else grouped.set(key, { row, rows: [rowNo] });
+    if (current) {
+      current.rows.push(rowNo);
+      if (row.INDEX) current.indexes.push(row.INDEX);
+    } else {
+      grouped.set(key, { row, rows: [rowNo], indexes: row.INDEX ? [row.INDEX] : [] });
+    }
   });
 
   const existingCodes = new Set(existing.map((row) => normalizeKibCode(row.kode_barang)).filter(Boolean));
   const existingExact = new Set(existing.map(exactKey));
   const existingIndexes = new Set(existing.map((row) => normText(row.kib_index)).filter(Boolean));
-  const records: KibImportRecord[] = Array.from(grouped.values()).map(({ row, rows }) => {
+  existing.forEach((row) => (row.unit_indexes || []).forEach((index) => {
+    const key = normText(index);
+    if (key) existingIndexes.add(key);
+  }));
+  const records: KibImportRecord[] = Array.from(grouped.values()).map(({ row, rows, indexes }) => {
     const record: KibImportRecord = {
-      opd: row.OPD || undefined, kib_index: row.INDEX || undefined, unit_indexes: [],
+      opd: row.OPD || undefined, kib_index: indexes[0] || undefined, unit_indexes: indexes.slice(1),
       kode_barang: row["KODE BARANG"], nama_aset: row["NAMA BARANG"],
       register_barang: row.REGISTER || undefined, kondisi: row.KONDISI || undefined,
       tahun: row.TAHUN, merk: row["NAMA UMUM"], spesifikasi: row.SPESIFIKASI || undefined,
@@ -112,8 +128,9 @@ export async function prepareKibImport(file: File | string, existing: Equipment[
       source_rows: rows, code_exists: false, exact_duplicate: false,
     };
     record.code_exists = existingCodes.has(normalizeKibCode(record.kode_barang));
-    record.exact_duplicate = record.kib_index
-      ? existingIndexes.has(normText(record.kib_index))
+    const incomingIndexes = [record.kib_index, ...(record.unit_indexes || [])].map(normText).filter(Boolean);
+    record.exact_duplicate = incomingIndexes.length
+      ? incomingIndexes.some((index) => existingIndexes.has(index))
       : existingExact.has(exactKey(record));
     return record;
   });

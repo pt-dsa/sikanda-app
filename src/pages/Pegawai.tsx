@@ -226,14 +226,11 @@ export default function PegawaiPage() {
 
   const filteredData = useMemo(() => {
     return data.filter((p) => {
-      const search = searchTerm.toLowerCase();
+      const search = String(searchTerm || "").toLocaleLowerCase("id-ID");
       const matchSearch =
         !search ||
-        p.nama.toLowerCase().includes(search) ||
-        p.nip.includes(search) ||
-        (p.unit_kerja || "").toLowerCase().includes(search) ||
-        (p.jabatan || "").toLowerCase().includes(search) ||
-        (p.golongan || "").toLowerCase().includes(search);
+        [p.nama, p.nip, p.unit_kerja, p.jabatan, p.golongan]
+          .some((value) => String(value ?? "").toLocaleLowerCase("id-ID").includes(search));
 
       const matchStatus = matchesEmploymentStatus(p, filterStatus);
       const matchBidang = filterBidang === "all" || (filterBidang === "__empty__" ? !String(p.unit_kerja || "").trim() : p.unit_kerja === filterBidang);

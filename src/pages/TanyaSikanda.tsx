@@ -243,7 +243,7 @@ export default function TanyaSikanda() {
                 if (hour >= 15 && hour < 18) return "Sore";
                 if (hour >= 18 || hour < 3) return "Malam";
                 return "Pagi";
-              })()}, ${namaDepan || "Sobat SIKANDA"} 😊 Apa kabar?\n\nMau mengecek data apa hari ini? Saya bisa membantu menelusuri pegawai, agenda KGB/pangkat/BUP, ulang tahun, kendaraan, serta alat dan mesin berdasarkan data yang dapat Anda akses.`,
+              })()}, ${namaDepan || "Sobat SIKANDA"} 😊 Apa kabar?\n\nMau mengecek data apa hari ini? Saya bisa membantu menelusuri pegawai, agenda KGB/pangkat/BUP, ulang tahun, kendaraan, serta inventaris berdasarkan data yang dapat Anda akses.`,
             time: nowLabel(),
           }}
         />

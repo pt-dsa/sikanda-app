@@ -1,6 +1,6 @@
 {
   "name": "SIKANDA",
-  "description": "SIKANDA V1.1.14 Production Hardening - KIB B Smart Import, galeri lampiran, dan pengelolaan aset daerah",
+  "description": "SIKANDA V1.1.16 Full Replacement - Supabase Auth melalui Apps Script, puzzle Logo SIKANDA, dan penyelarasan nama modul",
   "requestFramePermissions": ["camera", "geolocation"],
   "majorCapabilities": []
 }

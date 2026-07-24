@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext, useMemo } from "react";
 import {
   UserCog, Plus, Save, X, RefreshCw, ShieldAlert, ShieldCheck, Download,
-  CheckCircle2, Ban, Pencil, Mail, IdCard, Users as UsersIcon,
+  CheckCircle2, Ban, Pencil, Mail, IdCard, Users as UsersIcon, RotateCcw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { apiService, type AccessUser } from "@/services/apiService";
@@ -29,6 +29,12 @@ const inputCls =
   "w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none read-only:opacity-60";
 const labelCls = "block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1";
 
+function accountStatus(user: AccessUser) {
+  if (!user.is_active || user.auth_status === "disabled") return { label: "Dinonaktifkan", className: "text-gray-500 dark:text-gray-400", icon: Ban };
+  if (user.auth_status === "active") return { label: "Aktif", className: "text-emerald-600 dark:text-emerald-400", icon: ShieldCheck };
+  return { label: "Siap Registrasi", className: "text-amber-600 dark:text-amber-400", icon: IdCard };
+}
+
 
 
 interface FormState {
@@ -37,8 +43,9 @@ interface FormState {
   nip: string;
   nama: string;
   is_active: boolean;
+  auth_status: "ready" | "active" | "disabled";
 }
-const emptyForm: FormState = { email: "", role: "pegawai", nip: "", nama: "", is_active: true };
+const emptyForm: FormState = { email: "", role: "pegawai", nip: "", nama: "", is_active: true, auth_status: "ready" };
 
 export default function KelolaAkun() {
   const toast = useToast();
@@ -114,7 +121,7 @@ export default function KelolaAkun() {
   }
 
   function openEdit(u: AccessUser) {
-    setForm({ email: u.email, role: u.role, nip: String(u.nip || ""), nama: u.nama || "", is_active: u.is_active });
+    setForm({ email: u.email, role: u.role, nip: String(u.nip || ""), nama: u.nama || "", is_active: u.is_active, auth_status: u.auth_status || "ready" });
     setEmployeeQuery(u.nama || "");
     setSuggestionsOpen(false);
     setIsEdit(true);
@@ -127,7 +134,7 @@ export default function KelolaAkun() {
     setError(null);
     const email = form.email.trim().toLowerCase();
     if (!email || !email.includes("@")) {
-      setError("Email Google yang valid wajib diisi.");
+      setError("Email yang valid wajib diisi.");
       return;
     }
     if (!isEdit && !/^\d{18}$/.test(form.nip.trim())) {
@@ -176,11 +183,7 @@ export default function KelolaAkun() {
     }));
     setEmployeeQuery(String(employee.nama || "").trim());
     setSuggestionsOpen(false);
-    if (!email || !email.includes("@")) {
-      setError("Pegawai ini belum memiliki email valid. Lengkapi email pada menu Data ASN/PPPK terlebih dahulu.");
-    } else {
-      setError(null);
-    }
+    setError(null);
   }
 
   function handleDeactivate(u: AccessUser) {
@@ -196,7 +199,7 @@ export default function KelolaAkun() {
     }
     askConfirm({
       title: "Nonaktifkan Akun",
-      message: `Nonaktifkan akses untuk "${u.email}"?\n\nAkun tidak dihapus permanen — hanya is_active diset FALSE sehingga tidak bisa login. Dapat diaktifkan lagi nanti dari tombol Edit.`,
+      message: `Nonaktifkan akses untuk "${u.email}"?\n\nAkses SIKANDA dan kredensial login akan dinonaktifkan. Jika diaktifkan kembali melalui Edit, user harus melakukan registrasi ulang dan membuat password baru.`,
       confirmLabel: "Nonaktifkan",
       confirmClass: "bg-red-600 hover:bg-red-700",
       onConfirm: async () => {
@@ -214,12 +217,34 @@ export default function KelolaAkun() {
     });
   }
 
+  function handleResetRegistration(u: AccessUser) {
+    askConfirm({
+      title: "Reset Registrasi",
+      message: `Reset password dan registrasi untuk "${u.email}"?\n\nKredensial lama akan dihapus. User harus membuka menu Registrasi dan membuat password baru menggunakan NIP serta email yang sama.`,
+      confirmLabel: "Reset Registrasi",
+      confirmClass: "bg-amber-600 hover:bg-amber-700",
+      onConfirm: async () => {
+        try {
+          await apiService.userResetRegistration(u.email);
+          setNotice(`Registrasi ${u.email} telah direset. User dapat membuat password baru.`);
+          toast.success("Reset Registrasi Berhasil", `Akun ${u.email} kembali berstatus Siap Registrasi.`);
+          await load();
+        } catch (e: any) {
+          const message = String(e?.message || e);
+          setError(message);
+          toast.error("Reset Registrasi Gagal", message);
+        }
+      },
+    });
+  }
+
   function handleSeed() {
     askConfirm({
       title: "Buat dari Data Pegawai",
       message:
         "Buat akun untuk setiap pegawai aktif ber-NIP yang belum terdaftar?\n\n" +
-        "• Bila email pegawai valid, akun dibuat dan langsung AKTIF.\n" +
+        "• Bila email pegawai valid, akses dibuat dengan status SIAP REGISTRASI.\n" +
+        "• User membuat password sendiri melalui halaman Registrasi.\n" +
         "• Bila email kosong/tidak valid, data dilewati dan harus dilengkapi melalui Data ASN/PPPK.",
       confirmLabel: "Tarik Sekarang",
       confirmClass: "bg-blue-600 hover:bg-blue-700",
@@ -260,7 +285,8 @@ export default function KelolaAkun() {
     );
   }
 
-  const aktif = users.filter((u) => u.is_active).length;
+  const dapatLogin = users.filter((u) => u.is_active && u.auth_status === "active").length;
+  const siapRegistrasi = users.filter((u) => u.is_active && u.auth_status !== "active").length;
 
   return (
     <div className="space-y-6">
@@ -276,7 +302,7 @@ export default function KelolaAkun() {
             <UserCog size={24} /> Kelola Akun
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Daftar email yang boleh masuk SIKANDA & perannya · {users.length} akun ({aktif} aktif)
+            Daftar NIP, email, status registrasi, dan peran · {users.length} akun ({dapatLogin} dapat login, {siapRegistrasi} siap registrasi)
           </p>
         </div>
         <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
@@ -347,15 +373,7 @@ export default function KelolaAkun() {
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-700 pt-3">
                       <span className="font-mono text-xs text-gray-500 break-all">NIP {u.nip || "—"}</span>
-                      {u.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-                          <ShieldCheck size={14} /> Aktif
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-gray-400 text-xs font-bold">
-                          <Ban size={14} /> Nonaktif
-                        </span>
-                      )}
+                      {(() => { const status = accountStatus(u); const StatusIcon = status.icon; return <span className={`inline-flex items-center gap-1 text-xs font-bold ${status.className}`}><StatusIcon size={14} /> {status.label}</span>; })()}
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
                         <button onClick={() => openEdit(u)} className="min-h-11 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-blue-600 bg-blue-50 dark:bg-blue-900/30 rounded-xl" title="Edit">
@@ -364,6 +382,11 @@ export default function KelolaAkun() {
                         {u.is_active && (
                           <button onClick={() => handleDeactivate(u)} className="min-h-11 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-red-600 bg-red-50 dark:bg-red-900/30 rounded-xl" title="Nonaktifkan">
                             <Ban size={15} /> Nonaktifkan
+                          </button>
+                        )}
+                        {u.auth_status === "active" && u.email !== (user?.email || "").toLowerCase() && (
+                          <button onClick={() => handleResetRegistration(u)} className="col-span-2 min-h-11 inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-amber-700 bg-amber-50 dark:bg-amber-900/30 rounded-xl" title="Reset registrasi dan password">
+                            <RotateCcw size={15} /> Reset Registrasi
                           </button>
                         )}
                     </div>
@@ -392,11 +415,12 @@ export default function KelolaAkun() {
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{u.nama || "—"}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-300 font-mono text-xs">{u.nip || "—"}</td>
                         <td className="px-4 py-3">
-                          {u.is_active ? <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold"><ShieldCheck size={14} /> Aktif</span> : <span className="inline-flex items-center gap-1 text-gray-400 text-xs font-bold"><Ban size={14} /> Nonaktif</span>}
+                          {(() => { const status = accountStatus(u); const StatusIcon = status.icon; return <span className={`inline-flex items-center gap-1 text-xs font-bold ${status.className}`}><StatusIcon size={14} /> {status.label}</span>; })()}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => openEdit(u)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg" title="Edit"><Pencil size={15} /></button>
+                            {u.auth_status === "active" && u.email !== (user?.email || "").toLowerCase() && <button onClick={() => handleResetRegistration(u)} className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg" title="Reset Registrasi"><RotateCcw size={15} /></button>}
                             {u.is_active && <button onClick={() => handleDeactivate(u)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg" title="Nonaktifkan"><Ban size={15} /></button>}
                           </div>
                         </td>
@@ -477,14 +501,18 @@ export default function KelolaAkun() {
                 )}
 
                 <div>
-                  <label className={labelCls}><Mail size={12} className="inline mr-1" />Email Google</label>
+                  <label className={labelCls}><Mail size={12} className="inline mr-1" />Email untuk Registrasi</label>
                   <input
                     type="email"
                     value={form.email}
-                    readOnly
-                    placeholder="Terisi otomatis dari data pegawai"
+                    readOnly={isEdit && form.auth_status === "active"}
+                    onChange={(event) => setForm({ ...form, email: event.target.value })}
+                    placeholder="Masukkan email yang akan diverifikasi saat registrasi"
                     className={inputCls}
                   />
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    {isEdit && form.auth_status === "active" ? "Jalankan Reset Registrasi sebelum mengganti email akun aktif." : "Email ini akan dicocokkan saat user melakukan registrasi."}
+                  </p>
                 </div>
 
                 <div>
@@ -494,9 +522,9 @@ export default function KelolaAkun() {
                     onChange={(e: any) => setForm({ ...form, role: e.target.value })}
                     className={inputCls}
                   >
-                    <option value="admin">Administrator — CRUD penuh, approval, konfigurasi, dan kelola akun</option>
+                    <option value="admin">Administrator — CRUD penuh, konfigurasi, dan kelola akun</option>
                     <option value="pimpinan">Pimpinan — kewenangan penuh setara Administrator</option>
-                    <option value="pegawai">Pegawai — profil sendiri dan field identitas yang diizinkan</option>
+                    <option value="pegawai">Pegawai — akses baca dan perubahan profil sendiri yang diizinkan</option>
                   </select>
                 </div>
 
@@ -539,7 +567,7 @@ export default function KelolaAkun() {
                     onChange={(e: any) => setForm({ ...form, is_active: e.target.checked })}
                     className="w-4 h-4 rounded"
                   />
-                  Akun aktif (boleh login)
+                  Izinkan akses akun (user tetap harus menyelesaikan registrasi)
                 </label>}
               </div>
 

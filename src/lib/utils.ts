@@ -17,6 +17,15 @@ export function formatNumber(num: number): string {
   return new Intl.NumberFormat("id-ID").format(num);
 }
 
+/**
+ * Nilai database dapat bertipe string, number, null, atau boolean. Seluruh
+ * pencarian wajib melewati fungsi ini agar identifier numerik (mis. INDEX,
+ * NIP, dan Kode Barang) tidak menyebabkan runtime crash.
+ */
+export function toSearchText(value: unknown): string {
+  return String(value ?? "").toLocaleLowerCase("id-ID");
+}
+
 // ---------------------------------------------------------------------------
 // DATE HANDLING (SIKANDA standard: simpan ISO "YYYY-MM-DD", tampil "13 Juni 1968")
 // ---------------------------------------------------------------------------
@@ -175,7 +184,8 @@ export function parseMoneyString(val: any): number {
 // STRING-ONLY KEYS — never coerce these to numbers even if they look numeric.
 // NIP is 18-digit and exceeds MAX_SAFE_INTEGER; converting to float destroys precision.
 const STRING_ONLY_KEYS = new Set([
-  "no_polisi", "id", "nip", "kode", "kode_barang", "asset_code",
+  "no_polisi", "id", "nip", "pengguna_nip", "penanggung_jawab_nip",
+  "kode", "kode_barang", "asset_code", "kib_index", "index", "register_barang",
   "no", "nomer", "kontak", "phone", "telepon", "no_rangka", "no_mesin", "no_bpkb",
 ]);
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Search, CarFront, Wrench, FileText, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { spreadsheetService } from "@/services/spreadsheetService";
-import { cn } from "@/lib/utils";
+import { cn, toSearchText } from "@/lib/utils";
 
 interface SearchResult {
   id: string;
@@ -16,7 +16,7 @@ interface SearchResult {
 const MODULES: SearchResult[] = [
   { id: "m1", type: "module", title: "Dashboard", subtitle: "Ringkasan Aset Daerah", url: "/dashboard", icon: <FileText size={18} /> },
   { id: "m2", type: "module", title: "Data Kendaraan", subtitle: "Kelola aset kendaraan", url: "/kendaraan", icon: <CarFront size={18} /> },
-  { id: "m3", type: "module", title: "Alat & Mesin", subtitle: "Kelola aset alat dan mesin", url: "/alat-mesin", icon: <Wrench size={18} /> },
+  { id: "m3", type: "module", title: "Inventaris", subtitle: "Kelola data inventaris", url: "/alat-mesin", icon: <Wrench size={18} /> },
   { id: "m8", type: "module", title: "Peta Sebaran", subtitle: "Lokasi geografis aset", url: "/peta", icon: <FileText size={18} /> },
   { id: "m9", type: "module", title: "Rekap Laporan", subtitle: "Unduh laporan data", url: "/laporan", icon: <FileText size={18} /> },
 ];
@@ -88,25 +88,25 @@ export function GlobalSearch() {
       return;
     }
 
-    const q = query.toLowerCase();
+    const q = toSearchText(query);
     const searchResults: SearchResult[] = [];
 
     // Search modules
     const matchedModules = MODULES.filter(m => 
-      m.title.toLowerCase().includes(q) || m.subtitle.toLowerCase().includes(q)
+      toSearchText(m.title).includes(q) || toSearchText(m.subtitle).includes(q)
     );
     searchResults.push(...matchedModules);
 
     // Search vehicles
     if (assetsLoaded) {
       const vMatches = assetData.vehicles
-        .filter(v => v.no_polisi?.toLowerCase().includes(q) || v.merk?.toLowerCase().includes(q))
+        .filter(v => [v.no_polisi, v.merk, v.kode_barang].some((value) => toSearchText(value).includes(q)))
         .map(v => ({
           id: `v_${v.asset_id || v.no_polisi}`,
           type: "vehicle" as const,
           title: `${v.merk || "Kendaraan"} - ${v.no_polisi || ""}`,
           subtitle: v.jenis_kendaraan || "Data Kendaraan",
-          url: `/kendaraan?search=${v.no_polisi}`,
+          url: `/kendaraan?search=${encodeURIComponent(String(v.no_polisi || ""))}`,
           icon: <CarFront size={18} />
         }))
         .slice(0, 5); // Limit results
@@ -114,13 +114,13 @@ export function GlobalSearch() {
       searchResults.push(...vMatches);
 
       const eMatches = assetData.equipment
-        .filter(e => e.nama_barang?.toLowerCase().includes(q) || e.kode_barang?.toLowerCase().includes(q))
+        .filter(e => [e.nama_aset, e.nama_barang, e.kode_barang, e.kib_index].some((value) => toSearchText(value).includes(q)))
         .map(e => ({
           id: `e_${e.equipment_id || e.kode_barang}`,
           type: "equipment" as const,
-          title: e.nama_barang || "Alat & Mesin",
-          subtitle: e.kode_barang || "Data Alat & Mesin",
-          url: `/alat-mesin?search=${e.nama_barang}`,
+          title: String(e.nama_aset || e.nama_barang || "Inventaris"),
+          subtitle: String(e.kode_barang || "Data Inventaris"),
+          url: `/alat-mesin?search=${encodeURIComponent(String(e.nama_aset || e.nama_barang || ""))}`,
           icon: <Wrench size={18} />
         }))
         .slice(0, 5);

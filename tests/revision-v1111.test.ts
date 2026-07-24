@@ -38,19 +38,19 @@ const cleansing = read("src/pages/Cleansing.tsx");
 const dashboard = read("src/pages/Dashboard.tsx");
 const backend = read("apps-script/Code.gs");
 
-for (const [name, source] of [["Kendaraan", vehicle], ["Alat & Mesin", equipment]] as const) {
+for (const [name, source] of [["Kendaraan", vehicle], ["Inventaris", equipment]] as const) {
   assert(source.includes("summarizeAssetConditions(data)"), `${name}: card harus memakai ringkasan kondisi tetap`);
   assert(source.includes("kondisiSummary.unset") && source.includes("ASSET_CONDITION_UNSET"), `${name}: kondisi kosong harus menjadi peringatan/filter terpisah`);
   assert(source.includes("Verifikasi melalui form edit atau Data Cleansing"), `${name}: banner harus memberi jalur perbaikan yang jelas`);
 }
 assert(vehicle.includes('totalLabel="Total Kendaraan"'), "judul total kendaraan harus eksplisit");
-assert(equipment.includes('totalLabel="Total Alat & Mesin"'), "judul total alat & mesin harus eksplisit");
+assert(equipment.includes('totalLabel="Total Inventaris"'), "judul total inventaris harus eksplisit");
 assert(summaryCards.includes("text-sm font-extrabold") && !summaryCards.includes("c.label.toLowerCase()"), "judul card bersama harus lebih besar, tebal, dan mempertahankan ejaan label");
 assert(summaryCards.includes("grid grid-cols-2") && summaryCards.includes("lg:grid-cols-5"), "ringkasan lima card harus mobile-first dan menjadi lima kolom di desktop");
 assert(vehicle.includes("flex flex-col sm:flex-row") && equipment.includes("flex flex-col sm:flex-row"), "banner kualitas data harus beradaptasi pada layar mobile");
 assert(employee.includes("text-sm font-extrabold leading-snug"), "judul card ASN/PPPK harus lebih besar dan tebal");
 assert(watchBook.includes("text-sm font-extrabold leading-snug"), "judul card Buku Penjagaan harus lebih besar dan tebal");
 assert(cleansing.includes("text-sm font-extrabold") && dashboard.includes("text-base font-extrabold"), "judul card menu lain harus diaudit dan diperjelas");
-assert(backend.includes("version: '1.1.14-production'"), "endpoint backend harus melaporkan versi V1.1.14");
+assert(backend.includes("version: '1.1.16-production'"), "endpoint backend harus melaporkan versi V1.1.16");
 
 console.log("revision-v1111-tests: OK");

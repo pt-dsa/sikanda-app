@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   ScanSearch, RefreshCw, CheckCircle2, AlertTriangle,
   ShieldAlert, Info, ChevronDown, ChevronUp, Zap, Check,
-  UserCheck2, ArrowRight, ExternalLink, Wrench,
+  UserCheck2, ExternalLink, Wrench,
 } from "lucide-react";
 import { spreadsheetService } from "@/services/spreadsheetService";
 import { apiService } from "@/services/apiService";
@@ -17,12 +17,13 @@ import { can } from "@/lib/rbac";
 import {
   scanPegawai, buildCorrectionPayload, issueKey,
   ISSUE_META, LEVEL_META,
-  scanAssetNameMismatches, type AssetNameIssue,
+  scanAssetEmployeeLinks, type AssetNameIssue,
   type CleansingIssue, type IssueCode, type IssueLevel,
 } from "@/lib/cleansing";
 import { buildUnifiedAssets } from "@/lib/kelengkapan";
 import type { Pegawai } from "@/types";
 import { scanMissingAssetConditions, type MissingAssetConditionIssue } from "@/lib/assetCondition";
+import { EmployeeAutocomplete } from "@/components/ui/EmployeeAutocomplete";
 
 // ---------------------------------------------------------------------------
 // Halaman Cleansing (Tahap 6)
@@ -68,6 +69,8 @@ export default function Cleansing() {
   const [applyingAssetKey, setApplyingAssetKey] = useState<string | null>(null);
   const [assetScanLoading, setAssetScanLoading] = useState(true);
   const [conditionIssues, setConditionIssues] = useState<MissingAssetConditionIssue[]>([]);
+  const [assetSelections, setAssetSelections] = useState<Record<string, Pegawai | undefined>>({});
+  const [assetQueries, setAssetQueries] = useState<Record<string, string>>({});
 
   // Peta NIP → Pegawai (untuk buildCorrectionPayload)
   const pegawaiByNip = useMemo(() => {
@@ -99,7 +102,18 @@ export default function Cleansing() {
       // getDashboardMetrics (@/lib/kelengkapan), satu definisi tanpa duplikasi.
       const unifiedAssets = buildUnifiedAssets(vehicles, equipment);
 
-      setAssetIssues(scanAssetNameMismatches(result as Pegawai[], unifiedAssets));
+      const employeeRows = result as Pegawai[];
+      const linkIssues = scanAssetEmployeeLinks(employeeRows, unifiedAssets);
+      setAssetIssues(linkIssues);
+      const initialSelections: Record<string, Pegawai | undefined> = {};
+      const initialQueries: Record<string, string> = {};
+      for (const issue of linkIssues) {
+        const suggestion = employeeRows.find((employee) => String(employee.nip || "") === String(issue.matchedNip || ""));
+        initialSelections[issue.id] = suggestion;
+        initialQueries[issue.id] = suggestion?.nama || "";
+      }
+      setAssetSelections(initialSelections);
+      setAssetQueries(initialQueries);
       setConditionIssues(scanMissingAssetConditions(vehicles, equipment));
     } catch (err: any) {
       setErrorMsg(err?.message || "Gagal memuat data pegawai.");
@@ -185,14 +199,19 @@ export default function Cleansing() {
       toast.error("Akses Ditolak", "Hanya admin/pimpinan yang dapat menerapkan koreksi.");
       return;
     }
+    const selectedEmployee = assetSelections[issue.id];
+    if (!selectedEmployee?.nip) {
+      toast.warning("Pilih Pegawai", "Cari lalu pilih nama pegawai dari Data ASN / PPPK terlebih dahulu.");
+      return;
+    }
     setApplyingAssetKey(issue.id);
     try {
-      await apiService.fixAssetHolder(issue.sheet, issue.assetId, issue.matchedNama);
+      await apiService.linkAssetEmployee(issue.sheet, issue.assetId, selectedEmployee.nip);
       setAssetApplied((prev) => new Set([...prev, issue.id]));
       spreadsheetService.clearCache();
       toast.success(
         "Nama Pengguna Aset Diperbarui",
-        `"${issue.currentHolder}" → "${issue.matchedNama}" pada ${issue.sheetLabel}.`
+        `"${issue.currentHolder}" → "${selectedEmployee.nama}" (NIP ${selectedEmployee.nip}) pada ${issue.sheetLabel}.`
       );
     } catch (err: any) {
       toast.error("Gagal", err?.message || "Gagal memperbarui nama pengguna aset.");
@@ -524,16 +543,15 @@ export default function Cleansing() {
         </div>
       )}
 
-      {/* ── SECTION: Kecocokan Nama Pegawai ↔ Aset (fuzzy matching, validasi manual) ── */}
+      {/* Nama sumber tetap disimpan; NIP pegawai ditetapkan satu per satu. */}
       <div id="asset-verification-section" className="scroll-mt-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <UserCheck2 size={18} className="text-indigo-600" /> Kecocokan Nama Pegawai ↔ Aset
+              <UserCheck2 size={18} className="text-indigo-600" /> Cleansing Nama Pengguna Aset
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Saran selalu merujuk nama resmi pada menu Data ASN / PPPK, bukan variasi nama yang tercatat pada aset.
-              Setiap item harus ditinjau &amp; diterapkan satu per satu (tidak ada penerapan massal).
+              Hubungkan setiap nama pengguna dengan pegawai resmi pada menu Data ASN / PPPK. Cari berdasarkan nama, NIP, atau jabatan, lalu simpan satu per satu.
             </p>
           </div>
           {assetScanLoading ? (
@@ -576,53 +594,61 @@ export default function Cleansing() {
             {visibleAssetIssues.map((issue) => {
               const isBusy = applyingAssetKey === issue.id;
               const confPct = Math.round(issue.similarity * 100);
-              const confBadge =
-                issue.confidence === "tinggi"
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+              const selectedEmployee = assetSelections[issue.id];
+              const confBadge = issue.confidence === "tinggi"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                : issue.confidence === "sedang"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                  : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300";
               return (
-                <div key={issue.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
+                <div key={issue.id} className="p-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,1fr)_auto] lg:items-center">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
-                        {issue.sheetLabel}
-                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{issue.sheetLabel}</span>
                       <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{issue.assetLabel}</span>
                       <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${confBadge}`}>
-                        {confPct}% mirip
+                        {issue.confidence === "belum" ? "Belum terhubung" : `${confPct}% cocok`}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm flex-wrap">
-                      <span className="font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded">
-                        {issue.currentHolder}
-                      </span>
-                      <ArrowRight size={14} className="text-gray-400 shrink-0" />
-                      <span className="font-mono text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">
-                        {issue.matchedNama}
-                      </span>
-                      <span className="text-xs text-gray-400">(NIP {issue.matchedNip})</span>
-                    </div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Nama pada data lama/import</p>
+                    <p className="mt-1 break-words rounded-lg bg-red-50 px-2 py-1 text-sm font-medium text-red-700 dark:bg-red-900/20 dark:text-red-300">{issue.currentHolder}</p>
+                    {issue.currentNip && <p className="mt-1 text-xs text-gray-400">NIP lama: {issue.currentNip}</p>}
+                  </div>
+                  <div className="min-w-0">
+                    <EmployeeAutocomplete
+                      label="Hubungkan dengan pegawai"
+                      value={assetQueries[issue.id] || ""}
+                      selectedNip={selectedEmployee?.nip || ""}
+                      employees={pegawaiList}
+                      onChange={(value) => {
+                        setAssetQueries((previous) => ({ ...previous, [issue.id]: value }));
+                        setAssetSelections((previous) => ({ ...previous, [issue.id]: undefined }));
+                      }}
+                      onSelect={(employee) => {
+                        setAssetSelections((previous) => ({ ...previous, [issue.id]: employee || undefined }));
+                        if (employee) setAssetQueries((previous) => ({ ...previous, [issue.id]: employee.nama }));
+                      }}
+                      placeholder="Cari nama, NIP, atau jabatan pegawai..."
+                    />
                   </div>
                   {canEdit ? (
                     <button
-                      disabled={isBusy}
-                      onClick={() =>
-                        setConfirmState({
-                          open: true,
-                          title: "Terapkan Koreksi Nama Aset",
-                          message: `Ubah nama pengguna pada ${issue.sheetLabel} (${issue.assetLabel}) dari:\n"${issue.currentHolder}"\n\nmenjadi:\n"${issue.matchedNama}"\n\nPastikan ini benar-benar orang yang sama sebelum menerapkan.`,
-                          confirmLabel: "Ya, Terapkan",
-                          confirmClass: "bg-indigo-600 hover:bg-indigo-700",
-                          onConfirm: () => applyAssetFix(issue),
-                        })
-                      }
-                      className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors"
+                      disabled={isBusy || !selectedEmployee?.nip}
+                      onClick={() => setConfirmState({
+                        open: true,
+                        title: "Hubungkan Nama Pengguna",
+                        message: `Hubungkan pengguna pada ${issue.sheetLabel} (${issue.assetLabel}) dari:\n"${issue.currentHolder}"\n\ndengan pegawai:\n"${selectedEmployee?.nama}"\nNIP ${selectedEmployee?.nip}\nJabatan: ${selectedEmployee?.jabatan || "Belum tersedia"}\n\nPastikan orangnya benar sebelum menyimpan.`,
+                        confirmLabel: "Ya, Hubungkan",
+                        confirmClass: "bg-indigo-600 hover:bg-indigo-700",
+                        onConfirm: () => applyAssetFix(issue),
+                      })}
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors"
                     >
                       {isBusy ? <RefreshCw size={12} className="animate-spin" /> : <Check size={12} />}
-                      Terapkan
+                      Hubungkan
                     </button>
                   ) : (
-                    <span className="text-xs text-gray-400 italic shrink-0">Manual (perlu admin/pimpinan)</span>
+                    <span className="text-xs text-gray-400 italic shrink-0">Perlu admin/pimpinan</span>
                   )}
                 </div>
               );

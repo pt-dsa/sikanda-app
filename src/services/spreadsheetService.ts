@@ -123,6 +123,25 @@ function matchAssets(nama: string, byExact: Map<string, any[]>, byFuzzy: Map<str
   return { items: [] as any[], via: "none" as const };
 }
 
+function buildNipLookup(assets: any[]): Map<string, any[]> {
+  const byNip = new Map<string, any[]>();
+  for (const asset of assets) {
+    const nip = String(asset.pengguna_nip || "").trim();
+    if (!nip) continue;
+    const rows = byNip.get(nip) || [];
+    rows.push(asset);
+    byNip.set(nip, rows);
+  }
+  return byNip;
+}
+
+function matchAssetsByNip(nip: string, byNip: Map<string, any[]>) {
+  const key = String(nip || "").trim();
+  return key && byNip.has(key)
+    ? { items: byNip.get(key)!, via: "exact" as const }
+    : { items: [] as any[], via: "none" as const };
+}
+
 function locationTypeMatches(value: unknown, expected: "vehicle" | "equipment"): boolean {
   const type = String(value || "").trim().toLowerCase().replace(/[_-]+/g, " ");
   if (!type) return true;
@@ -275,7 +294,7 @@ export const spreadsheetService = {
   async saveVehicle(data: Partial<any>, isNew: boolean) {
     const allowed = [
       'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
-      'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
+      'pengguna_nip', 'penanggung_jawab', 'penanggung_jawab_nip', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
       'no_polisi', 'tipe', 'jenis_kendaraan', 'km_kendaraan', 'unit_kerja',
       'kapasitas_mesin', 'no_bpkb', 'no_rangka', 'no_mesin',
       'harga_pembelian', 'qr_url'
@@ -295,7 +314,7 @@ export const spreadsheetService = {
   async saveEquipment(data: Partial<any>, isNew: boolean) {
     const allowed = [
       'asset_id', 'kode_barang', 'nama_aset', 'merk', 'tahun', 'pengguna',
-      'penanggung_jawab', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
+      'pengguna_nip', 'penanggung_jawab', 'penanggung_jawab_nip', 'lokasi', 'kondisi', 'foto', 'latitude', 'longitude',
       'jenis', 'jumlah', 'satuan', 'harga_pembelian', 'qr_url', 'opd',
       'kib_index', 'unit_indexes', 'register_barang', 'spesifikasi', 'bidang',
       'mutasi', 'dokumentasi', 'dokumentasi_primary_id'
@@ -384,7 +403,7 @@ export const spreadsheetService = {
         : coordinatePairFromRow(locationLookup.get(assetId) || {});
       return {
         asset_id: assetId,
-        kode_barang: resolveVehicleItemCode(item),
+        kode_barang: String(resolveVehicleItemCode(item) || ""),
         nama_aset: item.asset_name || item.nama_aset || item.asset_category || "Kendaraan Dinas",
         no_polisi,
         merk: item.brand || item.merk || "",
@@ -392,7 +411,11 @@ export const spreadsheetService = {
         tahun: item.purchase_year || item.tahun || "",
         jenis_kendaraan: item.asset_category || item.jenis_kendaraan || item.nama_aset,
         pengguna: item.holder_name || item.pengguna || "",
+        pengguna_nip: String(item.pengguna_nip || ""),
+        pengguna_raw: item.pengguna_raw || item.holder_name || item.pengguna || "",
+        pengguna_match_status: item.pengguna_match_status || (item.pengguna_nip ? "matched" : "unmatched"),
         penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
+        penanggung_jawab_nip: String(item.penanggung_jawab_nip || ""),
         lokasi: item.usage || item.lokasi || item.unit_kerja || "",
         unit_kerja: item.usage || item.unit_kerja || item.lokasi || "",
         // Jangan pernah menganggap kondisi kosong sebagai BAIK. Data legacy kosong
@@ -409,9 +432,9 @@ export const spreadsheetService = {
         foto,
         qr_url: item.qr_legacy_url || item.qr_url,
         opd: item.opd || "",
-        kib_index: item.kib_index || "",
-        unit_indexes: Array.isArray(item.unit_indexes) ? item.unit_indexes : [],
-        register_barang: item.register_barang || "",
+        kib_index: String(item.kib_index || ""),
+        unit_indexes: Array.isArray(item.unit_indexes) ? item.unit_indexes.map((value: unknown) => String(value)) : [],
+        register_barang: String(item.register_barang || ""),
         spesifikasi: item.spesifikasi || "",
         bidang: item.bidang || "",
         mutasi: item.mutasi || "",
@@ -436,7 +459,7 @@ export const spreadsheetService = {
       return {
         ...item,
         asset_id: assetId,
-        kode_barang: item.asset_code || item.kode_barang || "",
+        kode_barang: String(item.asset_code || item.kode_barang || ""),
         nama_aset: item.asset_name || item.nama_aset || "",
         merk: item.brand || item.merk || "",
         jenis: item.asset_category || item.jenis || "",
@@ -444,7 +467,11 @@ export const spreadsheetService = {
         satuan: item.unit || item.satuan || "Unit",
         tahun: item.purchase_year ?? item.tahun ?? "",
         pengguna: item.holder_name || item.pengguna || "",
+        pengguna_nip: String(item.pengguna_nip || ""),
+        pengguna_raw: item.pengguna_raw || item.holder_name || item.pengguna || "",
+        pengguna_match_status: item.pengguna_match_status || (item.pengguna_nip ? "matched" : "unmatched"),
         penanggung_jawab: item.person_in_charge || item.penanggung_jawab || "",
+        penanggung_jawab_nip: String(item.penanggung_jawab_nip || ""),
         lokasi: item.location || item.lokasi || "",
         kondisi: String(item.condition || item.kondisi || "").trim().toUpperCase(),
         harga_pembelian: item.acquisition_price ?? item.harga_pembelian ?? "",
@@ -452,6 +479,9 @@ export const spreadsheetService = {
         longitude: coordinates.longitude,
         foto: item.photo_legacy || item.foto || item.photo,
         qr_url: item.qr_legacy_url || item.qr_url,
+        kib_index: String(item.kib_index || item.index || ""),
+        unit_indexes: Array.isArray(item.unit_indexes) ? item.unit_indexes.map((value: unknown) => String(value)) : [],
+        register_barang: String(item.register_barang || ""),
       };
     });
   },
@@ -487,8 +517,8 @@ export const spreadsheetService = {
         return [];
       }
 
-      const vMaps = buildLookupMaps(vehicles);
-      const eMaps = buildLookupMaps(equipment);
+      const vehiclesByEmployeeNip = buildNipLookup(vehicles);
+      const equipmentByEmployeeNip = buildNipLookup(equipment);
 
       const mapped = rawPegawai.map((item: any) => {
         // ── ROBUST: coba beberapa varian nama kolom ──
@@ -514,8 +544,8 @@ export const spreadsheetService = {
           ""
         ).trim();
 
-        const vMatch = matchAssets(nama, vMaps.byExact, vMaps.byFuzzy);
-        const eMatch = matchAssets(nama, eMaps.byExact, eMaps.byFuzzy);
+        const vMatch = matchAssetsByNip(nip, vehiclesByEmployeeNip);
+        const eMatch = matchAssetsByNip(nip, equipmentByEmployeeNip);
         const allAssets = [...vMatch.items, ...eMatch.items];
         const RANK = { exact: 2, fuzzy: 1, none: 0 };
         const bestQ = [vMatch.via, eMatch.via].reduce(

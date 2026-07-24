@@ -33,14 +33,6 @@ export default defineConfig(() => {
               ) {
                 return 'vendor-charts';
               }
-              // Firebase Auth (hanya untuk Login/Google Sign-In) → chunk terpisah
-              // agar tidak membebani entry utama yang dimuat sebelum login.
-              if (
-                id.includes('node_modules/firebase') ||
-                id.includes('node_modules/@firebase')
-              ) {
-                return 'vendor-firebase';
-              }
               // Inti React (selalu termuat) → satu chunk vendor stabil.
               if (
                 id.includes('node_modules/react-router') ||

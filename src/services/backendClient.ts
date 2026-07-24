@@ -1,5 +1,11 @@
 import { APPS_SCRIPT_URL, isBackendConfigured } from "@/appsScriptConfig";
-import { getFirebaseIdToken } from "@/lib/firebase";
+import {
+  clearAuthSession,
+  readAuthSession,
+  saveAuthSession,
+  sessionNeedsRefresh,
+  type AuthSession,
+} from "@/lib/authSession";
 import {
   beginLoadingTask,
   completeLoadingTask,
@@ -8,15 +14,78 @@ import {
 } from "@/lib/loadingProgress";
 
 export type BackendPayload = Record<string, any>;
-export type BackendAuth = { idToken?: string };
+export type BackendAuth = { accessToken?: string };
+
+function invalidateBrowserSession(message: string): void {
+  if (!/(sesi|akun dinonaktifkan|belum terhubung|belum menyelesaikan registrasi|identitas akun)/i.test(message)) return;
+  clearAuthSession();
+  window.dispatchEvent(new CustomEvent("sikanda:auth-invalid"));
+}
 
 async function buildAuth(explicitAuth?: BackendAuth): Promise<BackendAuth> {
-  if (explicitAuth?.idToken) return { idToken: explicitAuth.idToken };
-  const idToken = await getFirebaseIdToken();
-  if (!idToken) {
-    throw new Error("Sesi login tidak ditemukan atau sudah kedaluwarsa. Silakan masuk ulang dengan Google.");
+  if (explicitAuth?.accessToken) return { accessToken: explicitAuth.accessToken };
+  let session = readAuthSession();
+  if (!session) throw new Error("Sesi login tidak ditemukan. Silakan masuk kembali.");
+  if (sessionNeedsRefresh(session)) session = await refreshSession(session);
+  return { accessToken: session.accessToken };
+}
+
+let refreshPromise: Promise<AuthSession> | null = null;
+
+async function refreshSession(current: AuthSession): Promise<AuthSession> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const result = await fetchBackendJson({ action: "auth_refresh", refreshToken: current.refreshToken }, 30_000);
+      const next: AuthSession = {
+        accessToken: String(result.session?.access_token || ""),
+        refreshToken: String(result.session?.refresh_token || ""),
+        expiresAt: Number(result.session?.expires_at || 0),
+      };
+      if (!next.accessToken || !next.refreshToken || !next.expiresAt) throw new Error("Sesi tidak dapat diperbarui.");
+      saveAuthSession(next);
+      return next;
+    } catch (error) {
+      clearAuthSession();
+      window.dispatchEvent(new CustomEvent("sikanda:auth-invalid"));
+      throw error;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+async function fetchBackendJson(payload: BackendPayload, timeoutMs: number): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    let json: any;
+    try {
+      json = await response.json();
+    } catch {
+      throw new Error("Jawaban layanan SIKANDA tidak dapat dibaca. Silakan coba lagi.");
+    }
+    if (!json || json.ok !== true) {
+      const suffix = json?.request_id ? ` (ID: ${json.request_id})` : "";
+      throw new Error(((json && json.error) || "Operasi gagal di server SIKANDA.") + suffix);
+    }
+    return json;
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Server SIKANDA belum merespons dalam ${Math.round(timeoutMs / 1000)} detik.`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-  return { idToken };
 }
 
 let pendingRequests = 0;
@@ -60,7 +129,7 @@ export async function callBackend<T = any>(
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const timeoutMs = retryable.has(action) ? (attempt === 0 ? 25_000 : 40_000) : 45_000;
+    const timeoutMs = retryable.has(action) ? (attempt === 0 ? 30_000 : 60_000) : 60_000;
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -82,7 +151,9 @@ export async function callBackend<T = any>(
       updateLoadingTask(requestId, 92, "Menyiapkan tampilan");
       if (!json || json.ok !== true) {
         const suffix = json?.request_id ? ` (ID: ${json.request_id})` : ` (ID: ${requestId})`;
-        throw new Error(((json && json.error) || "Operasi gagal di server SIKANDA.") + suffix);
+        const message = String((json && json.error) || "Operasi gagal di server SIKANDA.");
+        invalidateBrowserSession(message);
+        throw new Error(message + suffix);
       }
       completeLoadingTask(requestId);
       return json as T;
@@ -107,6 +178,14 @@ export async function callBackend<T = any>(
   } finally {
     releaseConcurrencySlot();
   }
+}
+
+export async function callPublicBackend<T = any>(payload: BackendPayload): Promise<T> {
+  if (!isBackendConfigured()) {
+    throw new Error("Layanan SIKANDA belum siap digunakan. Silakan hubungi administrator.");
+  }
+  const requestId = globalThis.crypto?.randomUUID?.() || `public-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return fetchBackendJson({ ...payload, requestId }, 45_000) as Promise<T>;
 }
 
 export type SupabaseFilter = {

@@ -1,9 +1,13 @@
-name: Deploy SIKANDA Production ke Firebase Hosting
+name: Firebase Hosting (Manual Saat Domain Resmi Siap)
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
+    inputs:
+      deploy_live:
+        description: "Deploy ke Firebase live (aktifkan hanya setelah domain resmi dan secret siap)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,20 +37,19 @@ jobs:
         run: npm run verify
         env:
           VITE_APPS_SCRIPT_URL: ${{ secrets.VITE_APPS_SCRIPT_URL }}
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
 
       - name: Audit dependensi produksi
         run: npm audit --omit=dev --audit-level=high
 
       - name: Deploy live
+        if: ${{ inputs.deploy_live == true }}
         uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SIKANDA }}
           channelId: live
-          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          projectId: ${{ secrets.FIREBASE_HOSTING_PROJECT_ID }}
+
+      - name: Informasi penundaan deploy
+        if: ${{ inputs.deploy_live != true }}
+        run: echo "Verifikasi selesai. Deploy Firebase tidak dijalankan karena domain resmi belum siap."

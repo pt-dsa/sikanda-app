@@ -14,7 +14,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
-import { EmployeeAutocomplete, isOfficialEmployeeName } from "@/components/ui/EmployeeAutocomplete";
+import { EmployeeAutocomplete, isOfficialEmployeeSelection } from "@/components/ui/EmployeeAutocomplete";
 import { KibImportModal } from "@/components/equipment/KibImportModal";
 import { AssetMediaFields } from "@/components/ui/AssetMediaFields";
 import { apiService, fileToBase64 } from "@/services/apiService";
@@ -22,6 +22,7 @@ import { SafeImage } from "@/components/ui/SafeImage";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import { AuthContext } from "@/components/layout/AppShell";
 import { can } from "@/lib/rbac";
+import { toSearchText } from "@/lib/utils";
 import { optionalCoordinatePayload } from "@/lib/coordinates";
 import { normalizeAssetText, optionalAssetNumber, validOptionalAssetNumber } from "@/lib/assetFields";
 import {
@@ -165,7 +166,7 @@ export default function AlatMesin() {
           const idsToUpdate = new Set(selectedRows.map(r => r.asset_id));
           setData(prev => prev.map(item => idsToUpdate.has(item.asset_id) ? { ...item, kondisi: newStatus } : item));
           setSelectedRows([]);
-          toast.success("Status Diperbarui", `${selectedRows.length} data alat & mesin berhasil diperbarui.`);
+          toast.success("Status Diperbarui", `${selectedRows.length} data inventaris berhasil diperbarui.`);
         } catch (err: any) {
           toast.error("Gagal Memperbarui", err.message);
           load();
@@ -181,8 +182,9 @@ export default function AlatMesin() {
       toast.warning("Data Belum Lengkap", "Kode Barang, Nama Barang, dan Merk wajib diisi.");
       return;
     }
-    if (!isOfficialEmployeeName(formData.penanggung_jawab, employees)) {
-      toast.error("Nama Pegawai Tidak Valid", "Penanggung Jawab harus dipilih dari daftar pegawai. Pengguna boleh mengikuti NAMA PEMEGANG pada KIB B.");
+    if (!isOfficialEmployeeSelection(formData.pengguna, formData.pengguna_nip, employees)
+      || !isOfficialEmployeeSelection(formData.penanggung_jawab, formData.penanggung_jawab_nip, employees)) {
+      toast.error("Nama Pegawai Tidak Valid", "Pengguna dan Penanggung Jawab harus dipilih dari daftar Data ASN / PPPK.");
       return;
     }
     const coordinateResult = optionalCoordinatePayload(formData.latitude, formData.longitude);
@@ -226,7 +228,9 @@ export default function AlatMesin() {
       jenis: normalizeAssetText(formData.jenis),
       tahun: optionalAssetNumber(formData.tahun),
       pengguna: normalizeAssetText(formData.pengguna),
+      pengguna_nip: normalizeAssetText(formData.pengguna_nip),
       penanggung_jawab: normalizeAssetText(formData.penanggung_jawab),
+      penanggung_jawab_nip: normalizeAssetText(formData.penanggung_jawab_nip),
       lokasi: normalizeAssetText(formData.lokasi),
       jumlah: optionalAssetNumber(formData.jumlah) || 1,
       satuan: normalizeAssetText(formData.satuan) || "Unit",
@@ -284,7 +288,7 @@ export default function AlatMesin() {
       spreadsheetService.clearCache();
       await load();
       if (failedAttachments.length) toast.warning("Data Tersimpan, Sebagian Lampiran Gagal", failedAttachments.join(" · "));
-      else toast.success(isNew ? "Data Alat & Mesin Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data alat & mesin, koordinat, dan media telah tersimpan." : "Perubahan data alat & mesin telah tersimpan dan tervalidasi.");
+      else toast.success(isNew ? "Data Inventaris Berhasil Ditambahkan" : "Perubahan Data Berhasil Disimpan", isNew ? "Data inventaris, koordinat, dan media telah tersimpan." : "Perubahan data inventaris telah tersimpan dan tervalidasi.");
     } catch (err: any) {
       toast.error("Gagal Menyimpan", err.message);
       await load();
@@ -316,28 +320,26 @@ export default function AlatMesin() {
 
 
   const filteredData = useMemo(() => {
+    const query = toSearchText(search).trim();
     return data.filter(item => {
-      const matchSearch = search ? (
-        item.nama_aset?.toLowerCase().includes(search.toLowerCase()) ||
-        item.merk?.toLowerCase().includes(search.toLowerCase()) ||
-        item.jenis?.toLowerCase().includes(search.toLowerCase()) ||
-        item.pengguna?.toLowerCase().includes(search.toLowerCase()) ||
-        item.penanggung_jawab?.toLowerCase().includes(search.toLowerCase()) ||
-        item.kode_barang?.toLowerCase().includes(search.toLowerCase()) ||
-        item.kib_index?.toLowerCase().includes(search.toLowerCase()) ||
-        item.bidang?.toLowerCase().includes(search.toLowerCase()) ||
-        item.spesifikasi?.toLowerCase().includes(search.toLowerCase())
-      ) : true;
-      const matchJenis = filterJenis ? String(item.jenis || "").toLowerCase() === String(filterJenis || "").toLowerCase() : true;
+      const matchSearch = !query || [
+        item.nama_aset, item.merk, item.jenis, item.pengguna,
+        item.penanggung_jawab, item.kode_barang, item.kib_index,
+        item.bidang, item.spesifikasi,
+      ].some((value) => toSearchText(value).includes(query));
+      const matchJenis = filterJenis ? toSearchText(item.jenis) === toSearchText(filterJenis) : true;
       const matchKondisi = filterKondisi ? canonKey(assetConditionLabel(item.kondisi)) === canonKey(filterKondisi) : true;
       const matchTahun = filterTahun ? String(item.tahun || "") === filterTahun : true;
-      const indexes = [item.kib_index, ...(Array.isArray(item.unit_indexes) ? item.unit_indexes : [])].filter(Boolean).join(" ").toLowerCase();
-      const matchIndex = filterIndex ? indexes.includes(filterIndex.toLowerCase().trim()) : true;
+      const indexes = [item.kib_index, ...(Array.isArray(item.unit_indexes) ? item.unit_indexes : [])]
+        .map(toSearchText).filter(Boolean).join(" ");
+      const matchIndex = filterIndex ? indexes.includes(toSearchText(filterIndex).trim()) : true;
       const matchBidang = filterBidang ? canonKey(item.bidang) === canonKey(filterBidang) : true;
       const matchPengguna = filterPengguna ? canonKey(item.pengguna) === canonKey(filterPengguna) : true;
       return matchSearch && matchJenis && matchKondisi && matchTahun && matchIndex && matchBidang && matchPengguna;
     });
   }, [data, search, filterJenis, filterKondisi, filterTahun, filterIndex, filterBidang, filterPengguna]);
+
+  const hasActiveFilters = Boolean(search || filterJenis || filterKondisi || filterTahun || filterIndex || filterBidang || filterPengguna);
 
   // Empat kondisi resmi selalu tampil, termasuk saat jumlahnya nol. Data kosong
   // dipisahkan sebagai peringatan kualitas data, bukan kondisi alat/mesin.
@@ -479,12 +481,12 @@ export default function AlatMesin() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Data Alat & Mesin</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Data Inventaris</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Manajemen master data alat berat dan permesinan daerah</p>
         </div>
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
           <div className="col-span-2 sm:col-span-1 flex items-center justify-center min-h-10 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded-full">
-            Total: {filteredData.length} Aset
+            {hasActiveFilters ? `Hasil filter: ${filteredData.length} aset` : `Total: ${data.length} aset`}
           </div>
           <button
             type="button"
@@ -514,7 +516,7 @@ export default function AlatMesin() {
 
       <SummaryCards
         items={kondisiSummary.items}
-        totalLabel="Total Alat & Mesin"
+        totalLabel="Total Inventaris"
         totalCount={data.length}
         activeKey={canonKey(filterKondisi)}
         onSelect={(key) => setFilterKondisi(key)}
@@ -535,7 +537,7 @@ export default function AlatMesin() {
             <AlertCircle size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>
               <span className="block text-sm font-extrabold text-amber-900 dark:text-amber-200">
-                {kondisiSummary.unset} alat & mesin belum memiliki data kondisi
+                {kondisiSummary.unset} inventaris belum memiliki data kondisi
               </span>
               <span className="block text-xs text-amber-700 dark:text-amber-300">
                 Nilai ini tidak dimasukkan ke empat card kondisi. Verifikasi melalui form edit atau Data Cleansing.
@@ -622,7 +624,7 @@ export default function AlatMesin() {
       <DetailModal 
         isOpen={!!selectedItem} 
         onClose={() => setSelectedItem(null)} 
-        title="Detail Alat & Mesin" 
+        title="Detail Inventaris" 
         data={selectedItem ? {
           "ID Aset": selectedItem.asset_id,
           "Kode Barang": selectedItem.kode_barang,
@@ -647,7 +649,7 @@ export default function AlatMesin() {
         {selectedItem && (
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex flex-col items-center gap-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Foto Alat & Mesin</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Foto Inventaris</span>
               <div className="w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center relative group">
                 {(() => {
                   const primaryGalleryPhoto = Array.isArray(selectedItem.dokumentasi) ? selectedItem.dokumentasi.find((doc: any) => doc.id === selectedItem.dokumentasi_primary_id || doc.is_primary)?.url : "";
@@ -770,7 +772,7 @@ export default function AlatMesin() {
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-none sm:rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[100dvh] sm:max-h-[90dvh] animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
               <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
-                {formData.asset_id || (formData as any).id ? "Edit Alat & Mesin" : "Tambah Alat & Mesin"}
+                {formData.asset_id || (formData as any).id ? "Edit Inventaris" : "Tambah Inventaris"}
               </h3>
               <button 
                 onClick={() => setIsEditing(false)}
@@ -841,12 +843,26 @@ export default function AlatMesin() {
                   <p className="text-[11px] text-gray-400">Jumlah INDEX yang diisi tidak mengubah total Jumlah barang.</p>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Pengguna / Nama Pemegang</label>
-                  <input list="equipment-users" value={String(formData.pengguna || "")} onChange={(e) => setFormData({ ...formData, pengguna: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-transparent text-sm" placeholder="Nama pegawai atau unit sesuai KIB B" />
-                  <datalist id="equipment-users">{employees.map((employee) => <option key={employee.nip} value={employee.nama}/>)}</datalist>
+                  <EmployeeAutocomplete
+                    label="Pengguna / Nama Pemegang"
+                    value={String(formData.pengguna || "")}
+                    selectedNip={String(formData.pengguna_nip || "")}
+                    employees={employees}
+                    onChange={(pengguna) => setFormData((previous) => ({ ...previous, pengguna, pengguna_nip: "" }))}
+                    onSelect={(employee) => employee && setFormData((previous) => ({ ...previous, pengguna: employee.nama, pengguna_nip: employee.nip }))}
+                    placeholder="Cari nama, NIP, atau jabatan pegawai..."
+                  />
                 </div>
                 <div className="md:col-span-2">
-                  <EmployeeAutocomplete label="Penanggung Jawab" value={String(formData.penanggung_jawab || "")} employees={employees} onChange={(penanggung_jawab) => setFormData({ ...formData, penanggung_jawab })} placeholder="Ketik nama penanggung jawab..." />
+                  <EmployeeAutocomplete
+                    label="Penanggung Jawab"
+                    value={String(formData.penanggung_jawab || "")}
+                    selectedNip={String(formData.penanggung_jawab_nip || "")}
+                    employees={employees}
+                    onChange={(penanggung_jawab) => setFormData((previous) => ({ ...previous, penanggung_jawab, penanggung_jawab_nip: "" }))}
+                    onSelect={(employee) => employee && setFormData((previous) => ({ ...previous, penanggung_jawab: employee.nama, penanggung_jawab_nip: employee.nip }))}
+                    placeholder="Cari nama, NIP, atau jabatan pegawai..."
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500">Kondisi {!formData.asset_id && <span className="text-red-500">*</span>}</label>
@@ -877,7 +893,7 @@ export default function AlatMesin() {
                   onCoordinatesChange={(latitude, longitude) => setFormData({ ...formData, latitude, longitude })}
                   onFileChange={setPhotoFile}
                   onError={(message) => toast.error("Lokasi/Media Belum Siap", message)}
-                  photoLabel="Foto Alat & Mesin"
+                  photoLabel="Foto Inventaris"
                   autoLocate={!formData.asset_id}
                 />
                 <div className="md:col-span-2 space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-700">

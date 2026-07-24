@@ -9,7 +9,6 @@ import { SafeImage } from "@/components/ui/SafeImage";
 import { Car, Bike, Wrench, MapPin, Eye, Map as MapIcon, Layers, Radio, ZoomIn, X, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { renderToString } from "react-dom/server";
 import { StatusBadge } from "@/components/ui/Badge";
-import { nameSimilarity, normalizeNamaForMatch } from "@/lib/cleansing";
 import { resolveAssetPhotoCandidates, resolveAssetPhotoUrl } from "@/lib/media";
 import type { Pegawai } from "@/types";
 import { coordinatePairFromRow } from "@/lib/coordinates";
@@ -25,7 +24,7 @@ L.Icon.Default.mergeOptions({
 
 interface MapLocation {
   id: string;
-  type: string; // 'Kendaraan' atau 'Alat & Mesin'
+  type: string; // 'Kendaraan' atau 'Inventaris'
   lat: number;
   lng: number;
   title: string;
@@ -68,21 +67,17 @@ function MapResizeSync() {
   return null;
 }
 
-function canonicalEmployeeName(raw: unknown, employees: Pegawai[]): string {
+function canonicalEmployeeName(raw: unknown, nip: unknown, employees: Pegawai[]): string {
   const source = String(raw || "").trim();
   if (!source || source === "-") return "";
-  const norm = normalizeNamaForMatch(source);
-  const exact = employees.find((employee) => normalizeNamaForMatch(employee.nama) === norm);
-  if (exact) return exact.nama;
-  const ranked = employees
-    .map((employee) => ({ employee, score: nameSimilarity(norm, normalizeNamaForMatch(employee.nama)) }))
-    .sort((a, b) => b.score - a.score);
-  if (ranked[0] && ranked[0].score >= 0.86 && (!ranked[1] || ranked[0].score - ranked[1].score >= 0.06)) return ranked[0].employee.nama;
+  const employeeNip = String(nip || "").trim();
+  const linked = employeeNip && employees.find((employee) => String(employee.nip || "").trim() === employeeNip);
+  if (linked) return linked.nama;
   return source;
 }
 
 function assetPhotoUrl(photo: unknown, type: string): string {
-  return resolveAssetPhotoUrl(photo, type === "Alat & Mesin" ? "alat_mesin" : "kendaraan");
+  return resolveAssetPhotoUrl(photo, type === "Inventaris" ? "alat_mesin" : "kendaraan");
 }
 
 export default function PetaSebaran() {
@@ -128,7 +123,7 @@ export default function PetaSebaran() {
               subtitle: `${v.merk || ""} - ${v.jenis_kendaraan || ""}`,
               condition: assetConditionLabel(v.kondisi),
               isMotorcycle: isMotor,
-              pengguna: canonicalEmployeeName(v.pengguna, employeeDirectory),
+              pengguna: canonicalEmployeeName(v.pengguna, v.pengguna_nip, employeeDirectory),
               qrUrl: v.qr_url,
               foto: v.foto,
               data: {
@@ -137,8 +132,8 @@ export default function PetaSebaran() {
                 "Merk": v.merk,
                 "Tipe": v.tipe,
                 "Tahun": v.tahun,
-                "Pengguna": canonicalEmployeeName(v.pengguna, employeeDirectory),
-                "Penanggung Jawab": canonicalEmployeeName(v.penanggung_jawab, employeeDirectory),
+                "Pengguna": canonicalEmployeeName(v.pengguna, v.pengguna_nip, employeeDirectory),
+                "Penanggung Jawab": canonicalEmployeeName(v.penanggung_jawab, v.penanggung_jawab_nip, employeeDirectory),
                 "Unit Kerja": v.unit_kerja,
                 "Lokasi / Unit": v.lokasi || v.unit_kerja,
                 "Koordinat": `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
@@ -159,13 +154,13 @@ export default function PetaSebaran() {
           if (lat !== undefined && lng !== undefined) {
             mapLocations.push({
               id: String(e.asset_id || e.id || `equipment-${index}`),
-              type: "Alat & Mesin",
+              type: "Inventaris",
               lat, 
               lng,
-              title: e.nama_aset || "Alat & Mesin",
+              title: e.nama_aset || "Inventaris",
               subtitle: e.merk || "-",
               condition: assetConditionLabel(e.kondisi),
-              pengguna: canonicalEmployeeName(e.pengguna, employeeDirectory),
+              pengguna: canonicalEmployeeName(e.pengguna, e.pengguna_nip, employeeDirectory),
               qrUrl: e.qr_url,
               foto: e.foto,
               data: {
@@ -178,8 +173,8 @@ export default function PetaSebaran() {
                 "Jumlah": e.jumlah ? `${e.jumlah} ${e.satuan || ''}` : '',
                 "Kondisi": assetConditionLabel(e.kondisi),
                 "Tahun": e.tahun,
-                "Pengguna": canonicalEmployeeName(e.pengguna, employeeDirectory),
-                "Penanggung Jawab": canonicalEmployeeName(e.penanggung_jawab, employeeDirectory),
+                "Pengguna": canonicalEmployeeName(e.pengguna, e.pengguna_nip, employeeDirectory),
+                "Penanggung Jawab": canonicalEmployeeName(e.penanggung_jawab, e.penanggung_jawab_nip, employeeDirectory),
                 "Lokasi / Unit": e.lokasi,
                 "Koordinat": `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
                 "Harga Pembelian": e.harga_pembelian,
@@ -197,21 +192,19 @@ export default function PetaSebaran() {
   }, []);
 
   const filteredLocations = useMemo(() => {
+    const query = String(searchQuery || "").toLocaleLowerCase("id-ID");
     return locations.filter(loc => {
       const matchType = filterType === "Semua Tipe" || loc.type === filterType;
-      const matchCond = filterCondition === "Semua Kondisi" || loc.condition.toUpperCase() === filterCondition.toUpperCase();
-      const matchSearch = searchQuery === "" || 
-        loc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        loc.subtitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(loc.pengguna || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        Object.values(loc.data).some((value) => String(value || "").toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchCond = filterCondition === "Semua Kondisi" || String(loc.condition || "").toUpperCase() === String(filterCondition || "").toUpperCase();
+      const matchSearch = !query || [loc.title, loc.subtitle, loc.pengguna, ...Object.values(loc.data)]
+        .some((value) => String(value ?? "").toLocaleLowerCase("id-ID").includes(query));
       return matchType && matchCond && matchSearch;
     });
   }, [locations, filterType, filterCondition, searchQuery]);
 
   // Jumlah titik per tipe atas SELURUH lokasi (untuk chip klikable → filterType).
   const typeSummary = useMemo(() => {
-    const order = ["Kendaraan", "Alat & Mesin"];
+    const order = ["Kendaraan", "Inventaris"];
     const counts: Record<string, number> = {};
     locations.forEach((l) => { counts[l.type] = (counts[l.type] || 0) + 1; });
     const keys = Array.from(new Set([...order.filter((k) => counts[k]), ...Object.keys(counts)]));
@@ -253,7 +246,7 @@ export default function PetaSebaran() {
     ? [filteredLocations[0].lat, filteredLocations[0].lng]
     : [-6.2866, 106.6888]; // default to area info
 
-  const getMarkerIcon = (loc: MapLocation) => loc.type === "Alat & Mesin"
+  const getMarkerIcon = (loc: MapLocation) => loc.type === "Inventaris"
     ? markerIcons.equipment
     : (loc.isMotorcycle ? markerIcons.motorcycle : markerIcons.car);
 
@@ -330,7 +323,7 @@ export default function PetaSebaran() {
             >
               <option value="Semua Tipe">Jenis Aset</option>
               <option value="Kendaraan">Kendaraan</option>
-              <option value="Alat & Mesin">Alat & Mesin</option>
+              <option value="Inventaris">Inventaris</option>
             </select>
             <select 
               value={filterCondition} 
@@ -396,7 +389,7 @@ export default function PetaSebaran() {
                     >
                       <SafeImage 
                         src={assetPhotoUrl(item.foto, item.type)} 
-                        fallbackSrcs={resolveAssetPhotoCandidates(item.foto, item.type === "Alat & Mesin" ? "alat_mesin" : "kendaraan").slice(1)}
+                        fallbackSrcs={resolveAssetPhotoCandidates(item.foto, item.type === "Inventaris" ? "alat_mesin" : "kendaraan").slice(1)}
                         alt={item.title} 
                         className="w-full h-full object-contain bg-gray-900 group-hover:scale-105 transition-transform duration-300"
                       />
@@ -486,9 +479,9 @@ export default function PetaSebaran() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-6 h-6 rounded-full bg-[#16A34A] flex items-center justify-center text-white ring-2 ring-white dark:ring-gray-900 shadow-sm"><Wrench size={12} /></div>
-                    <span className="text-gray-700 dark:text-gray-300">Alat & Mesin</span>
+                    <span className="text-gray-700 dark:text-gray-300">Inventaris</span>
                   </div>
-                  <span className="font-bold text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{stats['Alat & Mesin'] || 0}</span>
+                  <span className="font-bold text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-md">{stats['Inventaris'] || 0}</span>
                 </div>
               </div>
               

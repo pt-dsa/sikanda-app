@@ -11,10 +11,21 @@ const csv = [KIB_B_HEADERS.join(","), row.join(","), row.join(","), indexed.join
 const result = await prepareKibImport(csv, [{ kode_barang: "132100203003", nama_aset: "Printer", merk: "Lama", tahun: "2024" }]);
 assert.equal(result.sourceRows, 3);
 assert.equal(result.sourceUnits, 3);
-assert.equal(result.records.length, 2);
-assert.equal(result.records.find((item) => !item.kib_index)?.jumlah, 2);
-assert.equal(result.aggregatedRows, 1);
-assert.equal(result.codeWarnings, 2);
+assert.equal(result.records.length, 1);
+assert.equal(result.records[0].jumlah, 3);
+assert.equal(result.records[0].kib_index, "499");
+assert.deepEqual(result.records[0].unit_indexes, []);
+assert.equal(result.aggregatedRows, 2);
+assert.equal(result.codeWarnings, 1);
 assert.equal(result.exactDuplicates, 0);
 assert.equal(result.invalid.length, 0);
+
+const indexed500 = [...indexed]; indexed500[1] = "500";
+const indexed501 = [...indexed]; indexed501[1] = "501";
+const indexedCsv = [KIB_B_HEADERS.join(","), indexed.join(","), indexed500.join(","), indexed501.join(",")].join("\n");
+const indexedResult = await prepareKibImport(indexedCsv, []);
+assert.equal(indexedResult.records.length, 1, "barang identik dengan INDEX berbeda harus menjadi satu data");
+assert.equal(indexedResult.records[0].jumlah, 3);
+assert.equal(indexedResult.records[0].kib_index, "499");
+assert.deepEqual(indexedResult.records[0].unit_indexes, ["500", "501"]);
 console.log("revision-v1114-kib-import-tests: OK");

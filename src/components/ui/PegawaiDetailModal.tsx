@@ -468,7 +468,7 @@ export function PegawaiDetailModal({
                         <div className="flex items-center gap-2 mb-2">
                           <Wrench size={14} className="text-green-500" />
                           <h5 className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                            Alat & Mesin ({pegawai.assets_alat_mesin.length})
+                            Inventaris ({pegawai.assets_alat_mesin.length})
                           </h5>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -483,7 +483,7 @@ export function PegawaiDetailModal({
                         <div className="flex items-center gap-2 mb-2">
                           <Archive size={14} className="text-orange-500" />
                           <h5 className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                            Inventaris ({pegawai.assets_inventaris.length})
+                            Alat & Mesin ({pegawai.assets_inventaris.length})
                           </h5>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

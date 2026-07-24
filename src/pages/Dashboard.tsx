@@ -53,7 +53,7 @@ function KpiCard({ title, value, icon: Icon, colorClass, subtitle }: {
         <div className="min-w-0">
           <p className="text-sm font-extrabold text-gray-700 dark:text-gray-200 leading-snug">{title}</p>
           <h4 className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">
-            {typeof value === "number" && (title.toLowerCase().includes("pagu") || title.toLowerCase().includes("realisasi"))
+            {typeof value === "number" && (String(title).toLowerCase().includes("pagu") || String(title).toLowerCase().includes("realisasi"))
               ? formatCurrency(value) : typeof value === "number" ? formatNumber(value) : value}
           </h4>
           {subtitle && <p className="text-xs text-gray-400 mt-0.5 truncate">{subtitle}</p>}
@@ -150,10 +150,10 @@ function PegawaiSetupGuide({ errorMsg, onRetry }: { errorMsg: string; onRetry: (
             <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Langkah yang dapat dilakukan:</p>
             <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-none">
               {[
-                `Logout lalu masuk kembali dengan Google, bukan Mode Pengembangan`,
+                `Keluar lalu masuk kembali menggunakan NIP dan password`,
                 `Pastikan alamat layanan aplikasi sudah diperbarui oleh Administrator`,
                 `Pastikan konfigurasi layanan aplikasi sudah dilengkapi oleh Administrator`,
-                `Pastikan email Google sudah aktif pada Kelola Akun, lalu klik tombol "Coba Lagi"`,
+                `Pastikan akun berstatus Aktif pada Kelola Akun, lalu klik tombol "Coba Lagi"`,
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-2.5">
                   <span className="shrink-0 w-5 h-5 bg-amber-100 dark:bg-amber-800 text-amber-700 dark:text-amber-400 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
@@ -226,8 +226,8 @@ export default function Dashboard() {
             pegawaiASN: 0, pegawaiPPPK: 0, pegawaiPPPKPenuhWaktu: 0, pegawaiPPPKParuhWaktu: 0,
             peringatanKGB: 0, peringatanPangkat: 0, peringatanPensiun: 0, peringatanTerlambat: 0,
             distribusiGolongan: [], distribusiPendidikan: [], distribusiMasaKerja: [],
-            totalKendaraan: vehicles.length, totalAlatMesin: equipment.length,
-            totalInventaris: 0, totalAset: vehicles.length + equipment.length,
+            totalKendaraan: vehicles?.length || 0, totalAlatMesin: equipment?.length || 0,
+            totalInventaris: 0, totalAset: (vehicles?.length || 0) + (equipment?.length || 0),
             totalPeminjaman: 0, totalPemeliharaan: 0,
             totalPagu: 0, totalRealisasi: 0,
             persenRealisasi: 0,
@@ -388,7 +388,7 @@ export default function Dashboard() {
                       value={metrics.pegawaiDenganInventaris ?? 0}
                       icon={PackageCheck}
                       colorClass="bg-indigo-100/70 text-indigo-600"
-                      subtitle="Pegawai yang memiliki relasi kendaraan atau alat & mesin"
+                      subtitle="Pegawai yang memiliki relasi kendaraan atau inventaris"
                     />
                   </Link>
                   <Link to="/pegawai?aset=none" className="block h-full transition-transform hover:-translate-y-0.5">

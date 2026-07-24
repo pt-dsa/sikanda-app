@@ -11,7 +11,7 @@ export const ASSET_CONDITION_UNSET = "BELUM DIISI";
 
 /**
  * Definisi tunggal untuk kartu kondisi aset. Urutannya sengaja tetap agar
- * Kendaraan dan Alat & Mesin selalu menampilkan lima indikator utama yang
+ * Kendaraan dan Inventaris selalu menampilkan lima indikator utama yang
  * sama (Total + empat kondisi), termasuk ketika hitungannya nol.
  *
  * Kelas Tailwind ditulis sebagai literal agar ikut terdeteksi saat build.
@@ -108,7 +108,7 @@ export interface MissingAssetConditionIssue {
   assetLabel: string;
   holderName: string;
   kind: "vehicle" | "equipment";
-  kindLabel: "Kendaraan" | "Alat & Mesin";
+  kindLabel: "Kendaraan" | "Inventaris";
   editPath: string;
 }
 
@@ -137,7 +137,7 @@ export function scanMissingAssetConditions(
       assetLabel: [item.nama_aset, item.merk].filter(Boolean).join(" · ") || "Alat/mesin tanpa nama",
       holderName: String(item.pengguna || "").trim(),
       kind: "equipment" as const,
-      kindLabel: "Alat & Mesin" as const,
+      kindLabel: "Inventaris" as const,
       editPath: `/alat-mesin?edit=${encodeURIComponent(String(item.asset_id || ""))}`,
     }));
 

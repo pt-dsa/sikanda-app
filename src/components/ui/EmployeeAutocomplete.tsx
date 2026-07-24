@@ -7,6 +7,8 @@ interface EmployeeAutocompleteProps {
   value: string;
   employees: Pegawai[];
   onChange: (employeeName: string) => void;
+  onSelect?: (employee: Pegawai | null) => void;
+  selectedNip?: string;
   placeholder?: string;
   required?: boolean;
 }
@@ -20,11 +22,22 @@ export function isOfficialEmployeeName(value: unknown, employees: Pegawai[]): bo
   return !key || employees.some((employee) => employeeKey(employee.nama) === key);
 }
 
+export function isOfficialEmployeeSelection(name: unknown, nip: unknown, employees: Pegawai[]): boolean {
+  const expectedName = employeeKey(name);
+  const expectedNip = String(nip || "").trim();
+  if (!expectedName && !expectedNip) return true;
+  return Boolean(expectedNip) && employees.some((employee) =>
+    String(employee.nip || "").trim() === expectedNip && employeeKey(employee.nama) === expectedName
+  );
+}
+
 export function EmployeeAutocomplete({
   label,
   value,
   employees,
   onChange,
+  onSelect,
+  selectedNip = "",
   placeholder = "Ketik minimal 2 huruf nama pegawai...",
   required = false,
 }: EmployeeAutocompleteProps) {
@@ -38,8 +51,10 @@ export function EmployeeAutocomplete({
       .slice(0, 10);
   }, [employees, query]);
   const selected = useMemo(
-    () => employees.find((employee) => employeeKey(employee.nama) === employeeKey(query)),
-    [employees, query],
+    () => String(selectedNip || "").trim()
+      ? employees.find((employee) => String(employee.nip || "").trim() === String(selectedNip || "").trim())
+      : undefined,
+    [employees, selectedNip],
   );
 
   return (
@@ -56,6 +71,7 @@ export function EmployeeAutocomplete({
           onBlur={() => window.setTimeout(() => setOpen(false), 120)}
           onChange={(event) => {
             onChange(event.target.value);
+            onSelect?.(null);
             setOpen(true);
           }}
           placeholder={placeholder}
@@ -76,6 +92,7 @@ export function EmployeeAutocomplete({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 onChange(employee.nama);
+                onSelect?.(employee);
                 setOpen(false);
               }}
               className="w-full px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/30 border-b last:border-b-0 border-gray-100 dark:border-gray-800"

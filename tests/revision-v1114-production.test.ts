@@ -6,7 +6,7 @@ function assert(condition: boolean, message: string) {
 
 const read = (path: string) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const appShell = read("src/components/layout/AppShell.tsx");
-const firebase = read("src/lib/firebase.ts");
+const authSession = read("src/lib/authSession.ts");
 const service = read("src/services/spreadsheetService.ts");
 const app = read("src/App.tsx");
 const backend = read("apps-script/Code.gs");
@@ -26,16 +26,16 @@ assert(
   "role tidak boleh dipulihkan dari localStorage dan cache wajib dibersihkan pada siklus autentikasi",
 );
 assert(
-  firebase.includes("browserSessionPersistence") && !firebase.includes("browserLocalPersistence") &&
+  authSession.includes("window.sessionStorage") && !authSession.includes("window.localStorage") &&
     app.includes("if (loading) return <LoadingState />") && app.includes('if (!user) return <Navigate to="/login" replace />'),
   "sesi wajib session-only dan route terproteksi harus menunggu verifikasi backend",
 );
 assert(service.includes('sessionStorage.removeItem("sheet_last_updated")'), "logout harus membersihkan seluruh penanda cache");
 
 assert(
-  backend.includes("ENABLE_BOOTSTRAP_ADMIN") && backend.includes("ENABLE_BOOTSTRAP_ADMIN && BOOTSTRAP_ADMIN_EMAIL") &&
-    backend.includes("ensureManagerContinuity_"),
-  "bootstrap admin harus opt-in dan akun pengelola terakhir harus dilindungi",
+  backend.includes("AUTH_PASSWORD_PEPPER") && backend.includes("credentialPassword_") &&
+    backend.includes("ensureManagerContinuity_") && !backend.includes("ENABLE_BOOTSTRAP_ADMIN"),
+  "kredensial Supabase harus diturunkan di backend dan akun pengelola terakhir harus dilindungi",
 );
 assert(
   backend.includes("AI_GENERATIVE_ENABLED") && backend.includes("scriptProp_('AI_GENERATIVE_ENABLED', 'false')") &&

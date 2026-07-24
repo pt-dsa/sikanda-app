@@ -29,7 +29,7 @@ const equipment: any[] = [
   { asset_id: "E1", nama_aset: "Printer", merk: "Epson", jenis: "Elektronik", kondisi: "BAIK", tahun: 2024, pengguna: "Andi" },
   { asset_id: "E2", nama_aset: "Pompa", merk: "Honda", jenis: "Mesin", kondisi: "RUSAK BERAT", tahun: 2022, pengguna: "Budi" },
 ];
-assert(filterEquipmentReport(equipment, { search: "pompa", jenis: "Mesin", kondisi: "RUSAK BERAT", tahun: "2022", pengguna: "Budi" }).length === 1, "Filter laporan Alat & Mesin harus mengikuti seluruh filter aktif");
+assert(filterEquipmentReport(equipment, { search: "pompa", jenis: "Mesin", kondisi: "RUSAK BERAT", tahun: "2022", pengguna: "Budi" }).length === 1, "Filter laporan Inventaris harus mengikuti seluruh filter aktif");
 
 const dashboard = read("src/pages/Dashboard.tsx");
 const report = read("src/pages/Laporan.tsx");
@@ -40,10 +40,10 @@ const shell = read("src/components/layout/AppShell.tsx");
 const backend = read("apps-script/Code.gs");
 
 assert(dashboard.includes("Sinkronisasi Data") && dashboard.includes("Terlewat") && dashboard.includes("min-h-[310px]"), "Dashboard harus memiliki sinkronisasi, istilah Terlewat, dan komposisi SDM proporsional");
-for (const option of ["Data ASN / PPPK", "Buku Penjagaan", "Data Kendaraan", "Data Alat & Mesin", "Seluruh Data"]) assert(report.includes(option), `Pilihan cetak ${option} harus tersedia`);
+for (const option of ["Data ASN / PPPK", "Buku Penjagaan", "Data Kendaraan", "Data Inventaris", "Seluruh Data"]) assert(report.includes(option), `Pilihan cetak ${option} harus tersedia`);
 assert(report.includes("letterhead-inner") && report.includes("grid-template-columns:106px 700px") && report.includes("data-columns") && report.includes("table-layout:fixed"), "Kop dan tabel cetak harus memakai layout cetak proporsional");
 assert(vehicle.includes("EmployeeAutocomplete") && vehicle.includes("AssetMediaFields") && vehicle.includes("uploadAssetFoto"), "Kendaraan harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
-assert(machine.includes("EmployeeAutocomplete") && machine.includes("AssetMediaFields") && machine.includes("uploadAssetFoto"), "Alat & Mesin harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
+assert(machine.includes("EmployeeAutocomplete") && machine.includes("AssetMediaFields") && machine.includes("uploadAssetFoto"), "Inventaris harus memakai pegawai resmi, GPS, kamera/galeri, dan upload foto");
 assert(account.includes("Jabatan Pegawai") && account.includes("selectedEmployee?.jabatan"), "Tambah Akun harus menampilkan Jabatan Pegawai");
 assert(shell.includes("getNotificationFeed") && shell.includes("totalNotif") && shell.includes("Ulang Tahun Hari Ini–7 Hari"), "Lonceng harus memakai feed agenda dan ulang tahun yang ditampilkan");
 assert(shell.includes("/pegawai?profile=") && shell.includes("100dvh"), "Notifikasi harus membuka profil tepat dan tidak terpotong di mobile");

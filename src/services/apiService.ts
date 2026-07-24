@@ -18,12 +18,12 @@ export type { WhoamiResult, AccessUser } from "./accessService";
 export const apiService = {
   ping: () => callBackend({ action: "ping" }),
 
-  // Identitas / sesi — diverifikasi di Apps Script memakai Firebase idToken,
-  // lalu dicocokkan ke Supabase app_access.
-  whoami: async (idToken?: string) => {
+  // Identitas / sesi — access token Supabase diverifikasi oleh Apps Script,
+  // lalu dicocokkan dengan binding auth_user_id pada app_access.
+  whoami: async (accessToken?: string) => {
     return callBackend<{ ok: true; email: string; role: "admin" | "pimpinan" | "pegawai"; nip: string; photo_nip: string; nama: string; foto: string }>(
       { action: "whoami" },
-      idToken ? { idToken } : undefined
+      accessToken ? { accessToken } : undefined
     );
   },
 
@@ -69,14 +69,21 @@ export const apiService = {
   setPrimaryEquipmentAttachment: (assetId: string, attachmentId: string) =>
     callBackend<{ ok: true }>({ action: "equipment_attachment_primary", assetId, attachmentId }),
 
-  // Aset: koreksi nama pengguna (Tahap 6 — Data Cleansing fuzzy matching).
-  fixAssetHolder: async (table: string, assetId: string, newHolderName: string) => {
+  // Aset: tautkan pengguna ke identitas resmi pegawai (NIP adalah kunci utama).
+  linkAssetEmployee: async (table: string, assetId: string, employeeNip: string) => {
     if (table !== "assets_vehicle" && table !== "assets_equipment") {
       throw new Error("Jenis aset tidak dikenali.");
     }
-    return callBackend<{ ok: true; sheet: string; assetId: string; newHolderName: string }>({
-      action: "asset_fix_holder", table, assetId, newHolderName,
+    return callBackend<{ ok: true; table: string; assetId: string; employeeNip: string; employeeName: string }>({
+      action: "asset_link_employee", table, assetId, employeeNip,
     });
+  },
+
+  // Kontrak lama tetap tersedia untuk kompatibilitas, tetapi backend selalu
+  // menerjemahkan nama ke NIP sebelum menulis data.
+  fixAssetHolder: async (table: string, assetId: string, newHolderName: string) => {
+    if (table !== "assets_vehicle" && table !== "assets_equipment") throw new Error("Jenis aset tidak dikenali.");
+    return callBackend<{ ok: true }>({ action: "asset_fix_holder", table, assetId, newHolderName });
   },
 
   getConfig: async (): Promise<{ ok: true; config: Record<string, any> }> =>
@@ -118,6 +125,9 @@ export const apiService = {
 
   userDelete: async (email: string) =>
     callBackend<{ ok: true; email: string }>({ action: "user_delete", email }),
+
+  userResetRegistration: async (email: string) =>
+    callBackend<{ ok: true; email: string }>({ action: "user_reset_registration", email }),
 
   userSeedFromPegawai: async () =>
     callBackend<{ ok: true; added: number; skipped_missing_email?: number; note?: string }>({ action: "user_seed_from_pegawai" }),

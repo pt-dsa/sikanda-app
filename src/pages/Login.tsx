@@ -1,90 +1,180 @@
-import React, { useState, useContext } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { LogIn, ShieldAlert } from "lucide-react";
-import { AuthContext } from "../components/layout/AppShell";
+import { Eye, EyeOff, IdCard, KeyRound, Mail, ShieldAlert, UserPlus } from "lucide-react";
+import { AuthContext } from "@/components/layout/AppShell";
+import { LogoSliderCaptcha } from "@/components/auth/LogoSliderCaptcha";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { LoadingState } from "@/components/ui/LoadingState";
+import type { CaptchaProof } from "@/services/authService";
 import bgUrl from "@/assets/images_landingpage.webp";
 
-export default function Login() {
-  const [error, setError] = useState("");
-  const { user, loading, loginWithGoogle, loginDev } = useContext(AuthContext);
+type Mode = "login" | "register";
 
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
+function getClientKey(): string {
+  const key = "sikanda_auth_client_key";
+  try {
+    const current = sessionStorage.getItem(key);
+    if (current) return current;
+    const next = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    sessionStorage.setItem(key, next);
+    return next;
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+const inputClass = "w-full rounded-xl border border-white/70 dark:border-gray-700 bg-white/70 dark:bg-gray-900/70 py-3 pl-11 pr-4 text-sm font-semibold text-gray-900 dark:text-white outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25";
+
+export default function Login() {
+  const { user, loading, loginWithPassword, registerAccount } = useContext(AuthContext);
+  const clientKey = useMemo(getClientKey, []);
+  const [mode, setMode] = useState<Mode>("login");
+  const [nip, setNip] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [captcha, setCaptcha] = useState<CaptchaProof | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  if (user) return <Navigate to="/dashboard" replace />;
+
+  function changeMode(next: Mode) {
+    setMode(next);
+    setPassword("");
+    setConfirmation("");
+    setCaptcha(null);
+    setCaptchaReset((value) => value + 1);
+    setError("");
+    setNotice("");
   }
 
-  const handleGoogle = async () => {
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError("");
-    try {
-      await loginWithGoogle();
-    } catch (e: any) {
-      setError(e?.message || "Gagal masuk. Pastikan akun Anda sudah didaftarkan admin.");
+    setNotice("");
+    const cleanNip = nip.replace(/\D/g, "");
+    if (!/^\d{18}$/.test(cleanNip)) {
+      setError("NIP wajib terdiri dari 18 digit angka.");
+      return;
     }
-  };
+    if (mode === "register" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Masukkan email yang telah didaftarkan Administrator/Pimpinan.");
+      return;
+    }
+    if (password.length < 10 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      setError("Password minimal 10 karakter dan harus memuat huruf serta angka.");
+      return;
+    }
+    if (mode === "register" && password !== confirmation) {
+      setError("Konfirmasi password tidak sama.");
+      return;
+    }
+    if (!captcha) {
+      setError("Selesaikan puzzle Logo SIKANDA terlebih dahulu.");
+      return;
+    }
 
-  // Public-safe: mode developer dinonaktifkan agar seluruh akses memakai Firebase idToken.
-  const isDev = false;
+    try {
+      if (mode === "login") {
+        await loginWithPassword({ nip: cleanNip, password, captcha, clientKey });
+      } else {
+        const result = await registerAccount({ nip: cleanNip, email: email.trim().toLowerCase(), password, captcha, clientKey });
+        if (result.requiresLogin) {
+          setMode("login");
+          setPassword("");
+          setConfirmation("");
+          setNotice(result.message || "Registrasi berhasil. Silakan masuk menggunakan NIP dan password Anda.");
+        }
+      }
+    } catch (caught: any) {
+      setError(caught?.message || "Permintaan autentikasi gagal. Silakan coba kembali.");
+    } finally {
+      setCaptcha(null);
+      setCaptchaReset((value) => value + 1);
+    }
+  }
 
   return (
-    <main
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-cover bg-center bg-no-repeat bg-gray-900"
-      style={{ backgroundImage: `url(${bgUrl})` }}
-    >
-      <div className="absolute inset-0 bg-black/10 dark:bg-black/40 backdrop-blur-[2px]"></div>
-
-      <div className="w-full max-w-lg bg-white/40 dark:bg-gray-900/40 backdrop-blur-xl shadow-2xl border border-white/50 dark:border-gray-700/50 p-6 sm:p-10 rounded-[32px] relative z-10 transition-all duration-300 mx-4 mt-8 sm:-mt-16">
-        <div className="flex flex-col items-center text-center w-[450px] h-[198.734px] mb-[31px] ml-0 max-w-full">
-          <BrandLogo className="w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] mb-5" />
-          <h1 className="text-2xl sm:text-[27px] font-bold text-gray-900 dark:text-gray-100 tracking-tight">Selamat Datang di SIKANDA</h1>
-          <p className="text-gray-700 dark:text-gray-300 text-[15px] w-[800px] max-w-full font-bold leading-[22.375px] font-[system-ui] mt-[6px] -ml-[6px] px-0">Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah</p>
-        </div>
-
-        {loading ? (
-          <LoadingState compact label="Memverifikasi akun Anda" />
-        ) : (
-          <div className="space-y-5 flex flex-col items-center w-full max-w-[400px] mx-auto">
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm text-center border border-red-100 dark:border-red-800/50 w-full flex items-start gap-2">
-                <ShieldAlert size={16} className="shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleGoogle}
-              className="w-full sm:w-[319px] mt-2 text-base bg-white hover:bg-gray-50 text-gray-800 font-bold py-3.5 rounded-full transition-all shadow-[6px_6px_12px_rgba(11,87,208,0.15),-6px_-6px_12px_rgba(255,255,255,0.8)] dark:shadow-[6px_6px_12px_rgba(0,0,0,0.6),-6px_-6px_12px_rgba(255,255,255,0.05)] active:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.15)] flex justify-center items-center gap-3 border border-gray-200"
-            >
-              <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
-                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.5 29.6 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.3-.3-3.5z" />
-                <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.5 29.6 4.5 24 4.5 16.3 4.5 9.7 8.9 6.3 14.7z" />
-                <path fill="#4CAF50" d="M24 43.5c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 34.6 26.7 35.5 24 35.5c-5.3 0-9.7-3.1-11.3-7.6l-6.6 5.1C9.5 39 16.2 43.5 24 43.5z" />
-                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C40.9 36.5 43.5 30.8 43.5 24c0-1.2-.1-2.3-.3-3.5z" />
-              </svg>
-              Masuk dengan Google
-            </button>
-
-            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center max-w-[330px]">
-              Pilih email yang digunakan untuk login SIKANDA.
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-300 text-center max-w-[330px] -mt-2">
-              Hanya akun terdaftar yang dapat masuk. Aktivitas akses dicatat untuk keamanan dan data diproses khusus untuk layanan kepegawaian serta aset SIKANDA.
-            </p>
-
-            {isDev && (
-              <button
-                type="button"
-                onClick={loginDev}
-                className="w-full sm:w-[319px] text-sm bg-amber-100/70 hover:bg-amber-200/70 text-amber-800 font-bold py-2.5 rounded-full transition-all flex justify-center items-center gap-2 border border-amber-300"
-                title="Hanya tampil saat pengembangan (vite dev). Otomatis hilang di build produksi."
-              >
-                <LogIn size={16} />
-                Masuk sebagai Admin (Mode Pengembangan)
-              </button>
-            )}
+    <main className="min-h-screen bg-cover bg-center bg-no-repeat bg-gray-950 px-4 py-8" style={{ backgroundImage: `url(${bgUrl})` }}>
+      <div className="fixed inset-0 bg-slate-950/25 backdrop-blur-[2px]" />
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-xl items-center justify-center">
+        <section className="w-full rounded-[32px] border border-white/55 bg-white/45 p-5 shadow-2xl backdrop-blur-2xl dark:bg-gray-950/55 sm:p-8">
+          <div className="mb-5 flex flex-col items-center text-center">
+            <BrandLogo className="mb-3 h-20 w-20 sm:h-24 sm:w-24" />
+            <h1 className="text-2xl font-extrabold tracking-tight text-gray-950 dark:text-white">Selamat Datang di SIKANDA</h1>
+            <p className="mt-1 text-sm font-bold text-gray-700 dark:text-gray-300">Sistem Informasi Kepegawaian dan Pengelolaan Aset Daerah</p>
           </div>
-        )}
+
+          <div className="mb-5 grid grid-cols-2 rounded-2xl bg-white/50 p-1 dark:bg-gray-900/50">
+            <button type="button" onClick={() => changeMode("login")} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === "login" ? "bg-blue-600 text-white shadow" : "text-gray-600 dark:text-gray-300"}`}>Masuk</button>
+            <button type="button" onClick={() => changeMode("register")} className={`rounded-xl px-3 py-2.5 text-sm font-bold transition ${mode === "register" ? "bg-blue-600 text-white shadow" : "text-gray-600 dark:text-gray-300"}`}>Registrasi</button>
+          </div>
+
+          {loading ? <LoadingState compact label={mode === "login" ? "Memverifikasi akun" : "Mendaftarkan akun"} /> : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-3 text-sm font-semibold text-emerald-700">{notice}</div>}
+              {error && (
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50/90 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/70 dark:text-red-300">
+                  <ShieldAlert size={17} className="mt-0.5 shrink-0" /><span>{error}</span>
+                </div>
+              )}
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">NIP</span>
+                <span className="relative block">
+                  <IdCard className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+                  <input value={nip} onChange={(event) => setNip(event.target.value.replace(/\D/g, "").slice(0, 18))} inputMode="numeric" autoComplete="username" placeholder="18 digit NIP" className={inputClass} />
+                </span>
+              </label>
+
+              {mode === "register" && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">Email yang Didaftarkan Administrator/Pimpinan</span>
+                  <span className="relative block">
+                    <Mail className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+                    <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="nama@instansi.go.id" className={inputClass} />
+                  </span>
+                </label>
+              )}
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">Password</span>
+                <span className="relative block">
+                  <KeyRound className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+                  <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value.slice(0, 72))} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder="Minimal 10 karakter" className={`${inputClass} pr-12`} />
+                  <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-3 rounded-lg p-1 text-gray-500" aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </span>
+              </label>
+
+              {mode === "register" && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-bold text-gray-700 dark:text-gray-300">Konfirmasi Password</span>
+                  <span className="relative block">
+                    <KeyRound className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+                    <input type={showPassword ? "text" : "password"} value={confirmation} onChange={(event) => setConfirmation(event.target.value.slice(0, 72))} autoComplete="new-password" placeholder="Ulangi password" className={inputClass} />
+                  </span>
+                </label>
+              )}
+
+              <LogoSliderCaptcha purpose={mode} clientKey={clientKey} resetKey={captchaReset} onChange={setCaptcha} />
+
+              <button type="submit" disabled={!captcha} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-700 to-emerald-600 px-5 py-3 font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55">
+                {mode === "login" ? <><KeyRound size={18} /> Masuk ke SIKANDA</> : <><UserPlus size={18} /> Daftarkan Akun</>}
+              </button>
+              <p className="text-center text-xs font-medium text-gray-600 dark:text-gray-300">
+                {mode === "login" ? "Gunakan NIP dan password yang dibuat saat registrasi." : "NIP, email, dan peran harus sudah ditetapkan Administrator/Pimpinan."}
+              </p>
+              {mode === "login" && (
+                <p className="text-center text-[11px] text-gray-500 dark:text-gray-400">
+                  Lupa password? Hubungi Administrator/Pimpinan untuk menjalankan Reset Registrasi.
+                </p>
+              )}
+            </form>
+          )}
+        </section>
       </div>
     </main>
   );
