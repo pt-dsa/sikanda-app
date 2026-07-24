@@ -1,0 +1,9 @@
+@echo off
+title Sikanda Localhost Server
+cd /d "E:\sikanda"
+echo Preparing Sikanda... Installing updates (if any)...
+call npm install
+echo Building Sikanda...
+call npm run build
+echo Starting Sikanda Localhost on http://localhost:3000...
+cmd /c npm run serve

@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import {
   Info, UserCircle, AlertTriangle, Package, GraduationCap,
   CheckCircle2, CircleDot, Car, Wrench, Archive, ChevronDown, Edit2, Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { formatDate } from "@/lib/utils";
+import { formatDate, maskSensitiveData } from "@/lib/utils";
 import type { Pegawai } from "@/types";
+import { AuthContext } from "@/components/layout/AppShell";
 import { employmentAgendaPolicy, employmentStatusLabel } from "@/lib/employmentStatus";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { assetConditionLabel } from "@/lib/assetCondition";
@@ -199,6 +200,7 @@ export function PegawaiDetailModal({
   onDelete?: () => void;
   onVerifyMatch?: () => void;
 }) {
+  const { user } = useContext(AuthContext);
   const [openSection, setOpenSection] = useState<string>("biodata");
   const totalAssets = pegawai.assets?.length || 0;
   const agendaPolicy = employmentAgendaPolicy(pegawai);
@@ -270,7 +272,7 @@ export function PegawaiDetailModal({
               <div className="flex items-center gap-1 mt-3 justify-center">
                 <h3 className="text-lg font-bold leading-tight">{pegawai.nama}</h3>
               </div>
-              <p className="text-xs font-mono text-gray-500 mt-0.5 break-all">{pegawai.nip}</p>
+              <p className="text-xs font-mono text-gray-500 mt-0.5 break-all">{maskSensitiveData("nip", pegawai.nip, user?.role, user?.nip, pegawai.nip)}</p>
 
               {pegawai.is_incomplete && (
                 <div className="mt-3 bg-amber-100/50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 p-2 rounded-lg flex items-start gap-2 text-left w-full border border-amber-200 dark:border-amber-800/50">
@@ -344,20 +346,20 @@ export function PegawaiDetailModal({
               {/* Biodata */}
               <Section id="biodata" title="Informasi Lengkap (Biodata/SK)" icon={UserCircle}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                  <InfoRow label="Nomor Induk Pegawai (NIP)" value={pegawai.nip} />
+                  <InfoRow label="Nomor Induk Pegawai (NIP)" value={maskSensitiveData("nip", pegawai.nip, user?.role, user?.nip, pegawai.nip)} />
                   <InfoRow label="Nama Lengkap" value={pegawai.nama} />
                   <InfoRow label="Status Kepegawaian" value={employmentStatusLabel(pegawai)} />
                   <InfoRow label="Golongan / Ruang" value={pegawai.golongan} />
                   <InfoRow label="Jabatan" value={pegawai.jabatan} />
                   <InfoRow label="Unit Kerja / Bidang" value={pegawai.unit_kerja} />
-                  <InfoRow label="Tanggal Lahir" value={pegawai.tgl_lahir} />
+                  <InfoRow label="Tanggal Lahir" value={maskSensitiveData("tanggal_lahir", pegawai.tgl_lahir, user?.role, user?.nip, pegawai.nip)} />
                   <InfoRow label="Usia" value={pegawai.usia} />
                   <InfoRow label="Masa Kerja" value={
                     pegawai.masa_kerja_tahun
                       ? `${pegawai.masa_kerja_tahun} tahun ${pegawai.masa_kerja_bulan} bulan`
                       : ""
                   } />
-                  <InfoRow label="Kontak" value={pegawai.kontak} />
+                  <InfoRow label="Kontak" value={maskSensitiveData("kontak", pegawai.kontak, user?.role, user?.nip, pegawai.nip)} />
                 </div>
               </Section>
 

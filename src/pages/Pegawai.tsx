@@ -18,7 +18,7 @@ import { LoadingState } from "@/components/ui/LoadingState";
 import { PegawaiFormModal } from "@/components/ui/PegawaiFormModal";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
-import { formatDate } from "@/lib/utils";
+import { formatDate, maskSensitiveData } from "@/lib/utils";
 import {
   buildUnifiedAssets, buildFuzzyNipSet, hitungKelengkapan, type KelengkapanResult,
 } from "@/lib/kelengkapan";
@@ -545,11 +545,8 @@ export default function PegawaiPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {filteredData.map((pegawai, index) => (
-                <motion.tr
+                <tr
                   key={pegawai.nip || index}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(index * 0.02, 0.4) }}
                   className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors ${
                     pegawai.is_incomplete ? "bg-amber-50/30 dark:bg-amber-900/10" : ""
                   }`}
@@ -575,7 +572,7 @@ export default function PegawaiPage() {
                     </div>
                   </td>
                   <td className="p-4 font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                    {pegawai.nip}
+                    {maskSensitiveData("nip", pegawai.nip, user?.role, user?.nip, pegawai.nip)}
                   </td>
                   <td className="p-4">
                     <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{pegawai.golongan}</span>
@@ -630,7 +627,7 @@ export default function PegawaiPage() {
                   <td className="p-4">
                     <KelengkapanBadge hasil={hitungKelengkapan(pegawai, fuzzyNipSet)} />
                   </td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -646,13 +643,9 @@ export default function PegawaiPage() {
       {/* Cards — Mobile */}
       <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
         {filteredData.map((pegawai, index) => (
-          <motion.div
+          <div
             key={pegawai.nip || index}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: Math.min(index * 0.04, 0.4) }}
-            whileHover={{ scale: 1.01 }}
-            className="cursor-pointer"
+            className="cursor-pointer transition-transform hover:scale-[1.01]"
             onClick={() => setSelectedPegawai(pegawai)}
           >
             <Card className="overflow-hidden hover:shadow-md transition-all">
@@ -674,7 +667,7 @@ export default function PegawaiPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] font-mono text-gray-500 mt-0.5">{pegawai.nip}</p>
+                    <p className="text-[10px] font-mono text-gray-500 mt-0.5">{maskSensitiveData("nip", pegawai.nip, user?.role, user?.nip, pegawai.nip)}</p>
                     <div className="flex gap-1 mt-1.5 flex-wrap">
                       <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded-full ${
                         pegawai.status === "ASN"
@@ -721,7 +714,7 @@ export default function PegawaiPage() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         ))}
         {filteredData.length === 0 && (
           <div className="col-span-full p-10 text-center text-gray-500">

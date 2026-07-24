@@ -221,3 +221,34 @@ export function normalizeData(data: any[]): any[] {
     return normalizedRow;
   });
 }
+
+// ---------------------------------------------------------------------------
+// DATA MASKING
+// ---------------------------------------------------------------------------
+export function maskSensitiveData(
+  type: "nip" | "tanggal_lahir" | "kontak", 
+  value: string | null | undefined, 
+  role?: string, 
+  currentUserNip?: string, 
+  profileNip?: string
+): string {
+  if (!value) return "";
+  const strValue = String(value);
+  // Jika bukan role pegawai, tidak perlu dimasker
+  if (role !== "pegawai") return strValue;
+  // Jika ini adalah profil milik user sendiri, jangan dimasker
+  if (currentUserNip && profileNip && String(currentUserNip).trim() === String(profileNip).trim()) {
+    return strValue;
+  }
+
+  switch (type) {
+    case "nip":
+      return strValue.substring(0, 4) + "x".repeat(Math.max(strValue.length - 4, 14));
+    case "tanggal_lahir":
+      return "XX - XX - XXXX";
+    case "kontak":
+      return strValue.substring(0, 4) + "X".repeat(Math.max(strValue.length - 4, 4));
+    default:
+      return strValue;
+  }
+}
