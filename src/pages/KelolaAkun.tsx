@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext, useMemo } from "react";
 import {
   UserCog, Plus, Save, X, RefreshCw, ShieldAlert, ShieldCheck, Download,
   CheckCircle2, Ban, Pencil, Mail, IdCard, Users as UsersIcon, RotateCcw,
+  Search, Filter
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { apiService, type AccessUser } from "@/services/apiService";
@@ -11,7 +12,7 @@ import { AuthContext } from "@/components/layout/AppShell";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ConfirmModal, CONFIRM_CLOSED, type ConfirmState } from "@/components/ui/ConfirmModal";
-import { employmentStatusLabel } from "@/lib/employmentStatus";
+import { employmentStatusLabel, matchesEmploymentStatus } from "@/lib/employmentStatus";
 import { useToast } from "@/components/ui/Toast";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -66,8 +67,46 @@ export default function KelolaAkun() {
   const [seeding, setSeeding] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [pegawaiStatusFilter, setPegawaiStatusFilter] = useState("all");
+
   // Ganti window.confirm — aman di dalam iframe
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_CLOSED);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const searchStr = searchQuery.toLowerCase();
+      const matchSearch = !searchQuery || (
+        (u.nama || "").toLowerCase().includes(searchStr) ||
+        (u.email || "").toLowerCase().includes(searchStr) ||
+        (u.nip || "").includes(searchQuery)
+      );
+      const matchRole = roleFilter === "all" || u.role === roleFilter;
+      
+      let matchStatus = true;
+      if (statusFilter !== "all") {
+        const statusLabel = accountStatus(u).label;
+        if (statusFilter === "aktif" && statusLabel !== "Aktif") matchStatus = false;
+        if (statusFilter === "siap_registrasi" && statusLabel !== "Siap Registrasi") matchStatus = false;
+        if (statusFilter === "nonaktif" && statusLabel !== "Dinonaktifkan") matchStatus = false;
+      }
+
+      let matchPegawaiStatus = true;
+      if (pegawaiStatusFilter !== "all") {
+        const p = pegawai.find((p) => p.nip === u.nip);
+        if (!p) {
+          matchPegawaiStatus = false;
+        } else {
+          matchPegawaiStatus = matchesEmploymentStatus(p, pegawaiStatusFilter);
+        }
+      }
+
+      return matchSearch && matchRole && matchStatus && matchPegawaiStatus;
+    });
+  }, [users, pegawai, searchQuery, roleFilter, statusFilter, pegawaiStatusFilter]);
 
   function askConfirm(opts: Omit<ConfirmState, "open">) {
     setConfirm({ ...opts, open: true });
@@ -334,6 +373,57 @@ export default function KelolaAkun() {
         </div>
       </div>
 
+      {/* Filter Bar */}
+      <Card className="bg-white/50 dark:bg-gray-800/30">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                placeholder="Cari nama, email, atau NIP..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="text-gray-400 shrink-0 hidden sm:block" size={16} />
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="w-full sm:w-40 px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="all">Semua Peran</option>
+                <option value="pegawai">Pegawai</option>
+                <option value="admin">Administrator</option>
+                <option value="pimpinan">Pimpinan</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full sm:w-44 px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="all">Semua Status Akun</option>
+                <option value="siap_registrasi">Siap Registrasi</option>
+                <option value="aktif">Aktif</option>
+                <option value="nonaktif">Dinonaktifkan</option>
+              </select>
+              <select
+                value={pegawaiStatusFilter}
+                onChange={(e) => setPegawaiStatusFilter(e.target.value)}
+                className="w-full sm:w-44 px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="all">Semua Status Pegawai</option>
+                <option value="ASN">ASN</option>
+                <option value="PPPK_PENUH_WAKTU">PPPK (Penuh Waktu)</option>
+                <option value="PPPK_PARUH_WAKTU">PPPK (Paruh Waktu)</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {notice && (
         <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm flex items-start gap-2 border border-emerald-200 dark:border-emerald-800/50">
           <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
@@ -355,10 +445,15 @@ export default function KelolaAkun() {
               <UsersIcon className="mx-auto mb-3 text-gray-300" size={36} />
               Belum ada akun terdaftar. Tambahkan akun atau buat dari data pegawai.
             </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
+              <Search className="mx-auto mb-3 text-gray-300" size={36} />
+              Tidak ada akun yang cocok dengan filter pencarian Anda.
+            </div>
           ) : (
             <>
               <div className="grid grid-cols-1 gap-3 p-3 md:hidden">
-                {users.map((u) => (
+                {filteredUsers.map((u) => (
                   <article key={u.email} className="rounded-2xl border border-gray-200/80 dark:border-gray-700 bg-white/50 dark:bg-gray-800/40 p-4 shadow-sm min-w-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -393,10 +488,10 @@ export default function KelolaAkun() {
                   </article>
                 ))}
               </div>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
+              <div className="hidden md:block overflow-auto max-h-[65vh] rounded-b-xl">
+                <table className="w-full text-sm text-left border-collapse relative">
+                  <thead className="sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm">
+                    <tr className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
                       <th className="px-4 py-3 font-bold">Email</th>
                       <th className="px-4 py-3 font-bold">Peran</th>
                       <th className="px-4 py-3 font-bold">Nama</th>
@@ -406,7 +501,7 @@ export default function KelolaAkun() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((u) => (
+                    {filteredUsers.map((u) => (
                       <tr key={u.email} className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                           {u.email || <span className="text-amber-500 dark:text-amber-400 italic text-xs font-normal">(email belum diisi — klik Edit)</span>}
