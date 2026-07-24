@@ -1091,6 +1091,24 @@ function filterQuery_(table, filters) {
   return out;
 }
 
+function maskSensitiveDataServer_(rows, currentUserNip) {
+  if (!rows || !Array.isArray(rows)) return rows;
+  return rows.map(function(row) {
+    if (row.nip && String(row.nip) === String(currentUserNip)) return row;
+    var maskedRow = Object.assign({}, row);
+    if (maskedRow.nip && typeof maskedRow.nip === 'string') {
+      maskedRow.nip = maskedRow.nip.substring(0, 4) + 'xxxx' + '*'.repeat(Math.max(0, maskedRow.nip.length - 8));
+    }
+    if (maskedRow.kontak && typeof maskedRow.kontak === 'string') {
+      maskedRow.kontak = maskedRow.kontak.substring(0, 3) + 'xxx-xxxx-' + maskedRow.kontak.slice(-3);
+    }
+    if (maskedRow.tgl_lahir) {
+      maskedRow.tgl_lahir = 'XXXX-XX-XX';
+    }
+    return maskedRow;
+  });
+}
+
 function selectForActor_(actor, table, filters, options) {
   table = String(table || '').trim();
   if (DEFERRED_V2_TABLES.indexOf(table) !== -1) return [];
@@ -1105,6 +1123,10 @@ function selectForActor_(actor, table, filters, options) {
     // pembuatan signed URL pada jalur tersebut memangkas waktu respons tanpa
     // mengubah otorisasi atau isi data.
     if (!(options && options.skipPhotoUrls)) hydrateEmployeePhotoUrls_(rows);
+    // Masking data for pegawai role to prevent data leakage in Network Tab
+    if (actor && actor.role === 'pegawai') {
+      rows = maskSensitiveDataServer_(rows, actor.nip);
+    }
   }
   if ((table === 'assets_vehicle' || table === 'assets_equipment') && !(options && options.skipPhotoUrls)) {
     hydrateAssetPhotoUrls_(rows);
